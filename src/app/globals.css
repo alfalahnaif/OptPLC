@@ -1,0 +1,98 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  --background: 220 20% 98%;
+  --foreground: 222 35% 9%;
+  --card: 0 0% 100%;
+  --card-foreground: 222 35% 9%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 222 35% 9%;
+  --primary: 222 68% 52%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 220 16% 95%;
+  --secondary-foreground: 222 35% 14%;
+  --muted: 220 16% 95%;
+  --muted-foreground: 220 9% 44%;
+  --accent: 193 76% 42%;
+  --accent-foreground: 0 0% 100%;
+  --destructive: 0 72% 46%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 220 14% 89%;
+  --input: 220 14% 88%;
+  --ring: 222 68% 52%;
+  --success: 139 54% 32%;
+  --warning: 38 84% 39%;
+  --info: 199 86% 39%;
+}
+
+.dark {
+  --background: 222 32% 8%;
+  --foreground: 220 20% 94%;
+  --card: 222 28% 11%;
+  --card-foreground: 220 20% 94%;
+  --popover: 222 28% 11%;
+  --popover-foreground: 220 20% 94%;
+  --primary: 216 92% 66%;
+  --primary-foreground: 222 35% 8%;
+  --secondary: 222 22% 16%;
+  --secondary-foreground: 220 18% 92%;
+  --muted: 222 22% 16%;
+  --muted-foreground: 220 12% 67%;
+  --accent: 187 86% 48%;
+  --accent-foreground: 222 35% 8%;
+  --destructive: 0 78% 62%;
+  --destructive-foreground: 222 35% 8%;
+  --border: 222 18% 22%;
+  --input: 222 18% 24%;
+  --ring: 216 92% 66%;
+  --success: 142 71% 45%;
+  --warning: 38 92% 50%;
+  --info: 199 89% 58%;
+}
+
+* {
+  border-color: hsl(var(--border));
+}
+
+body {
+  min-height: 100vh;
+  background:
+    linear-gradient(180deg, hsl(var(--background)), hsl(220 18% 97%)),
+    hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-feature-settings: "cv11", "ss01";
+}
+
+.dark body {
+  background: hsl(var(--background));
+}
+
+::selection {
+  background: hsl(var(--primary) / 0.2);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: hsl(var(--border));
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background-clip: padding-box;
+}
+
+.code-editor .monaco-editor,
+.code-editor .monaco-editor-background,
+.code-editor .margin {
+  background-color: hsl(var(--card)) !important;
+}
