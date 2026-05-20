@@ -29,9 +29,3 @@ Dockerfile text eol=lf
 *.pdf binary
 *.zip binary
 *.db binary
-
-# Local database files
-*.db
-*.sqlite
-*.sqlite3
-backend/*.db

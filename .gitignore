@@ -1,12 +1,26 @@
-node_modules
-.next
-out
-dist
-.env*
-!.env.example
-*.log
-.DS_Store
+# Local runtime databases
+backend/plcforge.db
+*.db
+*.sqlite
+*.sqlite3
+
+# Python
 __pycache__/
+*.py[cod]
 .pytest_cache/
 .venv/
 backend/.venv/
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+dist/
+
+# Environment files
+.env
+.env.local
+backend/.env
+
+# Logs
+*.log
