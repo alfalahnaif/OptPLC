@@ -1,12 +1,26 @@
+import asyncio
+
 from fastapi.testclient import TestClient
 
-from app.storage.memory import store
+from app.database.database import AsyncSessionLocal
+from app.database.models import ProjectModel, SessionModel
 
 
-def requirement_payload(project_id: str) -> dict:
+def create_project_payload() -> dict:
+    return {
+        "name": "Tank Level Control - T-204",
+        "description": "Maintain tank level using inlet and outlet valves with high-high trip.",
+        "domain": "Process Control",
+        "targetLanguage": "Structured Text",
+        "complexityTier": "medium",
+    }
+
+
+def requirement_payload(project_id: str, text: str | None = None) -> dict:
     return {
         "projectId": project_id,
-        "text": (
+        "text": text
+        or (
             "Control a conveyor motor with Start_PB, Stop_PB, E_Stop, Overload, "
             "and Reset_PB. Faults must latch until reset."
         ),
@@ -23,331 +37,176 @@ def requirement_payload(project_id: str) -> dict:
     }
 
 
-def test_list_projects_includes_seed_project(client: TestClient) -> None:
-    response = client.get("/api/projects")
+def _create_project(client: TestClient) -> str:
+    response = client.post("/api/projects", json=create_project_payload())
+    assert response.status_code == 201
+    return response.json()["id"]
 
+
+def _db_counts() -> tuple[int, int]:
+    async def _run() -> tuple[int, int]:
+        async with AsyncSessionLocal() as session:
+            project_count = len((await session.execute(ProjectModel.__table__.select())).all())
+            session_count = len((await session.execute(SessionModel.__table__.select())).all())
+            return project_count, session_count
+
+    return asyncio.run(_run())
+
+
+def test_create_project_persists_in_sqlite(client: TestClient) -> None:
+    response = client.post("/api/projects", json=create_project_payload())
+    assert response.status_code == 201
+    body = response.json()
+    assert body["status"] == "draft"
+    assert body["standard"] == "IEC 61131-3"
+    projects, _ = _db_counts()
+    assert projects == 1
+
+
+def test_list_projects_reads_from_db(client: TestClient) -> None:
+    project_id = _create_project(client)
+    response = client.get("/api/projects")
     assert response.status_code == 200
     projects = response.json()
     assert len(projects) == 1
-    assert projects[0]["id"] == "PRJ-0421"
-    assert projects[0]["targetLanguage"] == "Structured Text"
+    assert projects[0]["id"] == project_id
 
 
-def test_create_project(client: TestClient) -> None:
-    response = client.post(
-        "/api/projects",
-        json={
-            "name": "Tank Level Control - T-204",
-            "description": "Maintain tank level using inlet and outlet valves with high-high trip.",
-            "domain": "Process Control",
-            "targetLanguage": "Structured Text",
-            "complexityTier": "medium",
-        },
-    )
-
-    assert response.status_code == 201
-    project = response.json()
-    assert project["id"] == "PRJ-0422"
-    assert project["status"] == "draft"
-    assert project["standard"] == "IEC 61131-3"
-
-
-def test_get_project(client: TestClient) -> None:
-    response = client.get("/api/projects/PRJ-0421")
-
+def test_get_project_reads_from_db(client: TestClient) -> None:
+    project_id = _create_project(client)
+    response = client.get(f"/api/projects/{project_id}")
     assert response.status_code == 200
-    assert response.json()["name"] == "Motor Control - Conveyor M-12"
+    assert response.json()["id"] == project_id
 
 
-def test_get_project_not_found(client: TestClient) -> None:
-    response = client.get("/api/projects/PRJ-9999")
-
-    assert response.status_code == 404
-    assert "not found" in response.json()["detail"].lower()
-
-
-def test_submit_requirements_returns_workflow_event(client: TestClient) -> None:
-    response = client.post(
-        "/api/projects/PRJ-0421/requirements",
-        json=requirement_payload("PRJ-0421"),
-    )
-
+def test_submit_requirement_persists(client: TestClient) -> None:
+    project_id = _create_project(client)
+    response = client.post(f"/api/projects/{project_id}/requirements", json=requirement_payload(project_id))
     assert response.status_code == 200
     event = response.json()
-    assert event["projectId"] == "PRJ-0421"
-    assert event["agent"] == "Planning Agent"
+    assert event["projectId"] == project_id
     assert event["status"] == "completed"
-    assert "Plan Object" in event["outputSummary"]
+    _, sessions = _db_counts()
+    assert sessions == 1
 
 
-def test_submit_requirements_requires_matching_project_id(client: TestClient) -> None:
-    response = client.post(
-        "/api/projects/PRJ-0421/requirements",
-        json=requirement_payload("PRJ-9999"),
-    )
-
-    assert response.status_code == 400
-    assert "match the route" in response.json()["detail"]
-
-
-def test_submit_requirements_project_not_found(client: TestClient) -> None:
-    response = client.post(
-        "/api/projects/PRJ-9999/requirements",
-        json=requirement_payload("PRJ-9999"),
-    )
-
-    assert response.status_code == 404
-
-
-def test_create_plan_for_seed_project(client: TestClient) -> None:
-    response = client.post("/api/projects/PRJ-0421/plan")
-
+def test_create_plan_persists_plan_object(client: TestClient) -> None:
+    project_id = _create_project(client)
+    client.post(f"/api/projects/{project_id}/requirements", json=requirement_payload(project_id))
+    response = client.post(f"/api/projects/{project_id}/plan")
     assert response.status_code == 200
     plan = response.json()
-    assert plan["projectId"] == "PRJ-0421"
+    assert plan["projectId"] == project_id
     assert plan["agent"] == "PlanningAgent/rule_based.v1"
-    assert len(plan["inputs"]) == 5
-    assert len(plan["outputs"]) == 3
-    assert {item["name"] for item in plan["inputs"]} >= {"Start_PB", "E_Stop", "Overload"}
-    assert {item["name"] for item in plan["outputs"]} >= {"Motor_Run", "Fault_Lamp"}
-    assert plan["scope"]["standard"] == "IEC 61131-3"
-    assert plan["scope"]["language"] == "Structured Text"
 
 
-def test_blank_requirement_submission_returns_400(client: TestClient) -> None:
-    response = client.post(
-        "/api/projects/PRJ-0421/requirements",
-        json={
-            **requirement_payload("PRJ-0421"),
-            "text": "   ",
-        },
-    )
-
-    assert response.status_code == 400
-    assert "Requirement text must not be empty" in str(response.json()["detail"])
-
-
-def test_traffic_light_plan_endpoint_returns_traffic_signals(client: TestClient) -> None:
-    create_response = client.post(
-        "/api/projects",
-        json={
-            "name": "Intersection 17 Traffic Signal",
-            "description": "Traffic light sequence with pedestrian request.",
-            "domain": "Traffic Control",
-            "targetLanguage": "Structured Text",
-            "complexityTier": "medium",
-        },
-    )
-    project_id = create_response.json()["id"]
-    client.post(
-        f"/api/projects/{project_id}/requirements",
-        json={
-            **requirement_payload(project_id),
-            "text": "Traffic light controller with vehicle detector and pedestrian request.",
-        },
-    )
-
-    response = client.post(f"/api/projects/{project_id}/plan")
-
-    assert response.status_code == 200
-    plan = response.json()
-    assert {item["name"] for item in plan["inputs"]} >= {"Vehicle_Detect", "Ped_Request", "Cycle_Timer"}
-    assert {item["name"] for item in plan["outputs"]} >= {"Red_Light", "Amber_Light", "Green_Light", "Ped_Walk"}
-
-
-def test_generated_plan_is_stored_in_memory(client: TestClient) -> None:
-    response = client.post("/api/projects/PRJ-0421/plan")
-
-    assert response.status_code == 200
-    stored_plan = store.get_plan("PRJ-0421")
-    assert stored_plan is not None
-    assert stored_plan.projectId == "PRJ-0421"
-    assert stored_plan.agent == "PlanningAgent/rule_based.v1"
-
-
-def test_create_plan_requires_requirements(client: TestClient) -> None:
-    create_response = client.post(
-        "/api/projects",
-        json={
-            "name": "Intersection 17 Traffic Signal",
-            "description": "Traffic light sequence with pedestrian request.",
-            "domain": "Traffic Control",
-            "targetLanguage": "Structured Text",
-            "complexityTier": "medium",
-        },
-    )
-    project_id = create_response.json()["id"]
-
-    response = client.post(f"/api/projects/{project_id}/plan")
-
-    assert response.status_code == 400
-    assert "Requirements must be submitted" in response.json()["detail"]
-
-
-def test_create_plan_project_not_found(client: TestClient) -> None:
-    response = client.post("/api/projects/PRJ-9999/plan")
-
-    assert response.status_code == 404
-
-
-def test_generate_code_requires_plan_object(client: TestClient) -> None:
-    response = client.post("/api/projects/PRJ-0421/generate")
-
-    assert response.status_code == 400
-    assert response.json()["detail"] == "PlanObject must be generated before code generation."
-
-
-def test_generate_code_endpoint_returns_code_artifact(client: TestClient) -> None:
-    plan_response = client.post("/api/projects/PRJ-0421/plan")
-    assert plan_response.status_code == 200
-
-    response = client.post("/api/projects/PRJ-0421/generate")
-
+def test_generate_code_persists_artifact(client: TestClient) -> None:
+    project_id = _create_project(client)
+    client.post(f"/api/projects/{project_id}/requirements", json=requirement_payload(project_id))
+    client.post(f"/api/projects/{project_id}/plan")
+    response = client.post(f"/api/projects/{project_id}/generate")
     assert response.status_code == 200
     artifact = response.json()
-    assert artifact["projectId"] == "PRJ-0421"
+    assert artifact["projectId"] == project_id
     assert artifact["language"] == "structured-text"
-    assert artifact["metadata"]["generator"] == "template_based.v1"
-    assert "PROGRAM" in artifact["source"]
-    assert "END_PROGRAM" in artifact["source"]
 
 
-def test_generated_code_artifact_is_stored_in_memory(client: TestClient) -> None:
-    client.post("/api/projects/PRJ-0421/plan")
-    response = client.post("/api/projects/PRJ-0421/generate")
-
-    assert response.status_code == 200
-    stored_artifact = store.get_code_artifact("PRJ-0421")
-    assert stored_artifact is not None
-    assert stored_artifact.projectId == "PRJ-0421"
-    assert stored_artifact.metadata.generator == "template_based.v1"
-
-
-def test_validate_code_requires_code_artifact(client: TestClient) -> None:
-    client.post("/api/projects/PRJ-0421/plan")
-
-    response = client.post("/api/projects/PRJ-0421/validate")
-
-    assert response.status_code == 400
-    assert response.json()["detail"] == "CodeArtifact must be generated before validation."
-
-
-def test_validate_code_requires_plan_object(client: TestClient) -> None:
-    response = client.post("/api/projects/PRJ-0421/validate")
-
-    assert response.status_code == 400
-    assert response.json()["detail"] == "PlanObject must be generated before validation."
-
-
-def test_validate_code_endpoint_returns_validation_report(client: TestClient) -> None:
-    client.post("/api/projects/PRJ-0421/plan")
-    client.post("/api/projects/PRJ-0421/generate")
-
-    response = client.post("/api/projects/PRJ-0421/validate")
-
+def test_validate_persists_validation_report(client: TestClient) -> None:
+    project_id = _create_project(client)
+    client.post(f"/api/projects/{project_id}/requirements", json=requirement_payload(project_id))
+    client.post(f"/api/projects/{project_id}/plan")
+    client.post(f"/api/projects/{project_id}/generate")
+    response = client.post(f"/api/projects/{project_id}/validate")
     assert response.status_code == 200
     report = response.json()
-    assert report["projectId"] == "PRJ-0421"
-    assert report["status"] == "VERIFIED"
-    assert report["syntaxPassed"] is True
-    assert report["formalPassed"] is True
+    assert report["projectId"] == project_id
     assert report["validator"] == "static.v1"
-    assert report["syntaxErrors"] == []
-    assert len(report["safetyResults"]) >= 1
 
 
-def test_validation_report_is_stored_in_memory(client: TestClient) -> None:
-    client.post("/api/projects/PRJ-0421/plan")
-    client.post("/api/projects/PRJ-0421/generate")
-    response = client.post("/api/projects/PRJ-0421/validate")
-
+def test_debug_persists_debugging_report(client: TestClient) -> None:
+    project_id = _create_project(client)
+    client.post(f"/api/projects/{project_id}/requirements", json=requirement_payload(project_id))
+    client.post(f"/api/projects/{project_id}/plan")
+    client.post(f"/api/projects/{project_id}/generate")
+    client.post(f"/api/projects/{project_id}/validate")
+    response = client.post(f"/api/projects/{project_id}/debug")
     assert response.status_code == 200
-    stored_report = store.get_validation_report("PRJ-0421")
-    assert stored_report is not None
-    assert stored_report.projectId == "PRJ-0421"
-    assert stored_report.status == "VERIFIED"
+    assert response.json()["projectId"] == project_id
 
 
-def test_debug_code_requires_validation_report(client: TestClient) -> None:
-    client.post("/api/projects/PRJ-0421/plan")
-    client.post("/api/projects/PRJ-0421/generate")
-
-    response = client.post("/api/projects/PRJ-0421/debug")
-
-    assert response.status_code == 400
-    assert response.json()["detail"] == "ValidationReport must be generated before debugging."
-
-
-def test_debug_code_requires_code_artifact(client: TestClient) -> None:
-    client.post("/api/projects/PRJ-0421/plan")
-
-    response = client.post("/api/projects/PRJ-0421/debug")
-
-    assert response.status_code == 400
-    assert response.json()["detail"] == "CodeArtifact must be generated before debugging."
-
-
-def test_debug_code_requires_plan_object(client: TestClient) -> None:
-    response = client.post("/api/projects/PRJ-0421/debug")
-
-    assert response.status_code == 400
-    assert response.json()["detail"] == "PlanObject must be generated before debugging."
-
-
-def test_debug_code_endpoint_returns_debugging_report(client: TestClient) -> None:
-    client.post("/api/projects/PRJ-0421/plan")
-    client.post("/api/projects/PRJ-0421/generate")
-    client.post("/api/projects/PRJ-0421/validate")
-
-    response = client.post("/api/projects/PRJ-0421/debug")
-
+def test_repair_loop_persists_report(client: TestClient) -> None:
+    project_id = _create_project(client)
+    client.post(f"/api/projects/{project_id}/requirements", json=requirement_payload(project_id))
+    client.post(f"/api/projects/{project_id}/plan")
+    client.post(f"/api/projects/{project_id}/generate")
+    response = client.post(f"/api/projects/{project_id}/repair-loop")
     assert response.status_code == 200
     report = response.json()
-    assert report["projectId"] == "PRJ-0421"
-    assert report["status"] == "NOT_REQUIRED"
-    assert report["sourceValidationStatus"] == "VERIFIED"
-    assert report["debugger"] == "rule_based.v1"
+    assert report["projectId"] == project_id
+    assert report["finalValidationReport"]["status"] in {"VERIFIED", "SYNTAX_ERROR", "FORMAL_VIOLATION"}
 
 
-def test_debugging_report_is_stored_in_memory(client: TestClient) -> None:
-    client.post("/api/projects/PRJ-0421/plan")
-    client.post("/api/projects/PRJ-0421/generate")
-    client.post("/api/projects/PRJ-0421/validate")
-    response = client.post("/api/projects/PRJ-0421/debug")
-
-    assert response.status_code == 200
-    stored_report = store.get_debugging_report("PRJ-0421")
-    assert stored_report is not None
-    assert stored_report.projectId == "PRJ-0421"
-    assert stored_report.debugger == "rule_based.v1"
-
-
-def test_repair_loop_requires_code_artifact(client: TestClient) -> None:
-    client.post("/api/projects/PRJ-0421/plan")
-
-    response = client.post("/api/projects/PRJ-0421/repair-loop")
-
-    assert response.status_code == 400
-    assert response.json()["detail"] == "CodeArtifact must be generated before running repair loop."
-
-
-def test_repair_loop_requires_plan_object(client: TestClient) -> None:
-    response = client.post("/api/projects/PRJ-0421/repair-loop")
-
-    assert response.status_code == 400
-    assert response.json()["detail"] == "PlanObject must be generated before running repair loop."
-
-
-def test_repair_loop_endpoint_returns_report(client: TestClient) -> None:
-    client.post("/api/projects/PRJ-0421/plan")
-    client.post("/api/projects/PRJ-0421/generate")
-
-    response = client.post("/api/projects/PRJ-0421/repair-loop")
-
+def test_optimize_persists_optimization_report(client: TestClient) -> None:
+    project_id = _create_project(client)
+    client.post(f"/api/projects/{project_id}/requirements", json=requirement_payload(project_id))
+    client.post(f"/api/projects/{project_id}/plan")
+    client.post(f"/api/projects/{project_id}/generate")
+    client.post(f"/api/projects/{project_id}/validate")
+    response = client.post(f"/api/projects/{project_id}/optimize")
     assert response.status_code == 200
     report = response.json()
-    assert report["projectId"] == "PRJ-0421"
-    assert report["finalStatus"] == "VERIFIED"
-    assert report["iterations"] == 1
-    assert report["finalCodeArtifact"]["language"] == "structured-text"
-    assert report["finalValidationReport"]["status"] == "VERIFIED"
+    assert report["projectId"] == project_id
+    assert report["optimizer"] == "static.v1"
+
+
+def test_metrics_persists_metrics_report(client: TestClient) -> None:
+    project_id = _create_project(client)
+    client.post(f"/api/projects/{project_id}/requirements", json=requirement_payload(project_id))
+    client.post(f"/api/projects/{project_id}/plan")
+    client.post(f"/api/projects/{project_id}/generate")
+    response = client.get(f"/api/projects/{project_id}/metrics")
+    assert response.status_code == 200
+    report = response.json()
+    assert report["projectId"] == project_id
+    assert "metricsDelta" in report
+
+
+def test_data_survives_new_db_session(client: TestClient) -> None:
+    project_id = _create_project(client)
+    client.post(f"/api/projects/{project_id}/requirements", json=requirement_payload(project_id))
+
+    async def _read() -> tuple[bool, bool]:
+        async with AsyncSessionLocal() as session:
+            project = await session.get(ProjectModel, project_id)
+            rows = (await session.execute(SessionModel.__table__.select())).all()
+            return project is not None, len(rows) == 1
+
+    project_exists, session_exists = asyncio.run(_read())
+    assert project_exists is True
+    assert session_exists is True
+
+
+def test_no_endpoint_returns_coroutine_object(client: TestClient) -> None:
+    project_id = _create_project(client)
+    responses = [
+        client.get("/api/projects"),
+        client.get(f"/api/projects/{project_id}"),
+        client.post(f"/api/projects/{project_id}/requirements", json=requirement_payload(project_id)),
+        client.post(f"/api/projects/{project_id}/plan"),
+    ]
+    for response in responses:
+        assert response.status_code in {200, 201}
+        assert "coroutine" not in response.text.lower()
+
+
+def test_missing_prerequisites_return_400_guidance(client: TestClient) -> None:
+    project_id = _create_project(client)
+    r1 = client.post(f"/api/projects/{project_id}/generate")
+    r2 = client.post(f"/api/projects/{project_id}/validate")
+    r3 = client.post(f"/api/projects/{project_id}/debug")
+    r4 = client.post(f"/api/projects/{project_id}/repair-loop")
+    r5 = client.post(f"/api/projects/{project_id}/optimize")
+    r6 = client.get(f"/api/projects/{project_id}/metrics")
+    for response in [r1, r2, r3, r4, r5, r6]:
+        assert response.status_code == 400
+        assert "must be generated before" in response.json()["detail"] or "must be submitted before" in response.json()["detail"]

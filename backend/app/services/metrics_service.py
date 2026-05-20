@@ -1,22 +1,69 @@
 from __future__ import annotations
 
+import logging
 import re
 
 from app.schemas.contracts import StructuredTextMetrics, StructuredTextMetricsDelta
+from app.services.st_parser import STAstParser
+
+logger = logging.getLogger(__name__)
 
 
 class MetricsService:
     """Deterministic IEC Structured Text metrics used by optimization."""
 
+    _parser = STAstParser()
+    _block_comment_pattern = re.compile(r"\(\*.*?\*\)", re.DOTALL)
+    _line_comment_pattern = re.compile(r"//.*?$", re.MULTILINE)
+    _non_executable_pattern = re.compile(
+        r"^(PROGRAM|END_PROGRAM|FUNCTION_BLOCK|END_FUNCTION_BLOCK|VAR|VAR_INPUT|VAR_OUTPUT|VAR_IN_OUT|VAR_TEMP|VAR_GLOBAL|END_VAR)\b",
+        flags=re.IGNORECASE,
+    )
+    _declaration_pattern = re.compile(
+        r"^[A-Za-z_][A-Za-z0-9_]*\s*:\s*(BOOL|INT|DINT|REAL|LREAL|TIME|STRING|TON|TOF|TP)\s*;",
+        flags=re.IGNORECASE,
+    )
+    _if_elsif_pattern = re.compile(r"\b(IF|ELSIF)\b", re.IGNORECASE)
+    _comparison_pattern = re.compile(r"<=|>=|<>|(?<!:)=|<|>")
+    _boolean_pattern = re.compile(r"\b(AND|OR|NOT)\b", re.IGNORECASE)
+    _timer_pattern = re.compile(r"\b(TON|TOF|TP)\b", re.IGNORECASE)
+    _case_block_pattern = re.compile(r"\bCASE\b(?P<body>.*?)\bEND_CASE\b", re.IGNORECASE | re.DOTALL)
+    _case_branch_pattern = re.compile(
+        r"""(?imx)
+        ^\s*
+        (?!ELSE\b)
+        (?:
+            [A-Za-z_][A-Za-z0-9_]*
+            | TRUE
+            | FALSE
+            | [-+]?\d+(?:\.\d+)?
+            | '(?:[^']|'')*'
+            | "(?:[^"\\]|\\.)*"
+        )
+        (?:
+            \s*(?:,|\.\.)\s*
+            (?:
+                [A-Za-z_][A-Za-z0-9_]*
+                | TRUE
+                | FALSE
+                | [-+]?\d+(?:\.\d+)?
+                | '(?:[^']|'')*'
+                | "(?:[^"\\]|\\.)*"
+            )
+        )*
+        \s*:
+        """,
+    )
+
     @classmethod
     def calculate(cls, source: str) -> StructuredTextMetrics:
         uncommented = cls._strip_comments(source)
         executable_lines = cls._executable_lines(uncommented)
-        upper = uncommented.upper()
+        normalized = uncommented.upper()
 
         loc = len(executable_lines)
-        cyclomatic = cls._cyclomatic_complexity(upper)
-        scan_time = cls._estimated_scan_time_ms(upper)
+        cyclomatic = cls._cyclomatic_complexity(source)
+        scan_time = cls._estimated_scan_time_ms(normalized)
         maintainability = cls._maintainability_index(loc=loc, cyclomatic_complexity=cyclomatic)
 
         return StructuredTextMetrics(
@@ -41,59 +88,64 @@ class MetricsService:
 
     @staticmethod
     def _strip_comments(source: str) -> str:
-        without_block = re.sub(r"\(\*.*?\*\)", "", source, flags=re.DOTALL)
-        return re.sub(r"//.*", "", without_block)
+        without_block = MetricsService._block_comment_pattern.sub("", source)
+        return MetricsService._line_comment_pattern.sub("", without_block)
 
     @staticmethod
     def _executable_lines(source: str) -> list[str]:
-        non_executable = re.compile(
-            r"^(PROGRAM|END_PROGRAM|FUNCTION_BLOCK|END_FUNCTION_BLOCK|VAR|VAR_INPUT|VAR_OUTPUT|END_VAR)\b",
-            flags=re.IGNORECASE,
-        )
-        declaration = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*\s*:\s*(BOOL|INT|REAL|TIME|STRING)\s*;", flags=re.IGNORECASE)
-
         lines: list[str] = []
         for raw_line in source.splitlines():
             line = raw_line.strip()
             if not line:
                 continue
-            if non_executable.match(line):
+            if MetricsService._non_executable_pattern.match(line):
                 continue
-            if declaration.match(line):
+            if MetricsService._declaration_pattern.match(line):
                 continue
             lines.append(line)
         return lines
 
     @staticmethod
-    def _cyclomatic_complexity(upper_source: str) -> int:
-        tokens = ["IF", "ELSIF", "CASE", "FOR", "WHILE", "REPEAT"]
-        count = sum(len(re.findall(rf"\b{token}\b", upper_source)) for token in tokens)
-        return max(1, 1 + count)
+    def _cyclomatic_complexity(source: str) -> int:
+        decision_points, fallback_used = MetricsService._parser.count_decision_points_with_metadata(source)
+        if fallback_used:
+            logger.info("MetricsService parser fallback used for decision counting.")
+        return max(1, 1 + decision_points)
 
     @staticmethod
-    def _estimated_scan_time_ms(upper_source: str) -> float:
-        assignment_count = upper_source.count(":=")
-        boolean_count = sum(len(re.findall(rf"\b{token}\b", upper_source)) for token in ["AND", "OR", "NOT"])
-        comparison_count = len(re.findall(r"<=|>=|<>|(?<!:)=|<|>", upper_source))
-        branch_count = sum(len(re.findall(rf"\b{token}\b", upper_source)) for token in ["IF", "ELSIF", "CASE"])
-        loop_count = sum(len(re.findall(rf"\b{token}\b", upper_source)) for token in ["FOR", "WHILE", "REPEAT"])
-        timer_count = sum(len(re.findall(rf"\b{token}\b", upper_source)) for token in ["TON", "TOF", "TP"])
+    def _estimated_scan_time_ms(normalized_source: str) -> float:
+        assignment_count = normalized_source.count(":=")
+        if_elsif_count = len(MetricsService._if_elsif_pattern.findall(normalized_source))
+        case_branch_count = MetricsService._count_case_branches(normalized_source)
+        boolean_count = len(MetricsService._boolean_pattern.findall(normalized_source))
+        comparison_count = len(MetricsService._comparison_pattern.findall(normalized_source))
+        timer_count = len(MetricsService._timer_pattern.findall(normalized_source))
 
         estimate = (
             0.1
-            + assignment_count * 0.08
+            + assignment_count * 0.07
+            + if_elsif_count * 0.12
+            + case_branch_count * 0.1
             + boolean_count * 0.02
-            + comparison_count * 0.04
-            + branch_count * 0.1
-            + loop_count * 0.5
+            + comparison_count * 0.035
             + timer_count * 0.25
         )
         return round(estimate, 3)
 
     @staticmethod
     def _maintainability_index(*, loc: int, cyclomatic_complexity: int) -> int:
-        score = 100 - (loc * 1.4) - (cyclomatic_complexity * 4.5)
+        safe_loc = max(1, loc)
+        safe_cyclomatic = max(1, cyclomatic_complexity)
+        score = 100 - (safe_loc * 1.4) - (safe_cyclomatic * 4.5)
         return max(0, min(100, round(score)))
+
+    @staticmethod
+    def _count_case_branches(source: str) -> int:
+        total = 0
+        for case_match in MetricsService._case_block_pattern.finditer(source):
+            body = case_match.group("body")
+            total += len(MetricsService._case_branch_pattern.findall(body))
+        return total
 
     @staticmethod
     def _reduction_percent(before: float, after: float) -> float:

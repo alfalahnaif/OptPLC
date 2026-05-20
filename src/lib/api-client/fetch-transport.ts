@@ -121,6 +121,88 @@ export async function apiRequest<TResponse, TBody = unknown>(
   }
 }
 
+export async function apiBlobRequest<TBody = unknown>(
+  path: string,
+  options: ApiRequestOptions<TBody> = {}
+): Promise<Blob> {
+  const url = buildApiUrl(path);
+  const controller = new AbortController();
+  const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  let timedOut = false;
+
+  const timeoutId = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, timeoutMs);
+
+  const abortFromCaller = () => controller.abort();
+  if (options.signal) {
+    if (options.signal.aborted) {
+      clearTimeout(timeoutId);
+      throw new ApiError({
+        message: "Request was aborted before it started.",
+        code: "aborted",
+        url
+      });
+    }
+    options.signal.addEventListener("abort", abortFromCaller, { once: true });
+  }
+
+  try {
+    const response = await fetch(url, {
+      method: options.method ?? "GET",
+      headers: {
+        Accept: "*/*",
+        ...(options.body === undefined ? {} : { "Content-Type": "application/json" }),
+        ...options.headers
+      },
+      body: options.body === undefined ? undefined : JSON.stringify(options.body),
+      signal: controller.signal
+    });
+
+    if (!response.ok) {
+      const payload = await parseJson(response, url);
+      throw new ApiError({
+        message: apiErrorMessage(response, payload),
+        status: response.status,
+        code: "http_error",
+        detail: payload,
+        url
+      });
+    }
+
+    return response.blob();
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
+
+    if (timedOut) {
+      throw new ApiError({
+        message: `Request to ${url} timed out after ${timeoutMs} ms.`,
+        code: "timeout",
+        url
+      });
+    }
+
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new ApiError({
+        message: "Request was aborted.",
+        code: "aborted",
+        url
+      });
+    }
+
+    throw new ApiError({
+      message: `Backend unavailable at ${getApiBaseUrl()}. Start the FastAPI server or enable mock mode.`,
+      code: "network_error",
+      detail: error,
+      url
+    });
+  } finally {
+    clearTimeout(timeoutId);
+    options.signal?.removeEventListener("abort", abortFromCaller);
+  }
+}
+
 function buildApiUrl(path: string) {
   const normalizedPath = path.startsWith("/") ? path : `/${path}`;
   return `${getApiBaseUrl()}${normalizedPath}`;

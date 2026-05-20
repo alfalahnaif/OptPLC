@@ -1,0 +1,14 @@
+services:
+  plc-app:
+    build:
+      context: .
+      dockerfile: docker/app.Dockerfile
+    container_name: plcforge-app
+    ports:
+      - "8000:8000"
+    env_file:
+      - ./backend/.env
+    volumes:
+      - ./plcforge.db:/app/plcforge.db
+      - ./rag_db:/app/rag_db
+    restart: unless-stopped

@@ -1,64 +1,87 @@
 import pytest
 from fastapi.testclient import TestClient
+import asyncio
 
 from app.agents import CodeGenerationAgent, OptimizationAgent, PlanningAgent, ValidationAgent
+from app.database.database import AsyncSessionLocal
+from app.database.models import SessionModel
 from app.schemas.contracts import CodeArtifact, CodeMetadata, CodeMetrics
 from app.services.metrics_service import MetricsService
 from app.storage.memory import store
 
 
 def test_optimization_fails_with_400_if_no_code_artifact_exists(client: TestClient) -> None:
-    client.post("/api/projects/PRJ-0421/plan")
+    project_id = create_project(client)
+    submit_requirements(client, project_id)
+    client.post(f"/api/projects/{project_id}/plan")
 
-    response = client.post("/api/projects/PRJ-0421/optimize")
+    response = client.post(f"/api/projects/{project_id}/optimize")
 
     assert response.status_code == 400
     assert response.json()["detail"] == "CodeArtifact must be generated before optimization."
 
 
 def test_optimization_fails_with_400_if_no_plan_object_exists(client: TestClient) -> None:
-    store.save_code_artifact("PRJ-0421", minimal_artifact("PRJ-0421"))
+    project_id = create_project(client)
 
-    response = client.post("/api/projects/PRJ-0421/optimize")
+    response = client.post(f"/api/projects/{project_id}/optimize")
 
     assert response.status_code == 400
     assert response.json()["detail"] == "PlanObject must be generated before optimization."
 
 
 def test_optimization_fails_with_400_if_no_validation_report_exists(client: TestClient) -> None:
-    save_verified_motor_inputs(save_validation=False)
+    project_id = create_project(client)
+    submit_requirements(client, project_id)
+    client.post(f"/api/projects/{project_id}/plan")
+    client.post(f"/api/projects/{project_id}/generate")
 
-    response = client.post("/api/projects/PRJ-0421/optimize")
+    response = client.post(f"/api/projects/{project_id}/optimize")
 
     assert response.status_code == 400
     assert response.json()["detail"] == "ValidationReport must be generated before optimization."
 
 
 def test_optimization_fails_with_400_if_code_is_not_verified(client: TestClient) -> None:
-    plan, artifact = save_verified_motor_inputs(save_validation=False)
-    unsafe_artifact = artifact.model_copy(
-        update={
-            "source": artifact.source.replace("Motor_Run := Run_Cmd AND Safety_OK AND NOT Fault_State;", "Motor_Run := Run_Cmd;")
-        }
-    )
-    store.save_code_artifact("PRJ-0421", unsafe_artifact)
-    store.save_validation_report(
-        "PRJ-0421",
-        ValidationAgent().validate(project_id="PRJ-0421", artifact=unsafe_artifact, plan=plan),
-    )
+    project_id = create_project(client)
+    submit_requirements(client, project_id)
+    client.post(f"/api/projects/{project_id}/plan")
+    client.post(f"/api/projects/{project_id}/generate")
 
-    response = client.post("/api/projects/PRJ-0421/optimize")
+    async def _corrupt_artifact() -> None:
+        async with AsyncSessionLocal() as session:
+            result = await session.execute(SessionModel.__table__.select())
+            row = result.mappings().first()
+            assert row is not None
+            artifact = row["code_artifact"]
+            artifact["source"] = artifact["source"].replace("END_PROGRAM", "")
+            history = row["code_artifact_history"]
+            if history:
+                history[-1] = artifact
+            await session.execute(
+                SessionModel.__table__.update()
+                .where(SessionModel.id == row["id"])
+                .values(code_artifact=artifact, code_artifact_history=history)
+            )
+            await session.commit()
+
+    asyncio.run(_corrupt_artifact())
+    client.post(f"/api/projects/{project_id}/validate")
+
+    response = client.post(f"/api/projects/{project_id}/optimize")
 
     assert response.status_code == 400
     assert response.json()["detail"] == "Code must be verified before optimization. Run validation or repair loop first."
 
 
 def test_verified_motor_code_optimizes_and_remains_verified(client: TestClient) -> None:
-    client.post("/api/projects/PRJ-0421/plan")
-    client.post("/api/projects/PRJ-0421/generate")
-    client.post("/api/projects/PRJ-0421/validate")
+    project_id = create_project(client)
+    submit_requirements(client, project_id)
+    client.post(f"/api/projects/{project_id}/plan")
+    client.post(f"/api/projects/{project_id}/generate")
+    client.post(f"/api/projects/{project_id}/validate")
 
-    response = client.post("/api/projects/PRJ-0421/optimize")
+    response = client.post(f"/api/projects/{project_id}/optimize")
 
     assert response.status_code == 200
     report = response.json()
@@ -114,19 +137,24 @@ def test_rollback_occurs_if_optimization_pass_breaks_validation(monkeypatch: pyt
 
 
 def test_optimization_report_is_stored_in_memory(client: TestClient) -> None:
-    client.post("/api/projects/PRJ-0421/plan")
-    client.post("/api/projects/PRJ-0421/generate")
-    client.post("/api/projects/PRJ-0421/validate")
+    project_id = create_project(client)
+    submit_requirements(client, project_id)
+    client.post(f"/api/projects/{project_id}/plan")
+    client.post(f"/api/projects/{project_id}/generate")
+    client.post(f"/api/projects/{project_id}/validate")
 
-    response = client.post("/api/projects/PRJ-0421/optimize")
+    response = client.post(f"/api/projects/{project_id}/optimize")
 
     assert response.status_code == 200
-    stored = store.get_optimization_report("PRJ-0421")
-    assert stored is not None
-    assert stored.projectId == "PRJ-0421"
-    assert stored.optimizer == "static.v1"
-    assert store.get_code_artifact("PRJ-0421") is not None
-    assert store.get_code_artifact("PRJ-0421").artifactId == stored.optimizedArtifactId
+    body = response.json()
+
+    async def _has_optimization_report() -> bool:
+        async with AsyncSessionLocal() as session:
+            result = await session.execute(SessionModel.__table__.select())
+            row = result.mappings().first()
+            return bool(row and row["optimization_report"] and row["code_artifact"]["artifactId"] == body["optimizedArtifactId"])
+
+    assert asyncio.run(_has_optimization_report()) is True
 
 
 def test_llm_mode_raises_not_implemented() -> None:
@@ -180,6 +208,39 @@ def save_verified_motor_inputs(save_validation: bool = True):
             ValidationAgent().validate(project_id="PRJ-0421", artifact=artifact, plan=plan),
         )
     return plan, artifact
+
+
+def create_project(client: TestClient) -> str:
+    response = client.post(
+        "/api/projects",
+        json={
+            "name": "Motor Control - Conveyor M-12",
+            "description": "Motor control with safety.",
+            "domain": "Motor Control",
+            "targetLanguage": "Structured Text",
+            "complexityTier": "medium",
+        },
+    )
+    assert response.status_code == 201
+    return response.json()["id"]
+
+
+def submit_requirements(client: TestClient, project_id: str) -> None:
+    response = client.post(
+        f"/api/projects/{project_id}/requirements",
+        json={
+            "projectId": project_id,
+            "text": "Motor start stop with emergency stop and overload protection.",
+            "safetyConstraints": ["Motor must not auto-restart after E-Stop"],
+            "performanceTargets": {
+                "maxScanTimeMs": 5,
+                "maxCyclomaticComplexity": 8,
+                "minMaintainabilityIndex": 75,
+                "maxIterations": 5,
+            },
+        },
+    )
+    assert response.status_code == 200
 
 
 def minimal_artifact(project_id: str) -> CodeArtifact:

@@ -2,7 +2,7 @@
 
 Production-readiness MVP for **OptPLC - PLC Agent Optimizer**. The app presents an industrial AI workflow that turns natural-language PLC control requirements into planned, generated, validated, debugged, optimized, and reported IEC 61131-3 Structured Text.
 
-The frontend runs in mock mode by default, with an optional real API mode for the FastAPI endpoints that already exist. A FastAPI backend skeleton is available under `backend/` with in-memory storage for project creation, project lookup, requirement submission, a deterministic Planning Agent, a template-based Code Generation Agent, a static Validation Agent, a rule-based Debugging Agent, a deterministic repair loop, and a static Optimization Agent. Real LLM calls, external formal verification, metrics, benchmark, and final report generation are not implemented yet.
+The frontend is configured for real API mode by default. A FastAPI backend is available under `backend/` with SQLAlchemy-backed runtime storage for project creation, project lookup, requirement submission, a deterministic Planning Agent, a template-based Code Generation Agent, a static Validation Agent, a rule-based Debugging Agent, a deterministic repair loop, a static Optimization Agent, metrics generation, and final report assembly. Real LLM calls, external formal verification, benchmark execution, and PDF certificate generation are not implemented yet.
 
 ## Tech Stack
 
@@ -69,7 +69,7 @@ The frontend is prepared for backend integration through typed service modules:
 - `src/lib/api-client/optimization-client.ts`
 - `src/lib/api-client/report-client.ts`
 
-These clients expose async functions whose signatures match the API contracts. They use mock data by default and switch to typed fetch calls when `NEXT_PUBLIC_USE_MOCK_API=false`.
+These clients expose async functions whose signatures match the API contracts. They switch to typed fetch calls when `NEXT_PUBLIC_USE_MOCK_API=false`.
 
 ## Run Locally
 
@@ -98,14 +98,14 @@ Open `http://localhost:8000/api/health`.
 
 The frontend supports two API modes:
 
-- Mock mode, the default: all frontend clients use centralized local mock data.
-- Real API mode: implemented project endpoints call the FastAPI backend at `NEXT_PUBLIC_API_BASE_URL`.
+- Real API mode, the default: implemented project endpoints call the FastAPI backend at `NEXT_PUBLIC_API_BASE_URL`.
+- Mock mode: clients use centralized local mock data only when explicitly enabled.
 
 Create `.env.local` from [.env.example](/E:/Projects/PLC_AI/.env.example):
 
 ```bash
 NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
-NEXT_PUBLIC_USE_MOCK_API=true
+NEXT_PUBLIC_USE_MOCK_API=false
 ```
 
 To call the FastAPI backend for implemented endpoints:
@@ -115,7 +115,7 @@ NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
 NEXT_PUBLIC_USE_MOCK_API=false
 ```
 
-When real API mode is enabled, these frontend client functions call FastAPI:
+In real API mode, these frontend client functions call FastAPI:
 
 - `getHealth()` -> `GET /api/health`
 - `getProjects()` / `listProjects()` -> `GET /api/projects`
@@ -128,8 +128,12 @@ When real API mode is enabled, these frontend client functions call FastAPI:
 - `debugCode(id)` -> `POST /api/projects/{id}/debug`
 - `runRepairLoop(id)` -> `POST /api/projects/{id}/repair-loop`
 - `optimizeCode(id)` -> `POST /api/projects/{id}/optimize`
+- `getMetricsReport(id)` -> `GET /api/projects/{id}/metrics`
+- `getFinalReport(id)` / `getReport(id)` -> `GET /api/projects/{id}/report`
+- `exportReportJson(id)` -> `GET /api/projects/{id}/report/export/json`
+- `exportReportMarkdown(id)` -> `GET /api/projects/{id}/report/export/markdown`
 
-All other workflow clients remain mocked until backend endpoints are implemented.
+Benchmark workflow clients remain mocked until backend endpoints are implemented.
 
 ## Real Planning Agent Flow
 
@@ -257,9 +261,10 @@ Current behavior is intentionally local and deterministic:
 
 - Frontend API client functions return mock data by default.
 - Real API mode connects health, projects, requirements submission, Plan Object creation, code generation, static validation, debugging advice, repair loop, and optimization.
-- Backend project endpoints use in-memory storage; `/plan` uses the rule-based Planning Agent, `/generate` uses the template Code Generation Agent, `/validate` uses the static Validation Agent, `/debug` uses the rule-based Debugging Agent, `/repair-loop` orchestrates validation, debugging, regeneration, and revalidation, and `/optimize` runs the static Optimization Agent with rollback-on-regression.
+- Backend project endpoints use SQLAlchemy runtime persistence; `/plan` uses the rule-based Planning Agent, `/generate` uses the template Code Generation Agent, `/validate` uses the static Validation Agent, `/debug` uses the rule-based Debugging Agent, `/repair-loop` orchestrates validation, debugging, regeneration, and revalidation, and `/optimize` runs the static Optimization Agent with rollback-on-regression.
 - Dynamic routes pass `projectId` into page components, but mock responses resolve to the active sample project.
-- Buttons such as export, run, copy, and retry are UI placeholders.
+- Export JSON and Export Markdown are wired to backend downloads in real API mode.
+- Export PDF remains a disabled "Coming soon" placeholder.
 - Loading, empty, and error states are simulated through local component state and mock client behavior.
 - The Monaco editor is client-only to avoid SSR issues.
 
@@ -270,9 +275,9 @@ The Vitest suite covers the app shell, major workflow pages, dynamic project rou
 ## Known Limitations
 
 - No persistence, authentication, authorization, or real project workspace data.
-- No LLM, RAG, external formal solver, metrics, benchmark, or report-generation service calls.
-- Metrics, report, and benchmark frontend clients remain mocked.
-- Backend storage is process-local and resets on restart.
+- No LLM, RAG, or external formal solver service calls.
+- Benchmark frontend clients remain mocked.
+- Runtime project state persists in the configured SQLAlchemy database.
 - Repair-loop results are persisted only in process memory on the backend and cached only for the current frontend session.
 - Monaco highlighting is a focused IEC Structured Text tokenizer, not a full language server.
 - Export/download/copy actions are not wired to browser file APIs yet.

@@ -11,6 +11,8 @@ export const API_ENDPOINTS = {
   optimizeCode: "/api/projects/:id/optimize",
   getMetrics: "/api/projects/:id/metrics",
   getReport: "/api/projects/:id/report",
+  exportReportJson: "/api/projects/:id/report/export/json",
+  exportReportMarkdown: "/api/projects/:id/report/export/markdown",
   runBenchmarks: "/api/benchmarks/run"
 } as const;
 

@@ -111,7 +111,7 @@ describe("main frontend pages", () => {
   it("Report page renders export buttons", async () => {
     render(<ReportPage />);
 
-    expect(await screen.findByRole("button", { name: /Print/ })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /Export JSON/ })).toBeInTheDocument();
     expect(await screen.findByRole("button", { name: /Export PDF/ })).toBeInTheDocument();
   });
 

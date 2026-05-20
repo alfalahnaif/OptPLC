@@ -1,0 +1,27 @@
+# Python caches
+**/__pycache__/
+**/*.py[cod]
+**/.pytest_cache/
+**/.venv/
+**/.next/
+**/venv/
+**/env/
+
+# Dependencies
+**/node_modules/
+**/dist/
+**/build/
+
+# Databases
+**/plcforge.db
+**/rag_db/
+
+# Archives
+*.rar
+*.zip
+
+# Git and IDEs
+**/.git/
+**/.vscode/
+**/.idea/
+**/.env

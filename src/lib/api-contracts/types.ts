@@ -251,9 +251,23 @@ export interface FinalReport {
   reportId: string;
   generatedAt: string;
   summary: string;
-  validation: ValidationReport;
-  optimization: OptimizationReport;
-  metrics: MetricsReport;
+  validation?: ValidationReport | null;
+  optimization?: OptimizationReport | null;
+  metrics?: MetricsReport | null;
+  project: Project;
+  requirement?: RequirementInput | null;
+  planObject?: PlanObject | null;
+  codeArtifact?: CodeArtifact | null;
+  debugging?: DebuggingReport | null;
+  repairLoop?: RepairLoopReport | null;
+  validationSummary: string;
+  debuggingSummary: string;
+  repairLoopSummary: string;
+  optimizationSummary: string;
+  metricsSummary: string;
+  finalStatusSummary: string;
+  recommendations: string[];
+  limitationsDisclaimer: string;
 }
 
 export interface RepairLoopReport {

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -303,9 +305,23 @@ class FinalReport(ContractModel):
     reportId: str
     generatedAt: str
     summary: str
-    validation: ValidationReport
-    optimization: OptimizationReport
-    metrics: MetricsReport
+    validation: ValidationReport | None = None
+    optimization: OptimizationReport | None = None
+    metrics: MetricsReport | None = None
+    project: Project
+    requirement: RequirementInput | None = None
+    planObject: PlanObject | None = None
+    codeArtifact: CodeArtifact | None = None
+    debugging: DebuggingReport | None = None
+    repairLoop: RepairLoopReport | None = None
+    validationSummary: str
+    debuggingSummary: str
+    repairLoopSummary: str
+    optimizationSummary: str
+    metricsSummary: str
+    finalStatusSummary: str
+    recommendations: list[str] = Field(default_factory=list)
+    limitationsDisclaimer: str
 
 
 class RepairLoopReport(ContractModel):

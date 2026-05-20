@@ -1,8 +1,8 @@
 # PLC Agent Optimizer Backend
 
-FastAPI backend skeleton for the PLC Agent Optimizer frontend. This service provides foundational REST endpoints backed by in-memory storage plus deterministic Planning, Code Generation, Validation, Debugging, Repair Loop, and Optimization services.
+FastAPI backend for the PLC Agent Optimizer frontend. This service provides REST endpoints backed by SQLAlchemy persistence plus deterministic Planning, Code Generation, Validation, Debugging, Repair Loop, Optimization, Metrics, and Final Report services.
 
-No metrics, final report, benchmark, persistence, authentication, LLM calls, or external formal verification tools are implemented yet.
+Benchmark runner, authentication, LLM calls, and external formal verification tools are not implemented yet.
 
 ## Setup
 
@@ -21,6 +21,44 @@ uvicorn app.main:app --reload --port 8000
 
 The API will be available at `http://localhost:8000`.
 
+## Database Migrations (Alembic)
+
+Alembic is configured in `backend/alembic.ini` and `backend/alembic/`.
+
+Run all migrations:
+
+```bash
+cd backend
+alembic upgrade head
+```
+
+Create a new migration revision:
+
+```bash
+cd backend
+alembic revision -m "describe change"
+```
+
+Create a revision from model diffs:
+
+```bash
+cd backend
+alembic revision --autogenerate -m "describe change"
+```
+
+Downgrade one migration:
+
+```bash
+cd backend
+alembic downgrade -1
+```
+
+### Dev `create_all` vs Production Migrations
+
+- `app.main` keeps a **dev-only** startup bootstrap with `Base.metadata.create_all()` so local runs/tests work even before Alembic is applied.
+- Production and shared environments should use Alembic (`alembic upgrade head`) as the source of truth for schema evolution.
+- Keep `create_all` as a convenience bootstrap only; schema changes must be captured in new Alembic revisions.
+
 ## Implemented Endpoints
 
 - `GET /api/health`
@@ -34,6 +72,10 @@ The API will be available at `http://localhost:8000`.
 - `POST /api/projects/{id}/debug`
 - `POST /api/projects/{id}/repair-loop`
 - `POST /api/projects/{id}/optimize`
+- `GET /api/projects/{id}/metrics`
+- `GET /api/projects/{id}/report`
+- `GET /api/projects/{id}/report/export/json`
+- `GET /api/projects/{id}/report/export/markdown`
 
 ## Planning Agent
 
@@ -207,8 +249,15 @@ If a plan is missing, the endpoint returns:
 
 ### Modes
 
-- `static` is the default mode. It performs deterministic IEC Structured Text checks and rule-based domain safety checks without calling external tools.
+- `static` is the default mode. It performs deterministic IEC Structured Text checks and rule-based domain safety checks. When MATIEC is configured and executable, static mode also runs an optional MATIEC syntax-hardening pass before safety checks.
 - `formal` is reserved for future MATIEC, nuXmv, or PLCverif integration. It raises a placeholder error and does not call external tools.
+
+### MATIEC Optional Syntax Hardening
+
+- Configure MATIEC with `MATIEC_BIN` (defaults to `/usr/local/bin/iec2c`).
+- If MATIEC is available and executable, syntax diagnostics are included in `ValidationReport.syntaxErrors` when MATIEC detects compilation/syntax issues.
+- If MATIEC is unavailable, not executable, times out, or cannot start in the current environment (for example Linux-style path on Windows), validation falls back to the deterministic static syntax checks without failing the request.
+- Formal verification is still not implemented. MATIEC is currently used only as optional syntax hardening in static mode.
 
 ### Static Checks
 
@@ -438,9 +487,17 @@ If the latest validation failed, the endpoint returns:
 `MetricsService` calculates deterministic Structured Text metrics:
 
 - executable LOC, excluding blanks, comments, declarations, and POU/VAR delimiters
-- cyclomatic complexity from `IF`, `ELSIF`, `CASE`, `FOR`, `WHILE`, and `REPEAT`
+- cyclomatic complexity from AST decision points (`CC = 1 + decision_points`) via `STAstParser`
 - approximate maintainability index from LOC and complexity
-- estimated scan time from assignments, boolean operations, comparisons, branches, loops, and timer function blocks
+- estimated scan time from weighted deterministic counts for assignments, branch conditions, CASE branches, boolean operators, comparisons, and timer function blocks
+
+When the parser cannot parse a given ST sample, metrics safely fall back to regex-based decision counting. This fallback is internal and logged; API response contracts remain unchanged.
+
+Current parser limitations:
+
+- grammar focuses on common IEC 61131-3 Structured Text forms used in this repository
+- unsupported syntax variations may trigger fallback mode
+- fallback mode maintains endpoint availability but may be less precise than AST-based counting
 
 ### Passes
 
@@ -514,15 +571,41 @@ CORS is enabled for:
 - `http://localhost:3000`
 - `http://127.0.0.1:3000`
 
-The response shapes mirror the frontend TypeScript API contracts in `src/lib/api-contracts/`. Data is reset when the process restarts because storage is in-memory only.
+The response shapes mirror the frontend TypeScript API contracts in `src/lib/api-contracts/`. Runtime state is persisted through SQLAlchemy in the configured database URL.
+
+## Final Report Endpoint
+
+`GET /api/projects/{id}/report` assembles a final report from the latest persisted SQLAlchemy session artifacts.
+
+Export endpoints:
+
+- `GET /api/projects/{id}/report/export/json` returns a downloadable JSON report using `application/json` and `Content-Disposition` attachment headers.
+- `GET /api/projects/{id}/report/export/markdown` returns a downloadable Markdown report using `text/markdown` and `Content-Disposition` attachment headers.
+
+Included sections:
+
+- project metadata
+- requirement input (when available)
+- plan object (when available)
+- generated Structured Text artifact (when available)
+- validation, debugging, repair-loop, optimization, and metrics summaries
+- recommendations and limitations disclaimer
+
+Partial behavior:
+
+- Returns `404` if the project does not exist.
+- Returns `400` when no meaningful persisted artifacts exist for the project.
+- Returns a partial report when only some artifacts exist; missing sections are represented with `"Not generated yet"`-style summaries.
+- JSON and Markdown exports are implemented via backend download endpoints and real frontend buttons.
+- PDF export remains future work.
 
 ## Next Backend Steps
 
-1. Replace in-memory storage with a persistent repository layer.
+1. Add Alembic migrations for production schema evolution.
 2. Add real project lifecycle state transitions and request validation rules.
 3. Add the future LLM implementation behind `PlanningAgent(mode="llm")` and `CodeGenerationAgent(mode="llm")`.
 4. Add external MATIEC/nuXmv/PLCverif adapters behind `ValidationAgent(mode="formal")`.
 5. Add future LLM-assisted debugging behind `DebuggingAgent(mode="llm")`.
-6. Implement metrics, reports, and benchmark endpoints.
+6. Implement benchmark endpoint and PDF export backend.
 7. Add authentication and project authorization.
 8. Add contract tests against the frontend API client before enabling more live backend calls.

@@ -1,9 +1,15 @@
 from __future__ import annotations
 
+import asyncio
+import logging
+import os
 import re
+import threading
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Literal
 
+from app.config import settings
 from app.schemas.contracts import (
     CodeArtifact,
     PlanObject,
@@ -11,13 +17,16 @@ from app.schemas.contracts import (
     ValidationReport,
     ValidationSafetyResult,
 )
+from app.services.validation_service import MatiecValidator
 
 ValidationMode = Literal["static", "formal"]
+logger = logging.getLogger(__name__)
 
 
 class ValidationAgent:
-    def __init__(self, mode: ValidationMode = "static") -> None:
+    def __init__(self, mode: ValidationMode = "static", matiec_validator: MatiecValidator | None = None) -> None:
         self.mode = mode
+        self.matiec_validator = matiec_validator or MatiecValidator()
 
     def validate(
         self,
@@ -31,7 +40,7 @@ class ValidationAgent:
         if self.mode != "static":
             raise ValueError(f"Unsupported ValidationAgent mode: {self.mode}")
 
-        syntax_errors = self._syntax_errors(artifact.source)
+        syntax_errors = self._syntax_errors_with_optional_matiec(artifact.source)
         safety_results = [] if syntax_errors else self._safety_results(artifact.source, plan)
         failed_safety = [result for result in safety_results if result.status == "failed"]
         formal_errors = [result.details or result.description for result in failed_safety]
@@ -75,6 +84,36 @@ class ValidationAgent:
             counterexample=counterexamples or None,
             counterexamples=counterexamples,
         )
+
+    def _syntax_errors_with_optional_matiec(self, source: str) -> list[str]:
+        static_errors = self._syntax_errors(source)
+        if not source.strip():
+            return static_errors
+
+        available, reason = self._is_matiec_available()
+        if not available:
+            logger.info("MATIEC syntax hardening skipped: %s", reason)
+            return static_errors
+
+        try:
+            result = self._run_matiec_syntax(source)
+        except Exception as exc:  # pragma: no cover - defensive path
+            logger.warning("MATIEC syntax hardening failed; falling back to static checks: %s", exc)
+            return static_errors
+
+        errors = list(result.get("errors", []))
+        passed = bool(result.get("passed", False))
+        if passed:
+            return static_errors
+        if self._is_matiec_environment_error(errors):
+            logger.warning(
+                "MATIEC unavailable/tool issue during syntax hardening; falling back to static checks: %s",
+                "; ".join(errors) if errors else "unknown MATIEC error",
+            )
+            return static_errors
+
+        merged_errors = [*errors, *static_errors]
+        return list(dict.fromkeys(merged_errors))
 
     def _syntax_errors(self, source: str) -> list[str]:
         errors: list[str] = []
@@ -334,3 +373,61 @@ class ValidationAgent:
     @staticmethod
     def _utc_now() -> str:
         return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+
+    def _run_matiec_syntax(self, source: str) -> dict:
+        return self._run_coroutine_sync(self.matiec_validator.validate_syntax(source))
+
+    @staticmethod
+    def _run_coroutine_sync(coro):
+        try:
+            asyncio.get_running_loop()
+            running = True
+        except RuntimeError:
+            running = False
+
+        if not running:
+            return asyncio.run(coro)
+
+        result: dict | None = None
+        error: Exception | None = None
+
+        def _worker() -> None:
+            nonlocal result, error
+            try:
+                result = asyncio.run(coro)
+            except Exception as exc:  # pragma: no cover - defensive path
+                error = exc
+
+        thread = threading.Thread(target=_worker, daemon=True)
+        thread.start()
+        thread.join()
+        if error is not None:
+            raise error
+        return result or {"passed": False, "errors": ["MATIEC syntax validation returned no result."], "raw_output": ""}
+
+    @staticmethod
+    def _is_matiec_environment_error(errors: list[str]) -> bool:
+        normalized = " ".join(errors).lower()
+        keywords = [
+            "not found",
+            "not executable",
+            "permission was denied",
+            "could not be started",
+            "timed out",
+            "windows host",
+        ]
+        return any(keyword in normalized for keyword in keywords)
+
+    @staticmethod
+    def _is_matiec_available() -> tuple[bool, str]:
+        matiec_path = Path(settings.matiec_bin)
+        raw_path = str(matiec_path)
+        if os.name == "nt" and raw_path.startswith("/"):
+            return False, f"MATIEC path '{raw_path}' appears Linux-style on Windows host."
+        if not matiec_path.exists():
+            return False, f"MATIEC path '{raw_path}' does not exist."
+        if not matiec_path.is_file():
+            return False, f"MATIEC path '{raw_path}' is not a file."
+        if not os.access(matiec_path, os.X_OK):
+            return False, f"MATIEC path '{raw_path}' is not executable."
+        return True, "MATIEC binary is available."

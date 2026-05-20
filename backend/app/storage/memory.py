@@ -4,6 +4,7 @@ from app.schemas.contracts import CodeArtifact, DebuggingReport, MetricsReport, 
 
 
 class MemoryStore:
+    # MemoryStore is deprecated for runtime and retained only for tests or legacy fallback.
     def __init__(self) -> None:
         self._lock = Lock()
         self.reset()

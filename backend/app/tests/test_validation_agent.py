@@ -1,6 +1,7 @@
 import pytest
 
 from app.agents import CodeGenerationAgent, PlanningAgent, ValidationAgent
+from app.services.validation_service import MatiecValidator
 
 
 def test_valid_motor_structured_text_returns_verified() -> None:
@@ -159,3 +160,95 @@ def test_formal_mode_is_placeholder_only() -> None:
 
     with pytest.raises(NotImplementedError, match="future MATIEC/nuXmv/PLCverif"):
         ValidationAgent(mode="formal").validate(project_id="PRJ-MOTOR", artifact=artifact, plan=plan)
+
+
+def test_matiec_success_path_keeps_static_validation(monkeypatch: pytest.MonkeyPatch) -> None:
+    plan = PlanningAgent().generate_plan(
+        project_id="PRJ-MOTOR",
+        requirement_text="Motor start stop with emergency stop and overload protection.",
+        domain="Motor Control",
+    )
+    artifact = CodeGenerationAgent().generate_code(project_id="PRJ-MOTOR", plan=plan)
+    agent = ValidationAgent(matiec_validator=MatiecValidator())
+    monkeypatch.setattr(ValidationAgent, "_is_matiec_available", staticmethod(lambda: (True, "ok")))
+    monkeypatch.setattr(
+        ValidationAgent,
+        "_run_matiec_syntax",
+        lambda self, _source: {"passed": True, "errors": [], "raw_output": ""},
+    )
+
+    report = agent.validate(project_id="PRJ-MOTOR", artifact=artifact, plan=plan)
+
+    assert report.status == "VERIFIED"
+    assert report.syntaxPassed is True
+
+
+def test_matiec_syntax_failure_returns_syntax_error(monkeypatch: pytest.MonkeyPatch) -> None:
+    plan = PlanningAgent().generate_plan(
+        project_id="PRJ-MOTOR",
+        requirement_text="Motor start stop with emergency stop and overload protection.",
+        domain="Motor Control",
+    )
+    artifact = CodeGenerationAgent().generate_code(project_id="PRJ-MOTOR", plan=plan)
+    agent = ValidationAgent(matiec_validator=MatiecValidator())
+    monkeypatch.setattr(ValidationAgent, "_is_matiec_available", staticmethod(lambda: (True, "ok")))
+    monkeypatch.setattr(
+        ValidationAgent,
+        "_run_matiec_syntax",
+        lambda self, _source: {
+            "passed": False,
+            "errors": ["matiec: syntax error near END_IF"],
+            "raw_output": "error: syntax",
+        },
+    )
+
+    report = agent.validate(project_id="PRJ-MOTOR", artifact=artifact, plan=plan)
+
+    assert report.status == "SYNTAX_ERROR"
+    assert any("matiec: syntax error" in item for item in report.syntaxErrors)
+
+
+def test_matiec_unavailable_falls_back_to_static_validation(monkeypatch: pytest.MonkeyPatch) -> None:
+    plan = PlanningAgent().generate_plan(
+        project_id="PRJ-MOTOR",
+        requirement_text="Motor start stop with emergency stop and overload protection.",
+        domain="Motor Control",
+    )
+    artifact = CodeGenerationAgent().generate_code(project_id="PRJ-MOTOR", plan=plan)
+    agent = ValidationAgent(matiec_validator=MatiecValidator())
+    monkeypatch.setattr(ValidationAgent, "_is_matiec_available", staticmethod(lambda: (False, "missing binary")))
+    monkeypatch.setattr(
+        ValidationAgent,
+        "_run_matiec_syntax",
+        lambda self, _source: (_ for _ in ()).throw(AssertionError("MATIEC should not run when unavailable")),
+    )
+
+    report = agent.validate(project_id="PRJ-MOTOR", artifact=artifact, plan=plan)
+
+    assert report.status == "VERIFIED"
+    assert report.syntaxPassed is True
+
+
+def test_matiec_timeout_falls_back_to_static_validation(monkeypatch: pytest.MonkeyPatch) -> None:
+    plan = PlanningAgent().generate_plan(
+        project_id="PRJ-MOTOR",
+        requirement_text="Motor start stop with emergency stop and overload protection.",
+        domain="Motor Control",
+    )
+    artifact = CodeGenerationAgent().generate_code(project_id="PRJ-MOTOR", plan=plan)
+    agent = ValidationAgent(matiec_validator=MatiecValidator())
+    monkeypatch.setattr(ValidationAgent, "_is_matiec_available", staticmethod(lambda: (True, "ok")))
+    monkeypatch.setattr(
+        ValidationAgent,
+        "_run_matiec_syntax",
+        lambda self, _source: {
+            "passed": False,
+            "errors": ["MATIEC syntax validation timed out after 30 seconds."],
+            "raw_output": "",
+        },
+    )
+
+    report = agent.validate(project_id="PRJ-MOTOR", artifact=artifact, plan=plan)
+
+    assert report.status == "VERIFIED"
+    assert report.syntaxPassed is True

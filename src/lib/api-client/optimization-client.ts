@@ -16,6 +16,7 @@ export type OptimizationPageData = {
 
 export type MetricsPageData = {
   report: MetricsReport;
+  metricsCards: Array<{ label: string; before: number; after: number; delta: string; suffix: string }>;
   comparisonData: Array<{ metric: string; before: number; after: number }>;
   qualityRadar: Array<{ subject: string; before: number; after: number }>;
 };
@@ -177,6 +178,7 @@ export async function getMetricsPageData(projectId: string): Promise<MetricsPage
   const report = await getMetricsReport(projectId);
   return mockResolve({
     report,
+    metricsCards: metricCardsFromReport(report),
     comparisonData: comparisonDataFromReport(report),
     qualityRadar: qualityRadarFromReport(report)
   });
@@ -236,6 +238,39 @@ function comparisonDataFromReport(report: MetricsReport) {
   ];
 }
 
+function metricCardsFromReport(report: MetricsReport) {
+  return [
+    {
+      label: "Lines of code",
+      before: report.beforeMetrics.loc,
+      after: report.afterMetrics.loc,
+      delta: formatSignedPercent(report.metricsDelta.locReductionPercent),
+      suffix: ""
+    },
+    {
+      label: "Cyclomatic complexity",
+      before: report.beforeMetrics.cyclomaticComplexity,
+      after: report.afterMetrics.cyclomaticComplexity,
+      delta: formatSignedPercent(report.metricsDelta.complexityReductionPercent),
+      suffix: ""
+    },
+    {
+      label: "Maintainability index",
+      before: report.beforeMetrics.maintainabilityIndex,
+      after: report.afterMetrics.maintainabilityIndex,
+      delta: `+${report.metricsDelta.maintainabilityImprovementPercent.toFixed(1)}%`,
+      suffix: ""
+    },
+    {
+      label: "Estimated scan time",
+      before: round(report.beforeMetrics.estimatedScanTimeMs),
+      after: round(report.afterMetrics.estimatedScanTimeMs),
+      delta: formatSignedPercent(report.metricsDelta.scanTimeReductionPercent),
+      suffix: " ms"
+    }
+  ];
+}
+
 function qualityRadarFromReport(report: MetricsReport) {
   const compactnessBefore = clampQuality(100 - report.beforeMetrics.loc);
   const compactnessAfter = clampQuality(100 - report.afterMetrics.loc);
@@ -254,4 +289,13 @@ function qualityRadarFromReport(report: MetricsReport) {
 
 function clampQuality(value: number) {
   return Math.max(0, Math.min(100, Math.round(value)));
+}
+
+function round(value: number) {
+  return Math.round(value * 100) / 100;
+}
+
+function formatSignedPercent(value: number) {
+  const sign = value >= 0 ? "+" : "";
+  return `${sign}${value.toFixed(1)}%`;
 }
