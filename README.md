@@ -1,90 +1,139 @@
-# PLC Agent Optimizer
+# OptPLC
 
-Production-readiness MVP for **OptPLC - PLC Agent Optimizer**. The app presents an industrial AI workflow that turns natural-language PLC control requirements into planned, generated, validated, debugged, optimized, and reported IEC 61131-3 Structured Text.
+OptPLC is a research prototype for generating, validating, repairing, optimizing, and evaluating IEC 61131-3 Structured Text (ST) programs from natural-language industrial control requirements. The repository includes a Next.js frontend, a FastAPI backend, SQLAlchemy persistence, LLM-assisted pipeline agents, compiler-backed syntax validation plus domain-aware structural safety validation, and a benchmark runner for deterministic/LLM/RAG comparisons.
 
-The frontend is configured for real API mode by default. A FastAPI backend is available under `backend/` with SQLAlchemy-backed runtime storage for project creation, project lookup, requirement submission, a deterministic Planning Agent, a template-based Code Generation Agent, a static Validation Agent, a rule-based Debugging Agent, a deterministic repair loop, a static Optimization Agent, metrics generation, and final report assembly. Real LLM calls, external formal verification, benchmark execution, and PDF certificate generation are not implemented yet.
+## Naming Consistency Note
 
-## Tech Stack
+The canonical product name in runtime UI/backend metadata is `OptPLC`. The repository still contains legacy identifiers such as `plc-agent-optimizer` (package name) and `plcforge` (DB file names, report export filenames, and container name). This README keeps `OptPLC` as the project name and calls out legacy names where needed.
 
-- Next.js App Router
-- TypeScript
-- TailwindCSS
-- shadcn/ui conventions with Radix primitives
-- lucide-react
-- Recharts
-- Monaco Editor with custom `structured-text` language registration
-- Vitest + React Testing Library
-- FastAPI backend skeleton with Pydantic schemas and pytest tests
+## Current Implementation Status
 
-## Implemented Pages
 
-- Dashboard
-- New Project
-- Project Overview
-- Requirement Input
-- Plan Object Preview
-- Agent Workflow Monitor
-- Generated Structured Text Code
-- Validation Results
-- Debugging Feedback
-- Optimization Results
-- Metrics Comparison
-- Final Report
-- Benchmark Suite
-- Project History
-- Settings
+| Component                         | Status      | Description                                                                                                                                                |
+| --------------------------------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Project creation and persistence  | Implemented | `POST /api/projects` + SQLAlchemy `projects`/`sessions` persistence.                                                                                       |
+| Requirement analysis              | Implemented | `POST /api/projects/{id}/analyze-requirement` is available and used by frontend requirements preview.                                                      |
+| PlanObject generation             | Implemented | `PlanningAgent(mode="llm")` is used in runtime for `/plan`.                                                                                                |
+| `PlanObject.internalVars` support | Implemented | Field exists in backend/TS contracts and is produced by planning logic.                                                                                    |
+| Code generation                   | Implemented | `CodeGenerationAgent(mode="llm")` is used in runtime for `/generate`.                                                                                      |
+| LLM provider abstraction          | Implemented | Unified LLM client supports Anthropic, OpenAI, Gemini, Groq, Ollama via `LLM_PROVIDER`.                                                                    |
+| RAG retrieval                     | Partial     | RAG service is implemented and seeded at app startup; active in planning and benchmark `llm_rag`, but not enabled in default runtime code generation path. |
+| MATIEC validation                 | Implemented | Static validation path runs optional MATIEC syntax checking when `MATIEC_BIN` is available.                                                                |
+| Domain-aware safety validation    | Implemented | Static validators enforce domain safety checks and return structured safety results.                                                                       |
+| Debugging / repair loop           | Implemented | LLM debugging + iterative regeneration/revalidation loop is active via `/debug` and `/repair-loop`.                                                        |
+| Optimization passes               | Implemented | LLM optimization flow runs passes and revalidates outcomes.                                                                                                |
+| Rollback and revalidation         | Implemented | Optimization performs post-pass validation and rollback event tracking.                                                                                    |
+| Metrics                           | Implemented | Metrics endpoint computes LOC/CC/MI/estimated scan-time deltas and history.                                                                                |
+| Benchmark runner                  | Implemented | `/api/benchmarks/*` supports case run, mode compare, full suite, persisted result summaries.                                                               |
+| Final report                      | Implemented | `GET /api/projects/{id}/report` and JSON/Markdown export endpoints are active.                                                                             |
+| nuXmv / PLCverif integration      | Partial     | PLCverif path exists in `ValidationAgent(mode="formal")`, but formal mode is not wired into the main project runtime pipeline.                             |
 
-## Routing
 
-Global routes:
 
-- `/` - dashboard
-- `/new-project` - create a PLC project envelope
-- `/history` - project history
-- `/benchmark` - benchmark suite
-- `/settings` - local frontend configuration
 
-Project-scoped routes:
+## Architecture
 
-- `/projects/[id]`
-- `/projects/[id]/requirements`
-- `/projects/[id]/plan`
-- `/projects/[id]/workflow`
-- `/projects/[id]/code`
-- `/projects/[id]/validation`
-- `/projects/[id]/debugging`
-- `/projects/[id]/optimization`
-- `/projects/[id]/metrics`
-- `/projects/[id]/report`
-
-Legacy pipeline routes such as `/requirements`, `/plan`, `/workflow`, `/code`, `/validation`, `/debugging`, `/optimization`, `/metrics`, and `/report` are preserved as redirects to the active mock project route.
-
-## API Client Layer
-
-The frontend is prepared for backend integration through typed service modules:
-
-- `src/lib/api-client/project-client.ts`
-- `src/lib/api-client/workflow-client.ts`
-- `src/lib/api-client/validation-client.ts`
-- `src/lib/api-client/optimization-client.ts`
-- `src/lib/api-client/report-client.ts`
-
-These clients expose async functions whose signatures match the API contracts. They switch to typed fetch calls when `NEXT_PUBLIC_USE_MOCK_API=false`.
-
-## Run Locally
-
-Frontend:
-
-```bash
-npm install
-npm run dev
+```mermaid
+flowchart TD
+    A[Natural-language requirement] --> B[Requirement analysis + persistence]
+    B --> C[Planning Agent -> PlanObject]
+    C --> D[Optional RAG retrieval context]
+    D --> E[Code Generation Agent -> CodeArtifact]
+    E --> F[Validation Agent]
+    F -->|VERIFIED| G[Optimization Agent]
+    F -->|Not verified| H[Debugging Agent]
+    H --> I[Repair loop regeneration]
+    I --> F
+    G --> J[Revalidation + rollback checks]
+    J --> K[Metrics report]
+    K --> L[Final report + exports]
 ```
 
-Open `http://localhost:3000`.
 
-Backend:
 
-```bash
+
+
+## Agent Responsibilities
+
+
+| Agent                 | Input                                                   | Output               | Execution mode                  | Type                                                             |
+| --------------------- | ------------------------------------------------------- | -------------------- | ------------------------------- | ---------------------------------------------------------------- |
+| Planning Agent        | `projectId`, requirement text, constraints/targets      | `PlanObject`         | Runtime: `llm` (`/plan`)        | Hybrid (LLM + deterministic fallback)                            |
+| Code Generation Agent | `PlanObject`, optional patch advice                     | `CodeArtifact`       | Runtime: `llm` (`/generate`)    | Hybrid (LLM + structured templates/fallback)                     |
+| Validation Agent      | `CodeArtifact` + `PlanObject`                           | `ValidationReport`   | Runtime: `static` (`/validate`) | Deterministic (compiler-backed syntax + structural safety rules) |
+| Debugging Agent       | `PlanObject`, `CodeArtifact`, `ValidationReport`        | `DebuggingReport`    | Runtime: `llm` (`/debug`)       | Hybrid                                                           |
+| Optimization Agent    | artifact + plan + validation (+ optional repair report) | `OptimizationReport` | Runtime: `llm` (`/optimize`)    | Hybrid with revalidation guards                                  |
+
+
+
+
+## Artifact Contracts
+
+Implemented contracts are defined in `backend/app/schemas/contracts.py` and mirrored in `src/lib/api-contracts/types.ts`.
+
+- `RequirementInput`: `projectId`, `text`, `safetyConstraints`, `performanceTargets`, optional `confirmedOutputs`/`confirmedInputs`.
+- `PlanObject`: `inputs`, `outputs`, `internalVars`, `logicRules`, `safetyConstraints`, `scope`.
+- `PlanObject.internalVars`: typed internal declarations (`BOOL`/`INT`/`REAL`/`TIME`) used for generated ST structure.
+- `CodeArtifact`: source ST, iteration, metrics, and metadata.
+- `CodeMetadata`: includes implemented metadata fields `ragSources`, `llmProvider`, `llmModel`, `generationMode`, `tokensUsed`, `generationTimeMs`.
+- `RAGSource`: retrieval provenance (`id`, `name`, optional `similarity`, `domain`, `patternType`).
+- `ValidationReport`: status (`VERIFIED`/`SYNTAX_ERROR`/`FORMAL_VIOLATION`/`TIMEOUT`), syntax/formal errors, safety results, counterexamples.
+- `DebuggingReport`: root-cause summary, patch advice, regeneration prompt, optional LLM usage metadata.
+- `OptimizationReport`: optimization pass outcomes, metrics deltas, rollback events, revalidation status.
+- `MetricsReport`: before/after metrics and historical metric timeline.
+- `FinalReport`: aggregated project, requirements, plan, code, validation/debug/optimization/metrics summaries and recommendations.
+
+
+
+## Technology Stack
+
+- Python: `3.11` (Docker image), local environment configurable.
+- FastAPI: `0.136.1`
+- SQLAlchemy (async): `2.0.49`
+- Pydantic settings: `2.14.1`
+- LLM providers: Anthropic/OpenAI/Gemini/Groq/Ollama via provider abstraction.
+- Next.js: `^15.0.0`
+- TypeScript: `^5.7.2`
+- ChromaDB: `0.6.3`
+- sentence-transformers: `3.4.1`
+- MATIEC: `iec2c` invoked from configured binary path.
+- Docker: `docker/app.Dockerfile` + `docker-compose.yml` (backend service).
+
+
+
+## Repository Structure
+
+```text
+backend/
+  app/
+    api/                # FastAPI routers: health, projects, benchmarks
+    agents/             # Planning/codegen/validation/debug/optimization + llm client
+    services/           # Orchestration, metrics, validation backends, RAG, benchmark runner
+    schemas/            # Pydantic contracts
+    database/           # SQLAlchemy engine/models/repository
+  benchmark/cases/      # Benchmark case definitions (B001..B005)
+  benchmark/results/    # Persisted benchmark run outputs
+src/
+  app/                  # Next.js routes (project-scoped workflow pages)
+  components/pages/     # Workflow and system pages
+  lib/api-client/       # Real/mock transport and API clients
+  lib/api-contracts/    # Frontend contract types and endpoint constants
+docker/
+  app.Dockerfile
+docker-compose.yml
+```
+
+
+
+## Local Development
+
+
+
+### Backend
+
+PowerShell:
+
+```powershell
 cd backend
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
@@ -92,137 +141,239 @@ python -m pip install -r requirements-dev.txt
 uvicorn app.main:app --reload --port 8000
 ```
 
-Open `http://localhost:8000/api/health`.
-
-## API Mode
-
-The frontend supports two API modes:
-
-- Real API mode, the default: implemented project endpoints call the FastAPI backend at `NEXT_PUBLIC_API_BASE_URL`.
-- Mock mode: clients use centralized local mock data only when explicitly enabled.
-
-Create `.env.local` from [.env.example](/E:/Projects/PLC_AI/.env.example):
-
-```bash
-NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
-NEXT_PUBLIC_USE_MOCK_API=false
-```
-
-To call the FastAPI backend for implemented endpoints:
-
-```bash
-NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
-NEXT_PUBLIC_USE_MOCK_API=false
-```
-
-In real API mode, these frontend client functions call FastAPI:
-
-- `getHealth()` -> `GET /api/health`
-- `getProjects()` / `listProjects()` -> `GET /api/projects`
-- `getProject(id)` -> `GET /api/projects/{id}`
-- `createProject(request)` -> `POST /api/projects`
-- `submitRequirements(request)` -> `POST /api/projects/{id}/requirements`
-- `generatePlan(id)` / `createPlan(id)` -> `POST /api/projects/{id}/plan`
-- `generateCode(id)` -> `POST /api/projects/{id}/generate`
-- `validateCode(id)` -> `POST /api/projects/{id}/validate`
-- `debugCode(id)` -> `POST /api/projects/{id}/debug`
-- `runRepairLoop(id)` -> `POST /api/projects/{id}/repair-loop`
-- `optimizeCode(id)` -> `POST /api/projects/{id}/optimize`
-- `getMetricsReport(id)` -> `GET /api/projects/{id}/metrics`
-- `getFinalReport(id)` / `getReport(id)` -> `GET /api/projects/{id}/report`
-- `exportReportJson(id)` -> `GET /api/projects/{id}/report/export/json`
-- `exportReportMarkdown(id)` -> `GET /api/projects/{id}/report/export/markdown`
-
-Benchmark workflow clients remain mocked until backend endpoints are implemented.
-
-## Real Planning Agent Flow
-
-To test the real Planning Agent end to end:
-
-1. Start the FastAPI backend:
+Shell:
 
 ```bash
 cd backend
-.\.venv\Scripts\Activate.ps1
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements-dev.txt
 uvicorn app.main:app --reload --port 8000
 ```
 
-2. Create `.env.local` in the project root:
 
-```bash
-NEXT_PUBLIC_USE_MOCK_API=false
-NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
-```
 
-3. Start the frontend:
+### Frontend
 
-```bash
+PowerShell:
+
+```powershell
+npm install
 npm run dev
 ```
 
-4. Open `http://localhost:3000/new-project`, create a project, continue to Requirements, submit the requirement, and the app navigates to `/projects/{id}/plan`.
-
-In real mode:
-
-- New Project calls `POST /api/projects`.
-- Requirement Input calls `POST /api/projects/{id}/requirements`.
-- Plan Object Preview calls `POST /api/projects/{id}/plan`.
-- The Plan page displays the `PlanObject` generated by the backend `PlanningAgent/rule_based.v1`.
-- Requirement and Plan pages show `Real Backend Planning Agent`; mock mode shows `Mock Planning Mode`.
-
-The Code page continues the flow:
-
-- Click `Generate Code` on the Plan page to open `/projects/{id}/code`.
-- In real mode, the Code page calls `POST /api/projects/{id}/generate`.
-- The Code page displays backend-generated IEC 61131-3 Structured Text from `CodeGenerationAgent/template_based.v1`.
-- The Code page shows `Real Template Code Generator`; mock mode shows `Mock Code Generator`.
-
-The Validation page now continues the live backend path:
-
-- Click `Run validation` on the Code page to open `/projects/{id}/validation`.
-- In real mode, the Validation page calls `POST /api/projects/{id}/validate`.
-- The backend `ValidationAgent/static.v1` checks Structured Text structure, declarations, assignments, block closure, unsupported language syntax, and domain-specific safety rules.
-- The page displays `VERIFIED`, `SYNTAX_ERROR`, `FORMAL_VIOLATION`, or `TIMEOUT`, plus syntax errors, safety result rows, and counterexamples when present.
-- The Validation page shows `Real Static Validator`; mock mode shows `Mock Validator`.
-- If validation passes, the Validation page shows `Continue to Optimization`.
-- If validation fails, the Validation page shows `Open Debugging Advice` and routes to `/projects/{id}/debugging`.
-
-The Debugging page consumes the latest validation report:
-
-- In real mode, the Debugging page calls `POST /api/projects/{id}/debug`.
-- The backend `DebuggingAgent/rule_based.v1` returns `NOT_REQUIRED`, `PATCH_ADVICE_GENERATED`, or `CANNOT_DEBUG`.
-- The page displays root cause summary, affected code region, patch advice, suggested regeneration prompt, and counterexample summary when present.
-- The Debugging page shows `Real Rule-Based Debugger`; mock mode shows `Mock Debugger`.
-
-The Repair Loop completes the first real repair cycle:
-
-- Click `Run Repair Loop` on `/projects/{id}/debugging`.
-- In real mode, the frontend calls `POST /api/projects/{id}/repair-loop`.
-- The backend validates the current `CodeArtifact`, asks `DebuggingAgent/rule_based.v1` for patch advice when validation fails, regenerates ST through `CodeGenerationAgent/template_based.repair.v1`, and revalidates.
-- The loop stops when validation returns `VERIFIED`, when no actionable debugging advice exists, or when `MAX_ITER=5` is reached.
-- `RepairLoopPanel` displays final status, validation attempts, code versions, debugging advice used, and the final validation result.
-- Code, Validation, and Workflow pages can display the latest repair-loop report while the frontend session keeps it cached.
-
-The Optimization page now connects to the backend optimizer:
-
-- In real mode, `/projects/{id}/optimization` calls `POST /api/projects/{id}/optimize`.
-- Optimization only runs when a `PlanObject`, `CodeArtifact`, and latest `ValidationReport` exist and the validation status is `VERIFIED`.
-- The backend `OptimizationAgent/static.v1` applies three deterministic passes: Structural Simplification, Logic Compaction, and Maintainability Enhancement.
-- Each candidate pass is revalidated with `ValidationAgent/static.v1`; failed candidates are rolled back and recorded as rollback events.
-- The page displays `OPTIMIZED`, `NO_CHANGES`, `ROLLED_BACK`, or `CANNOT_OPTIMIZE`, plus before/after metrics, pass results, rollback events, and optimized Structured Text.
-- The Optimization page shows `Real Static Optimizer`; mock mode shows `Mock Optimizer`.
-
-## Quality Commands
-
-Frontend:
+Shell:
 
 ```bash
-npm run typecheck
-npm run lint
-npm run test
-npm run test:watch
-npm run build
+npm install
+npm run dev
 ```
+
+
+
+### Docker Compose (backend service)
+
+```bash
+docker compose up --build
+```
+
+
+
+## Repository Structure
+
+```text
+
+OptPLC/
+
+├── [README.md](http://README.md)
+
+├── [AGENTS.md](http://AGENTS.md)
+
+├── .env.example
+
+├── docker-compose.yml
+
+├── docker/
+
+│   └── app.Dockerfile
+
+│
+
+├── backend/
+
+│   ├── [README.md](http://README.md)
+
+│   ├── alembic.ini
+
+│   ├── alembic/
+
+│   │   ├── [env.py](http://env.py)
+
+│   │   └── versions/
+
+│   │
+
+│   ├── app/
+
+│   │   ├── agents/
+
+│   │   │   ├── planning_[agent.py](http://agent.py)
+
+│   │   │   ├── code_generation_[agent.py](http://agent.py)
+
+│   │   │   ├── validation_[agent.py](http://agent.py)
+
+│   │   │   ├── debugging_[agent.py](http://agent.py)
+
+│   │   │   ├── optimization_[agent.py](http://agent.py)
+
+│   │   │   └── llm_[client.py](http://client.py)
+
+│   │   │
+
+│   │   ├── api/
+
+│   │   │   ├── [projects.py](http://projects.py)
+
+│   │   │   ├── [benchmarks.py](http://benchmarks.py)
+
+│   │   │   └── [health.py](http://health.py)
+
+│   │   │
+
+│   │   ├── database/
+
+│   │   ├── schemas/
+
+│   │   │   └── [contracts.py](http://contracts.py)
+
+│   │   │
+
+│   │   ├── services/
+
+│   │   │   ├── project_[service.py](http://service.py)
+
+│   │   │   ├── rag_[service.py](http://service.py)
+
+│   │   │   ├── validation_[service.py](http://service.py)
+
+│   │   │   ├── repair_[service.py](http://service.py)
+
+│   │   │   ├── metrics_[service.py](http://service.py)
+
+│   │   │   ├── benchmark_[runner.py](http://runner.py)
+
+│   │   │   └── transpiler_[service.py](http://service.py)
+
+│   │   │
+
+│   │   ├── storage/
+
+│   │   └── [main.py](http://main.py)
+
+│   │
+
+│   ├── benchmark/
+
+│   │   ├── cases/
+
+│   │   └── results/          # Generated locally and ignored by Git
+
+│   │
+
+│   ├── knowledge_base/
+
+│   │   └── patterns/
+
+│   │
+
+│   ├── tests/
+
+│   └── requirements.txt
+
+│
+
+├── src/
+
+│   ├── components/
+
+│   │   ├── common/
+
+│   │   ├── layout/
+
+│   │   ├── pages/
+
+│   │   └── ui/
+
+│   │
+
+│   ├── lib/
+
+│   │   ├── api-client/
+
+│   │   └── api-contracts/
+
+│   │
+
+│   └── test/
+
+│
+
+├── package.json
+
+├── package-lock.json
+
+└── tsconfig.json
+
+
+
+## Environment Variables
+
+Variables are documented in `.env.example`. Do not commit real secrets.
+
+- Application:
+  - `MAX_ITER`
+- Database:
+  - `DATABASE_URL`
+- LLM:
+  - `LLM_PROVIDER`
+  - `LLM_MAX_TOKENS`
+  - `LLM_TEMPERATURE`
+  - `OPENAI_API_KEY`, `OPENAI_MODEL`
+  - `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL`
+  - `GEMINI_API_KEY`, `GEMINI_MODEL`
+  - `GROQ_API_KEY`, `GROQ_MODEL`
+  - `OLLAMA_BASE_URL`, `OLLAMA_MODEL`
+- RAG:
+  - No configurable env vars in current backend settings (paths are currently defined in service code).
+- Validation:
+  - `MATIEC_BIN`
+  - `PLCVERIF_BIN`
+  - `VERIFICATION_TIMEOUT_S`
+- CORS/frontend:
+  - `NEXT_PUBLIC_API_BASE_URL`
+  - `NEXT_PUBLIC_USE_MOCK_API`
+  - `NEXT_PUBLIC_PLANNING_MODE`
+
+
+
+## Running the Application
+
+- Backend server: `uvicorn app.main:app --reload --port 8000` (from `backend/`).
+- Frontend server: `npm run dev` (from repository root).
+- Docker Compose: `docker compose up --build`.
+- Knowledge-base seeding: runs automatically during backend startup lifespan; verify via backend logs and `GET /api/health`.
+- Benchmark runner (API): `POST /api/benchmarks/run`, `POST /api/benchmarks/compare`, or `POST /api/benchmarks/run-suite`.
+
+Example suite run:
+
+```bash
+curl -X POST http://localhost:8000/api/benchmarks/run-suite
+```
+
+
+
+## Testing and Quality Checks
 
 Backend:
 
@@ -232,63 +383,85 @@ pytest
 python -m compileall app
 ```
 
-## Project Structure
+Frontend:
 
-```text
-backend/                         FastAPI backend skeleton
-backend/app/api/                 Health and project routers
-backend/app/schemas/             Pydantic API contract schemas
-backend/app/services/            Project service layer and repair loop orchestration
-backend/app/agents/              Rule-based Planning, template Code Generation, static Validation, Debugging, and Optimization agents
-backend/app/storage/             In-memory storage
-backend/app/tests/               Pytest endpoint tests
-src/app/                         Next.js routes, redirects, and global layout
-src/app/projects/[id]/           Project-scoped workflow routes
-src/components/ui/               shadcn-style reusable primitives
-src/components/common/           Product-level reusable components and states
-src/components/layout/           App shell, page header, pipeline strip
-src/components/pages/            Page-level UI composition
-src/lib/mock-data.ts             Centralized PLC and agent mock data
-src/lib/api-client/              Mock/real API client layer with typed fetch transport
-src/lib/api-contracts/           Future backend TypeScript contracts
-src/lib/monaco-structured-text.ts Monaco IEC ST language support
-src/test/                        Vitest setup and browser API shims
+```bash
+npm run typecheck
+npm run lint
+npm run test
+npm run build
 ```
 
-## Frontend-Only Status
 
-Current behavior is intentionally local and deterministic:
 
-- Frontend API client functions return mock data by default.
-- Real API mode connects health, projects, requirements submission, Plan Object creation, code generation, static validation, debugging advice, repair loop, and optimization.
-- Backend project endpoints use SQLAlchemy runtime persistence; `/plan` uses the rule-based Planning Agent, `/generate` uses the template Code Generation Agent, `/validate` uses the static Validation Agent, `/debug` uses the rule-based Debugging Agent, `/repair-loop` orchestrates validation, debugging, regeneration, and revalidation, and `/optimize` runs the static Optimization Agent with rollback-on-regression.
-- Dynamic routes pass `projectId` into page components, but mock responses resolve to the active sample project.
-- Export JSON and Export Markdown are wired to backend downloads in real API mode.
-- Export PDF remains a disabled "Coming soon" placeholder.
-- Loading, empty, and error states are simulated through local component state and mock client behavior.
-- The Monaco editor is client-only to avoid SSR issues.
+## API Overview
 
-## Test Coverage
+Routers are registered under `/api`:
 
-The Vitest suite covers the app shell, major workflow pages, dynamic project routes, project ID propagation, and mock API client responses.
+- Health:
+  - `GET /api/health`
+- Project workflow:
+  - `/api/projects` for create/list/get and full workflow (`requirements`, `plan`, `generate`, `validate`, `debug`, `repair-loop`, `optimize`, `metrics`, `report`, exports).
+- Benchmarks:
+  - `/api/benchmarks/cases`
+  - `/api/benchmarks/run`
+  - `/api/benchmarks/compare`
+  - `/api/benchmarks/run-suite`
+  - `/api/benchmarks/results`
+  - `/api/benchmarks/summary`
+
+
+
+## Evaluation Modes
+
+Supported execution/evaluation modes:
+
+- Deterministic/rule-based: used by benchmark mode `rule_based`.
+- LLM-only: used by benchmark mode `llm`.
+- LLM + RAG: used by benchmark mode `llm_rag`.
+
+Configuration:
+
+- LLM provider/model is selected through backend environment variables (`LLM_PROVIDER` and provider-specific model vars).
+- Main runtime agent mode selection is currently hardcoded in `ProjectService` (plan/code/debug/optimize use `llm`; validation uses `static`).
+
+
 
 ## Known Limitations
 
-- No persistence, authentication, authorization, or real project workspace data.
-- No LLM, RAG, or external formal solver service calls.
-- Benchmark frontend clients remain mocked.
-- Runtime project state persists in the configured SQLAlchemy database.
-- Repair-loop results are persisted only in process memory on the backend and cached only for the current frontend session.
-- Monaco highlighting is a focused IEC Structured Text tokenizer, not a full language server.
-- Export/download/copy actions are not wired to browser file APIs yet.
-- `npm audit` previously reported moderate dependency-tree vulnerabilities; review dependency upgrades before using forced audit fixes.
+- Current validation in the active runtime is compiler-backed syntax validation plus domain-aware structural safety validation; it is not full temporal-logic model checking in the default pipeline.
+- `ValidationAgent(mode="formal")` exists, but formal mode is not wired into the main project workflow endpoints.
+- Generated PLC code still requires industrial engineer review before deployment.
+- Estimated scan time is a static proxy metric unless validated on real PLC hardware/digital twin.
+- LLM outputs can vary by provider/model and prompt context.
+- Default SQLite storage is suitable for local/demo use; production persistence requires managed DB deployment.
+- Frontend includes some remaining mock-only UI data paths (for dashboard/settings/workflow monitor views).
 
-## Backend Integration Plan
 
-1. Add persistent storage and project authorization to the backend.
-2. Persist project, requirement, plan, code, validation, debugging, and repair-loop records beyond process memory.
-3. Implement metrics, report, and benchmark endpoints.
-4. Replace remaining mocked workflow clients with real API calls endpoint by endpoint.
-5. Add contract tests against the FastAPI OpenAPI schema and integration tests for the full project flow.
-6. Replace `ValidationAgent(mode="static")` with external MATIEC/nuXmv/PLCverif adapters behind the reserved formal mode when those tools are available.
-7. Add future LLM/RAG implementations behind the existing placeholder agent modes.
+
+## Roadmap (Planned)
+
+- Wire formal validation mode into the default workflow and complete nuXmv/PLCverif operational integration.
+- Expand benchmark corpus and benchmarking analytics.
+- Conduct broader industrial engineer evaluation studies.
+- Add vendor-specific codegen targets and conformance profiles.
+- Validate generated logic on real PLC hardware or digital-twin environments.
+
+
+
+## Security Notes
+
+- Never commit `.env` files or API keys.
+- Keep local DB/vector-store artifacts out of version control.
+- Rotate any credential immediately if it is accidentally committed.
+
+
+
+## Research Disclaimer
+
+OptPLC is a research prototype for academic and engineering evaluation. It is not a certified safety system and does not provide SIL or production safety guarantees.
+
+## Additional Docs
+
+- Backend technical documentation: `[backend/README.md](backend/README.md)`
+

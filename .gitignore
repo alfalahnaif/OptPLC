@@ -1,26 +1,66 @@
-# Local runtime databases
+
+# Logs
+*.log
+
+
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
+backend/.env
+frontend/.env.local
+
+# Databases
 backend/plcforge.db
 *.db
 *.sqlite
 *.sqlite3
 
+# RAG persistent storage
+rag_db/
+backend/rag_db/
+chroma/
+chroma_db/
+backend/benchmark/results/
+
 # Python
 __pycache__/
 *.py[cod]
 .pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+.coverage
+htmlcov/
 .venv/
-backend/.venv/
+venv/
 
 # Node / Next.js
 node_modules/
 .next/
 out/
 dist/
+coverage/
+tsconfig.tsbuildinfo
 
-# Environment files
-.env
-.env.local
-backend/.env
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
 
-# Logs
-*.log
+
+# Chroma / RAG runtime storage
+rag_db/
+backend/rag_db/
+chroma/
+chroma_db/
+
+# TypeScript build cache
+tsconfig.tsbuildinfo
+*.tsbuildinfo
+
+# Generated benchmark run outputs
+backend/benchmark/results/*.json
+!backend/benchmark/results/README.md
+!backend/benchmark/results/.gitkeep
