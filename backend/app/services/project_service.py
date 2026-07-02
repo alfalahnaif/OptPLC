@@ -1,12 +1,16 @@
 from __future__ import annotations
 
+import logging
 import re
+import json
+import time
 from datetime import datetime, timezone
 from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agents import CodeGenerationAgent, DebuggingAgent, OptimizationAgent, PlanningAgent, ValidationAgent
+from app.config import settings
 from app.database.repository import Repository
 from app.schemas.contracts import (
     CodeArtifact,
@@ -22,11 +26,14 @@ from app.schemas.contracts import (
     Project,
     RepairLoopReport,
     RequirementInput,
+    RequirementPayload,
     StructuredTextMetrics,
     ValidationReport,
     WorkflowEvent,
 )
 from app.services.metrics_service import MetricsService
+
+logger = logging.getLogger(__name__)
 
 
 def utc_now() -> str:
@@ -67,6 +74,104 @@ class ProjectService:
         if model is None:
             return None
         return self._to_project_contract(model)
+
+    async def get_requirements(self, project_id: str) -> RequirementPayload | None:
+        project = await self.repository.require_project(self.db, project_id)
+        session = await self.repository.get_latest_session_for_project(self.db, project_id)
+        if session is None or not session.requirement_input:
+            return {
+                "projectId": project_id,
+                "text": "",
+                "safetyConstraints": [],
+                "performanceTargets": {
+                    "maxScanTimeMs": 5,
+                    "maxCyclomaticComplexity": 8,
+                    "minMaintainabilityIndex": 75,
+                    "maxIterations": 5,
+                },
+                "confirmedOutputs": [],
+                "confirmedInputs": [],
+            }
+
+        requirement_input = RequirementInput.model_validate(session.requirement_input)
+        submitted_at = session.created_at.isoformat() if session.created_at else None
+        return RequirementPayload(
+            projectId=requirement_input.projectId,
+            text=requirement_input.text,
+            safetyConstraints=list(requirement_input.safetyConstraints),
+            confirmedOutputs=list(requirement_input.confirmedOutputs),
+            confirmedInputs=list(requirement_input.confirmedInputs),
+            performanceTargets=requirement_input.performanceTargets,
+            domain=requirement_input.domain or project.domain,
+            complexityTier=requirement_input.complexityTier or project.complexity_tier,
+            submittedAt=submitted_at,
+            updatedAt=project.updated_at.isoformat(),
+        )
+
+    async def analyze_requirement(
+        self,
+        project_id: str,
+        text: str,
+        safety_constraints: list[str],
+    ) -> dict[str, Any]:
+        """Lightweight LLM analysis for live requirement preview."""
+        from app.agents.llm_client import llm_complete
+
+        analysis_system = """You are an IEC 61131-3 PLC I/O analyst.
+Extract signals and constraints from the control requirement.
+Return ONLY valid JSON - no prose, no markdown.
+
+Schema:
+{
+  "domain": "Motor Control|Process Control|Traffic Control|Safety Interlock|Sequential Batch",
+  "confidence": 0.0-1.0,
+  "inferred_inputs": [
+    {"name": str, "type": "BOOL|INT|REAL|TIME", "source": "Operator|Safety|Sensor|Timer", "description": str}
+  ],
+  "suggested_outputs": [
+    {"name": str, "type": "BOOL", "description": str, "confirmed": false}
+  ],
+  "suggested_internals": [
+    {"name": str, "type": "BOOL|INT", "description": str}
+  ],
+  "safety_constraints": [str],
+  "suggested_constraints": [str]
+}
+
+Rules:
+- Extract ALL named signals from the text - do not miss any
+- Mark signals explicitly named in the text as inputs
+- Mark signals that are controlled outputs (valves, motors, indicators)
+- Infer internal state variables needed (step counters, fault flags)
+- Copy safety constraints VERBATIM from the safetyConstraints list
+- suggested_constraints = additional constraints implied by the text but not stated
+- confidence = how certain you are of the domain classification (0.0-1.0)"""
+
+        normalized_constraints = [item.strip() for item in safety_constraints if isinstance(item, str) and item.strip()]
+        if normalized_constraints:
+            constraints_block = "\n".join(f"- {constraint}" for constraint in normalized_constraints)
+        else:
+            constraints_block = "None stated yet."
+        user_content = (
+            f"REQUIREMENT TEXT:\n{text}\n\n"
+            f"SAFETY CONSTRAINTS ALREADY STATED:\n{constraints_block}\n\n"
+            "Analyze and extract all signals."
+        )
+        response = await llm_complete(
+            system=analysis_system,
+            messages=[{"role": "user", "content": user_content}],
+            temperature=0.1,
+            max_tokens=800,
+        )
+
+        cleaned = re.sub(r"```(?:json)?\s*|\s*```", "", response.content).strip()
+        parsed = json.loads(cleaned)
+        if not isinstance(parsed, dict):
+            raise ValueError("LLM analysis response must be a JSON object.")
+        parsed["projectId"] = project_id
+        parsed["analyzedAt"] = datetime.utcnow().isoformat() + "Z"
+        parsed["source"] = "llm"
+        return parsed
 
     async def submit_requirements(self, project_id: str, request: RequirementInput) -> WorkflowEvent:
         project = await self.repository.require_project(self.db, project_id)
@@ -109,13 +214,20 @@ class ProjectService:
             RequirementInput,
             "Requirements must be submitted before planning.",
         )
-        plan = PlanningAgent(mode="rule_based").generate_plan(
+        planning_requirement_text = requirement_input.text
+        if requirement_input.confirmedInputs:
+            planning_requirement_text += (
+                "\n\nCONFIRMED INPUT SIGNALS (ENGINEER-VERIFIED):\n"
+                + "\n".join(f"- {item}" for item in requirement_input.confirmedInputs)
+            )
+        plan = await PlanningAgent(mode="llm").generate_plan(
             project_id=project_id,
-            requirement_text=requirement_input.text,
+            requirement_text=planning_requirement_text,
             safety_constraints=requirement_input.safetyConstraints,
             performance_targets=requirement_input.performanceTargets,
-            domain=project.domain,
-            complexity_tier=project.complexity_tier,
+            confirmed_outputs=requirement_input.confirmedOutputs,
+            domain=requirement_input.domain or project.domain,
+            complexity_tier=requirement_input.complexityTier or project.complexity_tier,
         )
         event = WorkflowEvent(
             id=f"{project_id}-wf-plan-{self._next_iteration(session.workflow_events)}",
@@ -139,6 +251,13 @@ class ProjectService:
         await self.db.commit()
         return plan
 
+    async def get_plan(self, project_id: str) -> PlanObject | None:
+        await self.repository.require_project(self.db, project_id)
+        session = await self.repository.get_latest_session_for_project(self.db, project_id)
+        if session is None or session.plan_object is None:
+            return None
+        return PlanObject.model_validate(session.plan_object)
+
     async def generate_code(self, project_id: str) -> CodeArtifact:
         await self.repository.require_project(self.db, project_id)
         session = await self.repository.get_or_create_project_session(self.db, project_id)
@@ -148,7 +267,7 @@ class ProjectService:
             "PlanObject must be generated before code generation.",
         )
         iteration = self._next_code_iteration(session.code_artifact_history)
-        artifact = CodeGenerationAgent(mode="template_based").generate_code(
+        artifact = await CodeGenerationAgent(mode="llm").generate_code(
             project_id=project_id,
             plan=plan,
             iteration=iteration,
@@ -177,6 +296,13 @@ class ProjectService:
         await self.repository.update_project(self.db, project_id, status="generated")
         await self.db.commit()
         return artifact
+
+    async def get_code(self, project_id: str) -> CodeArtifact | None:
+        await self.repository.require_project(self.db, project_id)
+        session = await self.repository.get_latest_session_for_project(self.db, project_id)
+        if session is None or session.code_artifact is None:
+            return None
+        return CodeArtifact.model_validate(session.code_artifact)
 
     async def validate_code(self, project_id: str) -> ValidationReport:
         await self.repository.require_project(self.db, project_id)
@@ -213,6 +339,16 @@ class ProjectService:
         await self.db.commit()
         return report
 
+    async def get_validation(self, project_id: str) -> ValidationReport | None:
+        await self.repository.require_project(self.db, project_id)
+        session = await self.repository.get_latest_session_for_project(self.db, project_id)
+        if session is None:
+            return None
+        payload = session.validation_report or session.validation_result
+        if payload is None:
+            return None
+        return ValidationReport.model_validate(payload)
+
     async def debug_code(self, project_id: str) -> DebuggingReport:
         await self.repository.require_project(self.db, project_id)
         session = await self.repository.get_or_create_project_session(self.db, project_id)
@@ -231,11 +367,12 @@ class ProjectService:
             ValidationReport,
             "ValidationReport must be generated before debugging.",
         )
-        report = DebuggingAgent(mode="rule_based").debug(
+        report = await DebuggingAgent(mode="llm").debug(
             project_id=project_id,
             plan=plan,
             artifact=artifact,
             validation=validation,
+            iteration=1,
         )
         history = self._append_history(session.debugging_report_history, report)
         await self.repository.update_session_state(
@@ -248,7 +385,21 @@ class ProjectService:
         await self.db.commit()
         return report
 
-    async def run_repair_loop(self, project_id: str, max_iter: int = 5) -> RepairLoopReport:
+    async def get_debugging(self, project_id: str) -> DebuggingReport | None:
+        await self.repository.require_project(self.db, project_id)
+        session = await self.repository.get_latest_session_for_project(self.db, project_id)
+        if session is None or session.debugging_report is None:
+            return None
+        return DebuggingReport.model_validate(session.debugging_report)
+
+    async def run_repair_loop(self, project_id: str, max_iter: int | None = None) -> RepairLoopReport:
+        MAX_WALL_SECONDS = 90
+        loop_start = time.monotonic()
+        if max_iter is None:
+            max_iter = settings.max_iter
+        if max_iter < 1:
+            raise ValueError("max_iter must be at least 1.")
+
         await self.repository.require_project(self.db, project_id)
         session = await self.repository.get_or_create_project_session(self.db, project_id)
         plan = self._require_contract(
@@ -267,8 +418,21 @@ class ProjectService:
         validation_reports: list[ValidationReport] = []
         debugging_reports: list[DebuggingReport] = []
         final_status = "FAILED"
+        timed_out = False
 
         for attempt in range(1, max_iter + 1):
+            elapsed = time.monotonic() - loop_start
+            if elapsed > MAX_WALL_SECONDS:
+                timed_out = True
+                logger.warning(
+                    "[RepairLoop] Time budget exceeded (%ss > %ss) after %s iterations. Returning best result.",
+                    f"{elapsed:.0f}",
+                    MAX_WALL_SECONDS,
+                    attempt - 1,
+                )
+                break
+            logger.info("[RepairLoop] iteration %s/%s (elapsed %ss)", attempt, max_iter, f"{elapsed:.0f}")
+
             validation = ValidationAgent(mode="static").validate(
                 project_id=project_id,
                 artifact=current_artifact,
@@ -279,11 +443,12 @@ class ProjectService:
                 final_status = "VERIFIED"
                 break
 
-            debugging = DebuggingAgent(mode="rule_based").debug(
+            debugging = await DebuggingAgent(mode="llm").debug(
                 project_id=project_id,
                 plan=plan,
                 artifact=current_artifact,
                 validation=validation,
+                iteration=attempt,
             )
             debugging_reports.append(debugging)
             if debugging.status != "PATCH_ADVICE_GENERATED":
@@ -293,16 +458,41 @@ class ProjectService:
                 final_status = "ITERATION_LIMIT_REACHED"
                 break
 
-            current_artifact = CodeGenerationAgent(mode="template_based").generate_code(
+            current_artifact = await CodeGenerationAgent(mode="llm").generate_code(
                 project_id=project_id,
                 plan=plan,
                 patch_advice=debugging.patchAdvice,
                 suggested_regeneration_prompt=debugging.suggestedRegenerationPrompt,
                 iteration=current_artifact.iteration + 1,
+                max_tokens_hint=1500,
             )
             code_versions.append(current_artifact)
 
+        if not validation_reports:
+            validation_reports.append(
+                self._placeholder_validation_report(project_id=project_id, artifact=current_artifact).model_copy(
+                    update={
+                        "summary": "Repair loop exited before validation because the server time budget was exceeded.",
+                    }
+                )
+            )
+        if timed_out and final_status != "VERIFIED":
+            final_status = "ITERATION_LIMIT_REACHED"
+            validation_reports[-1] = validation_reports[-1].model_copy(
+                update={
+                    "status": "TIMEOUT",
+                    "summary": (
+                        "Repair loop time budget exceeded before verification; returning the latest generated artifact."
+                    ),
+                }
+            )
+
         final_validation = validation_reports[-1]
+        summary = (
+            "Repair loop stopped because the server time budget was exceeded; returning the latest generated artifact."
+            if timed_out and final_status != "VERIFIED"
+            else self._repair_summary(final_status, len(validation_reports), len(debugging_reports))
+        )
         report = RepairLoopReport(
             projectId=project_id,
             finalStatus=final_status,  # type: ignore[arg-type]
@@ -312,7 +502,7 @@ class ProjectService:
             debuggingReports=debugging_reports,
             codeVersions=code_versions,
             validationReports=validation_reports,
-            summary=self._repair_summary(final_status, len(validation_reports), len(debugging_reports)),
+            summary=summary,
         )
 
         validation_history = self._append_many_history(session.validation_report_history, validation_reports)
@@ -340,6 +530,13 @@ class ProjectService:
         await self.db.commit()
         return report
 
+    async def get_optimization(self, project_id: str) -> OptimizationReport | None:
+        await self.repository.require_project(self.db, project_id)
+        session = await self.repository.get_latest_session_for_project(self.db, project_id)
+        if session is None or session.optimization_report is None:
+            return None
+        return OptimizationReport.model_validate(session.optimization_report)
+
     async def optimize_code(self, project_id: str) -> OptimizationReport:
         await self.repository.require_project(self.db, project_id)
         session = await self.repository.get_or_create_project_session(self.db, project_id)
@@ -361,7 +558,7 @@ class ProjectService:
         if validation.status != "VERIFIED":
             raise ValueError("Code must be verified before optimization. Run validation or repair loop first.")
         repair_loop_report = RepairLoopReport.model_validate(session.repair_loop_report) if session.repair_loop_report else None
-        report = OptimizationAgent(mode="static").optimize(
+        report = await OptimizationAgent(mode="llm").optimize(
             project_id=project_id,
             artifact=artifact,
             plan=plan,

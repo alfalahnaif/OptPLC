@@ -1,0 +1,34 @@
+{
+  "id": "B004",
+  "name": "Safety Gate Interlock",
+  "domain": "Safety Interlock",
+  "complexity": "medium",
+  "requirement": "Machine M-04 may only run when: Safety_Gate is closed, Light_Curtain is clear, E_Stop is healthy, Reset_PB has been pressed after any fault. Any safety violation immediately stops the machine.",
+  "expected_inputs": [
+    "Safety_Gate",
+    "Light_Curtain",
+    "E_Stop",
+    "Reset_PB",
+    "Run_Command"
+  ],
+  "expected_outputs": [
+    "Machine_Enable",
+    "Fault_Lamp",
+    "Ready_Lamp"
+  ],
+  "safety_constraints": [
+    "Machine_Enable must be false whenever any safety permissive is false.",
+    "Fault must latch and require Reset_PB before Machine_Enable can re-activate.",
+    "Ready_Lamp must only be true when all safety permissives are healthy."
+  ],
+  "expected_properties": [
+    {
+      "id": "B004-P1",
+      "description": "Machine output is gated by all safety permissives."
+    },
+    {
+      "id": "B004-P2",
+      "description": "Fault latch requires manual reset after a violation."
+    }
+  ]
+}

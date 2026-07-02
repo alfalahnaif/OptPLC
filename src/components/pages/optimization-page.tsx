@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { ArrowRight, Eye, RotateCcw, Sparkles } from "lucide-react";
 
 import { CodePanel } from "@/components/common/code-panel";
@@ -14,19 +15,35 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import type { OptimizationReport, OptimizationStatus, StructuredTextMetrics } from "@/lib/api-contracts";
-import { ACTIVE_PROJECT_ID, getOptimizationPageData, projectPath, useApiResource } from "@/lib/api-client";
+import { ACTIVE_PROJECT_ID, getOptimizationPageData, optimizeCode, projectPath, useApiResource } from "@/lib/api-client";
 
 export function OptimizationPage({ projectId = ACTIVE_PROJECT_ID, state }: { projectId?: string; state?: PageState } = {}) {
-  const resource = useApiResource(() => getOptimizationPageData(projectId), [projectId]);
+  const [reloadToken, setReloadToken] = useState(0);
+  const [isRunningOptimization, setIsRunningOptimization] = useState(false);
+  const [runOptimizationError, setRunOptimizationError] = useState<string | null>(null);
+  const resource = useApiResource(() => getOptimizationPageData(projectId), [projectId, reloadToken]);
   const effectiveState = state ?? resource.state;
   const data = resource.data;
   const report = data?.report;
+  const isEmpty = effectiveState === "empty" || (effectiveState === "ready" && !report);
+  async function handleRunOptimizationNow() {
+    setRunOptimizationError(null);
+    setIsRunningOptimization(true);
+    try {
+      await optimizeCode(projectId);
+      setReloadToken((value) => value + 1);
+    } catch (error) {
+      setRunOptimizationError(error instanceof Error ? error.message : "Unable to run optimization.");
+    } finally {
+      setIsRunningOptimization(false);
+    }
+  }
+
   const stateView =
-    effectiveState !== "ready" || !report ? (
+    effectiveState === "loading" || effectiveState === "error" ? (
       <PageStateGate
-        state={effectiveState === "ready" ? "loading" : effectiveState}
+        state={effectiveState}
         loading={{ title: "Running optimization", description: "Applying deterministic ST transformations with revalidation after each pass." }}
-        empty={{ title: "No optimization results", description: "Run optimization after validation passes." }}
         error={{ title: "Optimization report unavailable", description: optimizationErrorDescription(resource.error) }}
       />
     ) : null;
@@ -47,7 +64,22 @@ export function OptimizationPage({ projectId = ACTIVE_PROJECT_ID, state }: { pro
           </>
         }
       />
-      {stateView ?? (report ? <OptimizationReportView report={report} /> : null)}
+      {stateView ?? (report ? <OptimizationReportView report={report} /> : isEmpty ? (
+        <Card>
+          <CardContent className="flex min-h-72 flex-col items-center justify-center gap-3 text-center">
+            <div className="text-base font-semibold">No optimization results</div>
+            <p className="max-w-md text-sm text-muted-foreground">Run optimization before viewing results.</p>
+            {runOptimizationError ? (
+              <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-900 dark:bg-red-950/30 dark:text-red-200">
+                {runOptimizationError}
+              </div>
+            ) : null}
+            <Button onClick={() => void handleRunOptimizationNow()} disabled={isRunningOptimization}>
+              {isRunningOptimization ? "Running optimization..." : "Run Optimization Now"}
+            </Button>
+          </CardContent>
+        </Card>
+      ) : null)}
     </>
   );
 }

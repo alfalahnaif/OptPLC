@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import re
 from datetime import datetime, timezone
 from typing import Callable, Literal
@@ -19,13 +20,71 @@ from app.schemas.contracts import (
 from app.services.metrics_service import MetricsService
 
 OptimizationMode = Literal["static", "llm"]
+logger = logging.getLogger(__name__)
+
+OPT_SYSTEM_BASE = """You are an IEC 61131-3 PLC code optimization agent.
+
+ABSOLUTE CONSTRAINTS — violation triggers immediate rollback:
+1. IDENTICAL logical behavior for ALL possible input combinations
+2. Do NOT rename VAR_INPUT or VAR_OUTPUT variable names (hardware-fixed)
+3. Do NOT add new functionality or new output variables
+4. Do NOT change safety guard conditions (Emergency, Fault, interlock)
+5. ALL logic MUST resolve in a SINGLE PLC scan cycle:
+   - Do NOT create variables that feed back into themselves in same scan
+   - Do NOT introduce scan-cycle dependencies not present in original
+   - If UNSURE whether a change is scan-safe: LEAVE IT UNCHANGED
+MATIEC v0.1 TYPE RULES:
+- AND/OR operators require BOOL operands only
+- Never use an INT variable directly in AND/OR expressions
+- WRONG: Step_State AND NOT Fault_State
+- RIGHT: (Step_State > 0) AND NOT Fault_State
+- All CASE labels must be integer literals, not named constants
+6. Output ONLY the optimized ST code — no markdown, no explanation"""
+
+PASS_CONFIGS = {
+    1: {
+        "name": "Structural Simplification",
+        "temperature": 0.1,
+        "objective": """PASS 1: Structural Simplification
+Merge redundant IF/ELSIF chains into minimal form.
+Remove dead code (branches that can never execute).
+Simplify IF-THEN-ELSE when both branches assign same variable:
+  BEFORE: IF A THEN X:=TRUE; ELSE X:=FALSE; END_IF;
+  AFTER:  X := A;
+Combine consecutive assignments to same variable.
+NEVER convert CASE to IF chains — that is reverse optimization.
+Target: reduce IF count and line count.""",
+    },
+    2: {
+        "name": "Logic Compaction",
+        "temperature": 0.15,
+        "objective": """PASS 2: Logic Compaction
+Rewrite multi-line boolean IF chains as single assignments.
+  BEFORE: IF A AND NOT B THEN C:=TRUE; ELSE C:=FALSE; END_IF;
+  AFTER:  C := A AND NOT B;
+Apply De Morgan's law where it reduces operator count.
+Remove intermediate BOOL variables that mirror another variable.
+Only compact when BOTH branches assign the same output variable.""",
+    },
+    3: {
+        "name": "Maintainability Enhancement",
+        "temperature": 0.2,
+        "objective": """PASS 3: Maintainability Enhancement
+1. Rename ambiguous INTERNAL VAR names to self-documenting ones.
+   ONLY rename internal VARs. NEVER rename VAR_INPUT or VAR_OUTPUT.
+2. Add ONE-LINE comment (* ... *) above each logical section.
+3. Reorder logic blocks: safety sensing → fault handling → step transitions → output assignment.
+4. Remove intermediate variables that simply mirror NOT of another.
+Add comments that explain WHAT the code does, not HOW.""",
+    },
+}
 
 
 class OptimizationAgent:
     def __init__(self, mode: OptimizationMode = "static") -> None:
         self.mode = mode
 
-    def optimize(
+    async def optimize(
         self,
         *,
         project_id: str,
@@ -35,10 +94,32 @@ class OptimizationAgent:
         repair_loop_report: RepairLoopReport | None = None,
     ) -> OptimizationReport:
         if self.mode == "llm":
-            raise NotImplementedError("OptimizationAgent llm mode is reserved for future LLM-assisted optimization and makes no external calls.")
+            return await self._optimize_with_llm(
+                project_id=project_id,
+                artifact=artifact,
+                plan=plan,
+                validation=validation,
+                repair_loop_report=repair_loop_report,
+            )
         if self.mode != "static":
             raise ValueError(f"Unsupported OptimizationAgent mode: {self.mode}")
+        return self._optimize_static(
+            project_id=project_id,
+            artifact=artifact,
+            plan=plan,
+            validation=validation,
+            repair_loop_report=repair_loop_report,
+        )
 
+    def _optimize_static(
+        self,
+        *,
+        project_id: str,
+        artifact: CodeArtifact,
+        plan: PlanObject,
+        validation: ValidationReport,
+        repair_loop_report: RepairLoopReport | None = None,
+    ) -> OptimizationReport:
         original_metrics = MetricsService.calculate(artifact.source)
         if validation.status != "VERIFIED":
             preserved_artifact = self._optimized_artifact(
@@ -47,6 +128,7 @@ class OptimizationAgent:
                 source=artifact.source,
                 iteration=artifact.iteration,
                 metrics=original_metrics,
+                generator="static_optimizer.v1",
             )
             return OptimizationReport(
                 projectId=project_id,
@@ -133,6 +215,7 @@ class OptimizationAgent:
             source=current_source,
             iteration=artifact.iteration + 1,
             metrics=after_metrics,
+            generator="static_optimizer.v1",
         )
 
         if changed:
@@ -159,6 +242,204 @@ class OptimizationAgent:
             createdAt=self._utc_now(),
             summary=self._summary(status=status, passes=passes, repair_loop_report=repair_loop_report),
             revalidated=final_validation.status == "VERIFIED",
+        )
+
+    async def _optimize_with_llm(
+        self,
+        project_id: str,
+        artifact: CodeArtifact,
+        plan: PlanObject,
+        validation: ValidationReport,
+        repair_loop_report: RepairLoopReport | None,
+    ) -> OptimizationReport:
+        from app.agents.llm_client import llm_complete
+
+        current_code = artifact.source
+        current_validation = validation
+        passes_data: list[OptimizationPassResult] = []
+        rollback_events: list[OptimizationRollbackEvent] = []
+        passes_applied = 0
+        changed = False
+        input_names = [signal.name for signal in plan.inputs]
+        output_names = [signal.name for signal in plan.outputs]
+        safety_constraints = plan.safetyConstraints or []
+
+        for pass_num in range(1, 4):
+            cfg = PASS_CONFIGS[pass_num]
+            pass_name = str(cfg["name"])
+            before_source = current_code
+            before_metrics = MetricsService.calculate(before_source)
+            system = OPT_SYSTEM_BASE + "\n\n" + str(cfg["objective"])
+            user_content = (
+                f"PLAN REFERENCE:\n"
+                f"Inputs (DO NOT RENAME): {', '.join(input_names)}\n"
+                f"Outputs (DO NOT RENAME): {', '.join(output_names)}\n"
+                f"Safety constraints: {chr(10).join(safety_constraints)}\n\n"
+                f"CURRENT CODE TO OPTIMIZE:\n{before_source}\n\n"
+                f"Apply {pass_name} now. Output ONLY the ST code."
+            )
+
+            try:
+                response = await llm_complete(
+                    system=system,
+                    messages=[{"role": "user", "content": user_content}],
+                    temperature=float(cfg["temperature"]),
+                    max_tokens=2000,
+                )
+                candidate = response.content.strip()
+                candidate = re.sub(r"```[\w-]*\s*|\s*```", "", candidate).strip()
+
+                missing_io = [name for name in output_names if name not in candidate]
+                if missing_io:
+                    passes_data.append(
+                        OptimizationPassResult(
+                            name=pass_name,
+                            status="no_changes",
+                            summary=f"{pass_name} skipped: missing output names in candidate {missing_io}.",
+                            accepted=False,
+                            revalidationStatus=current_validation.status,
+                            beforeMetrics=before_metrics,
+                            afterMetrics=before_metrics,
+                        )
+                    )
+                    logger.warning("[OptimizationAgent] Pass %s skipped due to missing I/O names: %s", pass_num, missing_io)
+                    continue
+
+                if "PROGRAM" not in candidate.upper() or "END_PROGRAM" not in candidate.upper():
+                    passes_data.append(
+                        OptimizationPassResult(
+                            name=pass_name,
+                            status="no_changes",
+                            summary=f"{pass_name} skipped: candidate does not contain PROGRAM...END_PROGRAM.",
+                            accepted=False,
+                            revalidationStatus=current_validation.status,
+                            beforeMetrics=before_metrics,
+                            afterMetrics=before_metrics,
+                        )
+                    )
+                    logger.warning("[OptimizationAgent] Pass %s skipped due to invalid ST structure.", pass_num)
+                    continue
+
+                test_artifact = artifact.model_copy(
+                    update={
+                        "source": candidate,
+                        "artifactId": f"{project_id}-optimization-candidate-{pass_num}",
+                    }
+                )
+                recheck = ValidationAgent(mode="static").validate(
+                    project_id=project_id,
+                    artifact=test_artifact,
+                    plan=plan,
+                )
+
+                if recheck.status == "VERIFIED":
+                    after_metrics = MetricsService.calculate(candidate)
+                    did_change = candidate != before_source
+                    current_code = candidate
+                    current_validation = recheck
+                    changed = changed or did_change
+                    if did_change:
+                        passes_applied += 1
+                    passes_data.append(
+                        OptimizationPassResult(
+                            name=pass_name,
+                            status="applied" if did_change else "no_changes",
+                            summary=(
+                                f"{pass_name} applied and revalidated."
+                                if did_change
+                                else f"{pass_name} produced no source changes after normalization; candidate revalidated."
+                            ),
+                            accepted=True,
+                            revalidationStatus=recheck.status,
+                            beforeMetrics=before_metrics,
+                            afterMetrics=after_metrics,
+                        )
+                    )
+                    logger.info("[OptimizationAgent] Pass %s (%s) APPLIED", pass_num, pass_name)
+                else:
+                    rollback_events.append(
+                        OptimizationRollbackEvent(
+                            passName=pass_name,
+                            reason=f"Re-validation failed: {recheck.status}. Candidate rolled back to pre-pass code.",
+                            revalidationStatus=recheck.status,
+                        )
+                    )
+                    passes_data.append(
+                        OptimizationPassResult(
+                            name=pass_name,
+                            status="rolled_back",
+                            summary=f"{pass_name} rolled back because static revalidation returned {recheck.status}.",
+                            accepted=False,
+                            revalidationStatus=recheck.status,
+                            beforeMetrics=before_metrics,
+                            afterMetrics=before_metrics,
+                        )
+                    )
+                    logger.warning("[OptimizationAgent] Pass %s ROLLED BACK: %s", pass_num, recheck.status)
+            except Exception as exc:
+                rollback_events.append(
+                    OptimizationRollbackEvent(
+                        passName=pass_name,
+                        reason=f"Pass failed with exception and was rolled back: {exc}",
+                        revalidationStatus=current_validation.status,
+                    )
+                )
+                passes_data.append(
+                    OptimizationPassResult(
+                        name=pass_name,
+                        status="rolled_back",
+                        summary=f"{pass_name} rolled back due to pass execution error: {exc}",
+                        accepted=False,
+                        revalidationStatus=current_validation.status,
+                        beforeMetrics=before_metrics,
+                        afterMetrics=before_metrics,
+                    )
+                )
+                logger.error("[OptimizationAgent] Pass %s error: %s", pass_num, exc)
+
+        metrics_before = MetricsService.calculate(artifact.source)
+        metrics_after = MetricsService.calculate(current_code)
+        optimized_artifact = self._optimized_artifact(
+            project_id=project_id,
+            source_artifact=artifact,
+            source=current_code,
+            iteration=artifact.iteration + 1,
+            metrics=metrics_after,
+            generator="OptimizationAgent/llm.v1",
+        )
+        if changed:
+            status = "OPTIMIZED"
+        elif rollback_events:
+            status = "ROLLED_BACK"
+        else:
+            status = "NO_CHANGES"
+        summary = (
+            f"LLM optimizer applied {passes_applied} pass(es) with per-pass revalidation and rollback enforcement."
+            if status == "OPTIMIZED"
+            else "LLM optimizer made no accepted source changes after revalidation safeguards."
+        )
+        if status == "ROLLED_BACK":
+            summary = "LLM optimizer rolled back one or more passes after failed revalidation; safe baseline was preserved."
+        if repair_loop_report and repair_loop_report.finalStatus == "VERIFIED":
+            summary = f"{summary} Optimization ran after verified repair-loop output."
+
+        return OptimizationReport(
+            projectId=project_id,
+            sourceArtifactId=artifact.artifactId,
+            optimizedArtifactId=optimized_artifact.artifactId,
+            status=status,
+            optimizer="llm.v1",
+            originalCode=artifact,
+            optimizedCode=optimized_artifact,
+            passes=passes_data,
+            beforeMetrics=metrics_before,
+            afterMetrics=metrics_after,
+            metricsDelta=MetricsService.delta(metrics_before, metrics_after),
+            revalidationStatus=current_validation.status,
+            rollbackEvents=rollback_events,
+            createdAt=self._utc_now(),
+            summary=summary,
+            revalidated=current_validation.status == "VERIFIED",
         )
 
     @staticmethod
@@ -291,6 +572,7 @@ class OptimizationAgent:
         source: str,
         iteration: int,
         metrics,
+        generator: str,
     ) -> CodeArtifact:
         created_at = OptimizationAgent._utc_now()
         return source_artifact.model_copy(
@@ -307,7 +589,7 @@ class OptimizationAgent:
                     maintainabilityIndex=metrics.maintainabilityIndex,
                 ),
                 "metadata": CodeMetadata(
-                    generator="static_optimizer.v1",
+                    generator=generator,
                     iecStandard="IEC 61131-3",
                     sourcePlanId=source_artifact.metadata.sourcePlanId,
                     createdAt=created_at,

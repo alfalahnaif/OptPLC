@@ -1,8 +1,8 @@
 "use client";
 
-import Link from "next/link";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { ArrowRight, CheckCircle2, Clock, ShieldCheck, TriangleAlert, XCircle } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 import { PageStateGate, type PageState } from "@/components/common/page-state";
 import { RepairLoopPanel } from "@/components/common/repair-loop-panel";
@@ -16,19 +16,56 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import type { ValidationReport, ValidationStatus } from "@/lib/api-contracts";
-import { ACTIVE_PROJECT_ID, getValidationPageData, projectPath, useApiResource } from "@/lib/api-client";
+import { ACTIVE_PROJECT_ID, debugCode, getValidationPageData, optimizeCode, projectPath, useApiResource, validateCode } from "@/lib/api-client";
 
 export function ValidationPage({ projectId = ACTIVE_PROJECT_ID, state }: { projectId?: string; state?: PageState } = {}) {
-  const resource = useApiResource(() => getValidationPageData(projectId), [projectId]);
+  const router = useRouter();
+  const [reloadToken, setReloadToken] = useState(0);
+  const [isRunningValidation, setIsRunningValidation] = useState(false);
+  const [runValidationError, setRunValidationError] = useState<string | null>(null);
+  const [isRunningNextStep, setIsRunningNextStep] = useState(false);
+  const [nextStepError, setNextStepError] = useState<string | null>(null);
+  const resource = useApiResource(() => getValidationPageData(projectId), [projectId, reloadToken]);
   const effectiveState = state ?? resource.state;
   const data = resource.data;
   const report = data?.report;
+  async function handleRunValidationNow() {
+    setRunValidationError(null);
+    setIsRunningValidation(true);
+    try {
+      await validateCode(projectId);
+      setReloadToken((value) => value + 1);
+    } catch (error) {
+      setRunValidationError(error instanceof Error ? error.message : "Unable to run validation.");
+    } finally {
+      setIsRunningValidation(false);
+    }
+  }
+  async function handleNextStep() {
+    if (!report) return;
+    setNextStepError(null);
+    setIsRunningNextStep(true);
+    try {
+      if (report.status === "VERIFIED") {
+        await optimizeCode(projectId);
+        router.push(projectPath(projectId, "optimization"));
+      } else {
+        await debugCode(projectId);
+        router.push(projectPath(projectId, "debugging"));
+      }
+    } catch (error) {
+      setNextStepError(error instanceof Error ? error.message : "Unable to continue.");
+    } finally {
+      setIsRunningNextStep(false);
+    }
+  }
+
+  const isEmpty = effectiveState === "empty" || (effectiveState === "ready" && !report);
   const stateView =
-    effectiveState !== "ready" || !report ? (
+    effectiveState === "loading" || effectiveState === "error" ? (
       <PageStateGate
-        state={effectiveState === "ready" ? "loading" : effectiveState}
+        state={effectiveState}
         loading={{ title: "Running validation", description: "Checking Structured Text syntax and static domain safety rules." }}
-        empty={{ title: "No validation report", description: "Generate Structured Text code before running validation." }}
         error={{
           title: "Validation report unavailable",
           description: validationErrorDescription(resource.error)
@@ -47,15 +84,43 @@ export function ValidationPage({ projectId = ACTIVE_PROJECT_ID, state }: { proje
           <>
             <ValidationModeBadge />
             {report ? <ValidationStatusBadge status={report.status} /> : null}
-            {report ? <ValidationNextAction projectId={projectId} status={report.status} /> : null}
+            {report ? (
+              <ValidationNextAction
+                status={report.status}
+                onClick={() => void handleNextStep()}
+                loading={isRunningNextStep}
+              />
+            ) : null}
           </>
         }
       />
+      {nextStepError ? (
+        <div className="mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-900 dark:bg-red-950/30 dark:text-red-200">
+          {nextStepError}
+        </div>
+      ) : null}
       {stateView ?? (report ? (
         <div className="space-y-5">
           <ValidationReportView report={report} />
           {data?.repairLoopReport ? <RepairLoopPanel report={data.repairLoopReport} /> : null}
         </div>
+      ) : isEmpty ? (
+        <Card>
+          <CardContent className="flex min-h-72 flex-col items-center justify-center gap-3 text-center">
+            <div className="text-base font-semibold">No validation report</div>
+            <p className="max-w-md text-sm text-muted-foreground">
+              Run validation from the Generated Code page before viewing results.
+            </p>
+            {runValidationError ? (
+              <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-900 dark:bg-red-950/30 dark:text-red-200">
+                {runValidationError}
+              </div>
+            ) : null}
+            <Button onClick={() => void handleRunValidationNow()} disabled={isRunningValidation}>
+              {isRunningValidation ? "Running validation..." : "Run validation now"}
+            </Button>
+          </CardContent>
+        </Card>
       ) : null)}
     </>
   );
@@ -208,13 +273,19 @@ function ValidationStatusBadge({ status }: { status: ValidationStatus }) {
   return <Badge tone={tone} dot>{status}</Badge>;
 }
 
-function ValidationNextAction({ projectId, status }: { projectId: string; status: ValidationStatus }) {
+function ValidationNextAction({
+  status,
+  onClick,
+  loading
+}: {
+  status: ValidationStatus;
+  onClick: () => void;
+  loading: boolean;
+}) {
   const verified = status === "VERIFIED";
   return (
-    <Button asChild>
-      <Link href={projectPath(projectId, verified ? "optimization" : "debugging")}>
-        {verified ? "Continue to Optimization" : "Open Debugging Advice"} <ArrowRight />
-      </Link>
+    <Button onClick={onClick} disabled={loading}>
+      {verified ? (loading ? "Running optimization..." : "Continue to Optimization") : (loading ? "Preparing debugging advice..." : "Open Debugging Advice")} <ArrowRight />
     </Button>
   );
 }

@@ -1,611 +1,209 @@
-# PLC Agent Optimizer Backend
+# OptPLC Backend
 
-FastAPI backend for the PLC Agent Optimizer frontend. This service provides REST endpoints backed by SQLAlchemy persistence plus deterministic Planning, Code Generation, Validation, Debugging, Repair Loop, Optimization, Metrics, and Final Report services.
+FastAPI backend for OptPLC. It exposes project workflow and benchmark APIs, persists state with async SQLAlchemy, runs LLM-assisted planning/code/debug/optimization, performs compiler-backed syntax checks plus domain-aware structural safety checks, and produces metrics/final reports.
 
-Benchmark runner, authentication, LLM calls, and external formal verification tools are not implemented yet.
+## Runtime Startup
 
-## Setup
+PowerShell:
 
-```bash
+```powershell
 cd backend
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -r requirements-dev.txt
-```
-
-## Run
-
-```bash
 uvicorn app.main:app --reload --port 8000
 ```
 
-The API will be available at `http://localhost:8000`.
+Shell:
 
-## Database Migrations (Alembic)
+```bash
+cd backend
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements-dev.txt
+uvicorn app.main:app --reload --port 8000
+```
 
-Alembic is configured in `backend/alembic.ini` and `backend/alembic/`.
+API base URL: `http://localhost:8000/api`
 
-Run all migrations:
+## Configuration
+
+Primary settings module: `backend/app/config.py`.
+
+- LLM provider routing: `LLM_PROVIDER` (`anthropic`, `openai`, `gemini`, `groq`, `ollama`)
+- Provider keys/models:
+  - `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL`
+  - `OPENAI_API_KEY`, `OPENAI_MODEL`
+  - `GEMINI_API_KEY`, `GEMINI_MODEL`
+  - `GROQ_API_KEY`, `GROQ_MODEL`
+  - `OLLAMA_BASE_URL`, `OLLAMA_MODEL`
+- Validation:
+  - `MATIEC_BIN`
+  - `PLCVERIF_BIN`
+  - `VERIFICATION_TIMEOUT_S`
+- Persistence:
+  - `DATABASE_URL`
+- Pipeline controls:
+  - `MAX_ITER`
+  - `LLM_MAX_TOKENS`
+  - `LLM_TEMPERATURE`
+
+## Database and Migrations
+
+- ORM models: `backend/app/database/models.py`
+- Engine/session: `backend/app/database/database.py`
+- Repository abstraction: `backend/app/database/repository.py`
+- Migration tooling: `backend/alembic.ini` + `backend/alembic/versions/`
+
+Commands:
 
 ```bash
 cd backend
 alembic upgrade head
-```
-
-Create a new migration revision:
-
-```bash
-cd backend
-alembic revision -m "describe change"
-```
-
-Create a revision from model diffs:
-
-```bash
-cd backend
 alembic revision --autogenerate -m "describe change"
 ```
 
-Downgrade one migration:
+Runtime note:
+
+- `app.main` also runs `Base.metadata.create_all()` at startup for local convenience.
+- Alembic remains the schema source of truth for controlled environments.
+
+## Agent and Service Architecture
+
+### Runtime agent modes in `ProjectService`
+
+- Planning: `PlanningAgent(mode="llm")`
+- Code generation: `CodeGenerationAgent(mode="llm")`
+- Validation: `ValidationAgent(mode="static")`
+- Debugging: `DebuggingAgent(mode="llm")`
+- Optimization: `OptimizationAgent(mode="llm")`
+
+### Agent responsibilities
+
+- `PlanningAgent`: requirement -> `PlanObject` (with `internalVars` support).
+- `CodeGenerationAgent`: plan (+ optional patch advice) -> `CodeArtifact`.
+- `ValidationAgent`: code + plan -> `ValidationReport`.
+- `DebuggingAgent`: failed validation context -> `DebuggingReport`.
+- `OptimizationAgent`: verified/repaired artifact -> `OptimizationReport` + rollback metadata.
+
+### LLM provider abstraction
+
+`backend/app/agents/llm_client.py` provides unified async completion for:
+
+- Anthropic
+- OpenAI
+- Gemini (OpenAI-compatible endpoint)
+- Groq (OpenAI-compatible endpoint)
+- Ollama
+
+## RAG Initialization and Persistence
+
+RAG service: `backend/app/services/rag_service.py`
+
+- Storage: ChromaDB persistent store at `/app/rag_db` (container path).
+- Seed source: `/app/knowledge_base/patterns`.
+- Startup behavior: `app.main` lifespan calls `get_rag_service().seed()`.
+- Active usage:
+  - Planning LLM path (retrieval context included).
+  - Benchmark mode `llm_rag` (code generation RAG enabled).
+- Not active by default:
+  - Main `/generate` path does not explicitly enable `CodeGenerationAgent.rag_enabled`.
+
+## Validation Stages
+
+### Active runtime path (`ValidationAgent(mode="static")`)
+
+1. Optional MATIEC syntax validation (if binary is available).
+2. Static syntax/structure checks (fallback or supplemental checks).
+3. Domain-aware structural safety checks (motor, traffic, tank, interlock, batch).
+
+This corresponds to compiler-backed syntax validation and domain-aware structural safety validation.
+
+### Implemented but not active in default pipeline (`mode="formal"`)
+
+- ST -> SMV transpilation (`transpiler_service.py`)
+- PLCverif execution (`validation_service.py`, `PLCVerifValidator`)
+
+The formal path exists in source but is not selected by `ProjectService` for normal `/validate`.
+
+## API Routes
+
+Routers are mounted in `app.main` under `/api`:
+
+- Health:
+  - `GET /api/health`
+- Projects:
+  - `POST /api/projects`
+  - `GET /api/projects`
+  - `GET /api/projects/{project_id}`
+  - `POST /api/projects/{project_id}/requirements`
+  - `GET /api/projects/{project_id}/requirements`
+  - `POST /api/projects/{project_id}/analyze-requirement`
+  - `POST /api/projects/{project_id}/plan`
+  - `GET /api/projects/{project_id}/plan`
+  - `POST /api/projects/{project_id}/generate`
+  - `GET /api/projects/{project_id}/code`
+  - `POST /api/projects/{project_id}/validate`
+  - `GET /api/projects/{project_id}/validation`
+  - `POST /api/projects/{project_id}/debug`
+  - `GET /api/projects/{project_id}/debug`
+  - `POST /api/projects/{project_id}/repair-loop`
+  - `POST /api/projects/{project_id}/optimize`
+  - `GET /api/projects/{project_id}/optimization`
+  - `GET /api/projects/{project_id}/metrics`
+  - `GET /api/projects/{project_id}/report`
+  - `GET /api/projects/{project_id}/report/export/json`
+  - `GET /api/projects/{project_id}/report/export/markdown`
+- Benchmarks:
+  - `GET /api/benchmarks/cases`
+  - `POST /api/benchmarks/run`
+  - `POST /api/benchmarks/compare`
+  - `POST /api/benchmarks/run-suite`
+  - `GET /api/benchmarks/results`
+  - `GET /api/benchmarks/summary`
+
+## Benchmarks
+
+Benchmark runner: `backend/app/services/benchmark_runner.py`
+
+- Supported modes: `rule_based`, `llm`, `llm_rag`
+- Cases loaded from `backend/benchmark/cases/` (B001..B005)
+- Output persisted as JSON under `backend/benchmark/results/`
+
+Example:
+
+```bash
+curl -X POST http://localhost:8000/api/benchmarks/run-suite
+```
+
+## Tests and Quality Checks
+
+Run backend checks:
 
 ```bash
 cd backend
-alembic downgrade -1
-```
-
-### Dev `create_all` vs Production Migrations
-
-- `app.main` keeps a **dev-only** startup bootstrap with `Base.metadata.create_all()` so local runs/tests work even before Alembic is applied.
-- Production and shared environments should use Alembic (`alembic upgrade head`) as the source of truth for schema evolution.
-- Keep `create_all` as a convenience bootstrap only; schema changes must be captured in new Alembic revisions.
-
-## Implemented Endpoints
-
-- `GET /api/health`
-- `POST /api/projects`
-- `GET /api/projects`
-- `GET /api/projects/{id}`
-- `POST /api/projects/{id}/requirements`
-- `POST /api/projects/{id}/plan`
-- `POST /api/projects/{id}/generate`
-- `POST /api/projects/{id}/validate`
-- `POST /api/projects/{id}/debug`
-- `POST /api/projects/{id}/repair-loop`
-- `POST /api/projects/{id}/optimize`
-- `GET /api/projects/{id}/metrics`
-- `GET /api/projects/{id}/report`
-- `GET /api/projects/{id}/report/export/json`
-- `GET /api/projects/{id}/report/export/markdown`
-
-## Planning Agent
-
-`POST /api/projects/{id}/plan` now calls `PlanningAgent` instead of returning static mock data. The agent reads the stored project requirement and emits a frontend-compatible `PlanObject` with:
-
-- `inputs`
-- `outputs`
-- `logicRules`
-- `safetyConstraints`
-- `scope`
-
-The public response shape remains camelCase to match the frontend TypeScript contracts.
-
-### Modes
-
-- `rule_based` is the default mode. It uses deterministic templates and keyword/domain matching.
-- `llm` is reserved for a future LLM integration. It raises a placeholder error and does not call external APIs.
-
-### Rule-Based Domains
-
-The deterministic parser supports:
-
-- Motor start/stop with emergency stop and overload protection
-- Traffic light controller
-- Tank level control
-- Safety interlock
-- Sequential batch process
-- Generic fallback for unsupported domains
-
-### Sample Flow
-
-Submit requirements:
-
-```bash
-curl -X POST http://localhost:8000/api/projects/PRJ-0421/requirements \
-  -H "Content-Type: application/json" \
-  -d '{
-    "projectId": "PRJ-0421",
-    "text": "Control a three-phase motor with Start_PB, Stop_PB, E_Stop, Overload, and Reset_PB. Faults must latch until reset.",
-    "safetyConstraints": [
-      "Motor must not auto-restart after E-stop",
-      "Reset requires explicit operator action"
-    ],
-    "performanceTargets": {
-      "maxScanTimeMs": 5,
-      "maxCyclomaticComplexity": 8,
-      "minMaintainabilityIndex": 75,
-      "maxIterations": 5
-    }
-  }'
-```
-
-Generate a plan:
-
-```bash
-curl -X POST http://localhost:8000/api/projects/PRJ-0421/plan
-```
-
-Example response excerpt:
-
-```json
-{
-  "projectId": "PRJ-0421",
-  "agent": "PlanningAgent/rule_based.v1",
-  "inputs": [
-    {
-      "name": "Start_PB",
-      "type": "BOOL",
-      "source": "DI-04",
-      "description": "Momentary start pushbutton"
-    }
-  ],
-  "outputs": [
-    {
-      "name": "Motor_Run",
-      "type": "BOOL",
-      "address": "DO-01",
-      "description": "Motor contactor coil"
-    }
-  ],
-  "logicRules": [
-    "Implement the controller as an IEC 61131-3 PROGRAM POU"
-  ],
-  "safetyConstraints": [
-    "Motor must not auto-restart after E-stop"
-  ],
-  "scope": {
-    "standard": "IEC 61131-3",
-    "edition": "3rd ed. (2013)",
-    "language": "Structured Text",
-    "runtime": "CODESYS / TwinCAT compatible"
-  }
-}
-```
-
-## Code Generation Agent
-
-`POST /api/projects/{id}/generate` calls `CodeGenerationAgent` after a `PlanObject` has been stored. It returns a frontend-compatible `CodeArtifact` with `source` containing IEC 61131-3 Structured Text and `metadata` describing the deterministic generator.
-
-### Modes
-
-- `template_based` is the default mode. It emits deterministic ST from the stored `PlanObject`.
-- `llm` is reserved for a future LLM integration. It raises a placeholder error and does not call external APIs.
-
-### Template-Based Domains
-
-The generator supports plans for:
-
-- Motor start/stop with emergency stop and overload protection
-- Traffic light controller
-- Tank level control
-- Safety interlock
-- Sequential batch process
-- Generic fallback plans
-
-Generate code:
-
-```bash
-curl -X POST http://localhost:8000/api/projects/PRJ-0421/generate
-```
-
-Example Structured Text excerpt:
-
-```iecst
-PROGRAM PLC_PRJ_0421_Controller
-(* Generated by CodeGenerationAgent template_based.v1 from PlanObject. *)
-
-VAR_INPUT
-    Start_PB : BOOL;  (* Momentary start pushbutton *)
-    E_Stop : BOOL;  (* Emergency stop input *)
-END_VAR
-
-VAR_OUTPUT
-    Motor_Run : BOOL;  (* Motor contactor coil *)
-END_VAR
-
-VAR
-    Run_Cmd : BOOL;
-    Fault_State : BOOL;
-END_VAR
-
-(* Main control logic. *)
-IF NOT Safety_OK THEN
-    Fault_State := TRUE;
-    Run_Cmd := FALSE;
-END_IF;
-
-Motor_Run := Run_Cmd AND Safety_OK AND NOT Fault_State;
-END_PROGRAM
-```
-
-## Validation Agent
-
-`POST /api/projects/{id}/validate` calls `ValidationAgent` after a `PlanObject` and `CodeArtifact` have both been stored. It returns a frontend-compatible `ValidationReport` with the legacy booleans (`syntaxPassed`, `formalPassed`) plus explicit status fields and detailed result collections.
-
-If code has not been generated yet, the endpoint returns:
-
-```json
-{
-  "detail": "CodeArtifact must be generated before validation."
-}
-```
-
-If a plan is missing, the endpoint returns:
-
-```json
-{
-  "detail": "PlanObject must be generated before validation."
-}
-```
-
-### Modes
-
-- `static` is the default mode. It performs deterministic IEC Structured Text checks and rule-based domain safety checks. When MATIEC is configured and executable, static mode also runs an optional MATIEC syntax-hardening pass before safety checks.
-- `formal` is reserved for future MATIEC, nuXmv, or PLCverif integration. It raises a placeholder error and does not call external tools.
-
-### MATIEC Optional Syntax Hardening
-
-- Configure MATIEC with `MATIEC_BIN` (defaults to `/usr/local/bin/iec2c`).
-- If MATIEC is available and executable, syntax diagnostics are included in `ValidationReport.syntaxErrors` when MATIEC detects compilation/syntax issues.
-- If MATIEC is unavailable, not executable, times out, or cannot start in the current environment (for example Linux-style path on Windows), validation falls back to the deterministic static syntax checks without failing the request.
-- Formal verification is still not implemented. MATIEC is currently used only as optional syntax hardening in static mode.
-
-### Static Checks
-
-The static validator checks:
-
-- non-empty code
-- `PROGRAM` or `FUNCTION_BLOCK` plus matching end block
-- `VAR_INPUT`, `VAR_OUTPUT`, and matching `END_VAR` blocks
-- declared assigned variables
-- IEC assignment operator `:=`
-- uppercase boolean constants `TRUE` and `FALSE`
-- balanced `IF`, `CASE`, `FOR`, and `WHILE` blocks
-- obvious unsupported Python, JavaScript, C++, or pseudocode syntax
-
-It also runs deterministic domain safety rules for:
-
-- motor control E-stop, overload, and manual reset behavior
-- traffic light conflicting green/walk prevention
-- tank level high/low limit handling and REAL level variables
-- safety interlock fail-safe permissives
-- sequential batch step/state and safe idle fallback
-
-### Statuses
-
-- `VERIFIED` means syntax/static checks and all safety checks passed.
-- `SYNTAX_ERROR` means basic IEC ST structure or declarations failed.
-- `FORMAL_VIOLATION` means static domain safety checks failed.
-- `TIMEOUT` is reserved for future formal solver integrations.
-
-Validate generated code:
-
-```bash
-curl -X POST http://localhost:8000/api/projects/PRJ-0421/validate
-```
-
-Example response excerpt:
-
-```json
-{
-  "projectId": "PRJ-0421",
-  "artifactId": "PRJ-0421-code-iter-1",
-  "iteration": 1,
-  "status": "VERIFIED",
-  "syntaxPassed": true,
-  "formalPassed": true,
-  "solver": "static.v1",
-  "validator": "static.v1",
-  "summary": "Structured Text syntax and static safety checks passed.",
-  "syntaxErrors": [],
-  "formalErrors": [],
-  "safetyResults": [
-    {
-      "id": "MC-1",
-      "description": "Motor output must be forced FALSE when emergency stop is active",
-      "status": "passed",
-      "details": null
-    }
-  ],
-  "counterexamples": []
-}
-```
-
-## Debugging Agent
-
-`POST /api/projects/{id}/debug` calls `DebuggingAgent` after a `PlanObject`, `CodeArtifact`, and `ValidationReport` have all been stored. It returns a frontend-compatible `DebuggingReport` with structured patch advice for later regeneration.
-
-If validation has not run yet, the endpoint returns:
-
-```json
-{
-  "detail": "ValidationReport must be generated before debugging."
-}
-```
-
-If code or plan data is missing, the endpoint returns the corresponding `CodeArtifact must be generated before debugging.` or `PlanObject must be generated before debugging.` error.
-
-### Modes
-
-- `rule_based` is the default mode. It deterministically maps syntax and safety failures to root cause summaries, affected code regions, patch advice, and suggested regeneration prompts.
-- `llm` is reserved for future LLM-assisted debugging. It raises a placeholder error and does not call external APIs.
-
-### Debugging Statuses
-
-- `NOT_REQUIRED` means the source validation status was `VERIFIED`.
-- `PATCH_ADVICE_GENERATED` means the agent found actionable syntax or safety patch advice.
-- `CANNOT_DEBUG` means no concrete failure was available, such as a future formal solver `TIMEOUT`.
-
-The rule-based debugger recognizes:
-
-- missing POU declarations or end blocks
-- missing or unclosed VAR sections
-- undeclared assigned variables
-- unbalanced IF, CASE, FOR, and WHILE blocks
-- unsupported Python, JavaScript, C++, or pseudocode syntax
-- motor E-stop, overload, auto-restart, and reset problems
-- traffic conflicting green/walk phase problems
-- tank high/low level and REAL variable problems
-- safety interlock fail-safe problems
-- sequential batch state/abort/fallback problems
-
-Generate debugging advice:
-
-```bash
-curl -X POST http://localhost:8000/api/projects/PRJ-0421/debug
-```
-
-Example response excerpt:
-
-```json
-{
-  "projectId": "PRJ-0421",
-  "sourceArtifactId": "PRJ-0421-code-iter-1",
-  "status": "PATCH_ADVICE_GENERATED",
-  "sourceValidationStatus": "FORMAL_VIOLATION",
-  "errorType": "motor_safety_shutdown",
-  "rootCauseSummary": "Motor_Run is not visibly forced FALSE by the emergency stop or overload safety path.",
-  "affectedCodeRegion": "Motor_Run and safety latch logic",
-  "patchAdvice": [
-    "Introduce a Safety_OK expression using E_Stop and Overload.",
-    "Force Run_Cmd and Motor_Run FALSE whenever Safety_OK is false."
-  ],
-  "suggestedRegenerationPrompt": "Regenerate IEC 61131-3 Structured Text for project PRJ-0421...",
-  "counterexampleSummary": "1 counterexample step(s) reported; first violation: MC-1.",
-  "createdAt": "2026-05-19T10:00:00+00:00",
-  "debugger": "rule_based.v1"
-}
-```
-
-## Repair Loop
-
-`POST /api/projects/{id}/repair-loop` runs the first deterministic repair cycle over the stored project state. It requires a `PlanObject` and `CodeArtifact` before starting.
-
-The loop is orchestrated by `RepairService.run_repair_loop(project_id)`:
-
-1. Run `ValidationAgent/static.v1` on the current code artifact.
-2. If validation is `VERIFIED`, return immediately with the current code and validation report.
-3. If validation returns `SYNTAX_ERROR` or `FORMAL_VIOLATION`, run `DebuggingAgent/rule_based.v1`.
-4. Pass `DebuggingReport.patchAdvice` and `DebuggingReport.suggestedRegenerationPrompt` into `CodeGenerationAgent/template_based.repair.v1`.
-5. Store the regenerated `CodeArtifact`, re-run validation, and repeat until verification or `MAX_ITER=5`.
-
-If code has not been generated yet, the endpoint returns:
-
-```json
-{
-  "detail": "CodeArtifact must be generated before running repair loop."
-}
-```
-
-If a plan is missing, the endpoint returns:
-
-```json
-{
-  "detail": "PlanObject must be generated before running repair loop."
-}
-```
-
-The service stores:
-
-- latest repair-loop report
-- code artifact history
-- validation report history
-- debugging report history
-
-Example response excerpt:
-
-```json
-{
-  "projectId": "PRJ-0421",
-  "finalStatus": "VERIFIED",
-  "iterations": 2,
-  "summary": "Repair loop verified the code after 2 validation attempt(s) and 1 debugging pass(es).",
-  "finalCodeArtifact": {
-    "artifactId": "PRJ-0421-code-iter-2",
-    "language": "structured-text",
-    "metadata": {
-      "generator": "template_based.repair.v1",
-      "iecStandard": "IEC 61131-3",
-      "sourcePlanId": "PRJ-0421",
-      "iteration": 2
-    }
-  },
-  "finalValidationReport": {
-    "status": "VERIFIED",
-    "validator": "static.v1"
-  },
-  "debuggingReports": [],
-  "codeVersions": [],
-  "validationReports": []
-}
-```
-
-## Optimization Agent
-
-`POST /api/projects/{id}/optimize` runs `OptimizationAgent/static.v1` against the latest verified `CodeArtifact`. The endpoint enforces that a `PlanObject`, `CodeArtifact`, and latest `ValidationReport` exist, and the latest validation status must be `VERIFIED`.
-
-If code has not been generated yet, the endpoint returns:
-
-```json
-{
-  "detail": "CodeArtifact must be generated before optimization."
-}
-```
-
-If validation has not run yet, the endpoint returns:
-
-```json
-{
-  "detail": "ValidationReport must be generated before optimization."
-}
-```
-
-If the latest validation failed, the endpoint returns:
-
-```json
-{
-  "detail": "Code must be verified before optimization. Run validation or repair loop first."
-}
-```
-
-### Modes
-
-- `static` is the default mode. It applies deterministic IEC 61131-3 Structured Text transformations and revalidates every candidate.
-- `llm` is reserved for future LLM-assisted optimization. It raises a placeholder error and does not call external APIs.
-
-### Metrics
-
-`MetricsService` calculates deterministic Structured Text metrics:
-
-- executable LOC, excluding blanks, comments, declarations, and POU/VAR delimiters
-- cyclomatic complexity from AST decision points (`CC = 1 + decision_points`) via `STAstParser`
-- approximate maintainability index from LOC and complexity
-- estimated scan time from weighted deterministic counts for assignments, branch conditions, CASE branches, boolean operators, comparisons, and timer function blocks
-
-When the parser cannot parse a given ST sample, metrics safely fall back to regex-based decision counting. This fallback is internal and logged; API response contracts remain unchanged.
-
-Current parser limitations:
-
-- grammar focuses on common IEC 61131-3 Structured Text forms used in this repository
-- unsupported syntax variations may trigger fallback mode
-- fallback mode maintains endpoint availability but may be less precise than AST-based counting
-
-### Passes
-
-The static optimizer runs three passes:
-
-1. **Structural Simplification** collapses safe adjacent/nested IF patterns and normalizes repeated safety checks.
-2. **Logic Compaction** removes consecutive duplicate assignments and compacts repeated latch/reset assignments where the validator can prove safety is preserved.
-3. **Maintainability Enhancement** adds deterministic section annotations and ensures safe CASE defaults for state logic.
-
-Each pass produces a candidate source artifact and calls `ValidationAgent/static.v1`. Passing candidates are accepted. Failing candidates are rolled back and recorded in `rollbackEvents`.
-
-### Statuses
-
-- `OPTIMIZED` means at least one source-changing pass was accepted and final revalidation passed.
-- `NO_CHANGES` means the verified source was already in a safe optimized form.
-- `ROLLED_BACK` means candidate passes were rejected by revalidation and the original verified code was preserved.
-- `CANNOT_OPTIMIZE` is reserved for non-runnable optimization contexts; the endpoint normally returns a `400` for failed preconditions.
-
-Optimize verified code:
-
-```bash
-curl -X POST http://localhost:8000/api/projects/PRJ-0421/optimize
-```
-
-Example response excerpt:
-
-```json
-{
-  "projectId": "PRJ-0421",
-  "status": "OPTIMIZED",
-  "optimizer": "static.v1",
-  "sourceArtifactId": "PRJ-0421-code-iter-1",
-  "optimizedArtifactId": "PRJ-0421-code-optimized-2",
-  "passes": [
-    {
-      "name": "Structural Simplification",
-      "status": "applied",
-      "accepted": true,
-      "revalidationStatus": "VERIFIED"
-    }
-  ],
-  "beforeMetrics": {
-    "loc": 17,
-    "cyclomaticComplexity": 4,
-    "maintainabilityIndex": 58,
-    "estimatedScanTimeMs": 1.04
-  },
-  "afterMetrics": {
-    "loc": 14,
-    "cyclomaticComplexity": 3,
-    "maintainabilityIndex": 67,
-    "estimatedScanTimeMs": 0.82
-  },
-  "rollbackEvents": [],
-  "revalidationStatus": "VERIFIED",
-  "summary": "Static optimizer applied 2 pass(es); every accepted pass revalidated successfully."
-}
-```
-
-## Quality Checks
-
-```bash
 pytest
 python -m compileall app
 ```
 
-## Frontend Integration Notes
+## Docker
 
-CORS is enabled for:
+Compose file: `docker-compose.yml` (backend service only)
 
-- `http://localhost:3000`
-- `http://127.0.0.1:3000`
+```bash
+docker compose up --build
+```
 
-The response shapes mirror the frontend TypeScript API contracts in `src/lib/api-contracts/`. Runtime state is persisted through SQLAlchemy in the configured database URL.
+Image build file: `docker/app.Dockerfile`
 
-## Final Report Endpoint
+- Builds MATIEC (`iec2c`) in a builder stage.
+- Installs Python dependencies and runs `uvicorn`.
+- Includes a PLCverif placeholder executable path; formal runtime availability depends on real binary provisioning.
 
-`GET /api/projects/{id}/report` assembles a final report from the latest persisted SQLAlchemy session artifacts.
+## Troubleshooting
 
-Export endpoints:
-
-- `GET /api/projects/{id}/report/export/json` returns a downloadable JSON report using `application/json` and `Content-Disposition` attachment headers.
-- `GET /api/projects/{id}/report/export/markdown` returns a downloadable Markdown report using `text/markdown` and `Content-Disposition` attachment headers.
-
-Included sections:
-
-- project metadata
-- requirement input (when available)
-- plan object (when available)
-- generated Structured Text artifact (when available)
-- validation, debugging, repair-loop, optimization, and metrics summaries
-- recommendations and limitations disclaimer
-
-Partial behavior:
-
-- Returns `404` if the project does not exist.
-- Returns `400` when no meaningful persisted artifacts exist for the project.
-- Returns a partial report when only some artifacts exist; missing sections are represented with `"Not generated yet"`-style summaries.
-- JSON and Markdown exports are implemented via backend download endpoints and real frontend buttons.
-- PDF export remains future work.
-
-## Next Backend Steps
-
-1. Add Alembic migrations for production schema evolution.
-2. Add real project lifecycle state transitions and request validation rules.
-3. Add the future LLM implementation behind `PlanningAgent(mode="llm")` and `CodeGenerationAgent(mode="llm")`.
-4. Add external MATIEC/nuXmv/PLCverif adapters behind `ValidationAgent(mode="formal")`.
-5. Add future LLM-assisted debugging behind `DebuggingAgent(mode="llm")`.
-6. Implement benchmark endpoint and PDF export backend.
-7. Add authentication and project authorization.
-8. Add contract tests against the frontend API client before enabling more live backend calls.
+- `LLM provider key errors`: ensure the key for selected `LLM_PROVIDER` is set.
+- `MATIEC unavailable` in `/api/health`: verify `MATIEC_BIN` path and executable permissions.
+- `No RAG patterns loaded`: ensure knowledge-base files are mounted/copied where the service expects them.
+- `Project not found` / `artifact missing` on workflow routes: complete prior pipeline steps in order (`requirements -> plan -> generate -> validate ...`).
+- `Formal validation expectations`: default runtime uses `ValidationAgent(mode="static")`; formal flow is implemented but not wired into main project orchestration.

@@ -1,30 +1,50 @@
 from __future__ import annotations
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.agents import CodeGenerationAgent, DebuggingAgent, ValidationAgent
-from app.schemas.contracts import CodeArtifact, DebuggingReport, RepairLoopFinalStatus, RepairLoopReport, ValidationReport
-from app.storage.memory import MemoryStore
+from app.database.repository import Repository
+from app.schemas.contracts import (
+    CodeArtifact,
+    DebuggingReport,
+    PlanObject,
+    RepairLoopFinalStatus,
+    RepairLoopReport,
+    ValidationReport,
+)
 
 MAX_ITER = 5
 
 
 class RepairService:
-    def __init__(self, storage: MemoryStore) -> None:
-        self.storage = storage
+    def __init__(self, db: AsyncSession) -> None:
+        self.db = db
+        self.repository = Repository()
 
-    def run_repair_loop(self, project_id: str, max_iter: int = MAX_ITER) -> RepairLoopReport:
-        self.storage.require_project(project_id)
-        plan = self.storage.get_plan(project_id)
-        if plan is None:
+    async def run_repair_loop(self, project_id: str, max_iter: int = MAX_ITER) -> RepairLoopReport:
+        await self.repository.require_project(self.db, project_id)
+        session = await self.repository.get_or_create_project_session(self.db, project_id)
+
+        if session.plan_object is None:
             raise ValueError("PlanObject must be generated before running repair loop.")
-        current_artifact = self.storage.get_code_artifact(project_id)
-        if current_artifact is None:
-            raise ValueError("CodeArtifact must be generated before running repair loop.")
+        plan = PlanObject.model_validate(session.plan_object)
 
-        code_versions: list[CodeArtifact] = self.storage.list_code_artifacts(project_id) or [current_artifact]
+        if session.code_artifact is None:
+            raise ValueError("CodeArtifact must be generated before running repair loop.")
+        current_artifact = CodeArtifact.model_validate(session.code_artifact)
+
+        code_versions: list[CodeArtifact] = [CodeArtifact.model_validate(item) for item in (session.code_artifact_history or [])]
+        if not code_versions:
+            code_versions = [current_artifact]
+
         validation_reports: list[ValidationReport] = []
         debugging_reports: list[DebuggingReport] = []
         final_validation: ValidationReport | None = None
         final_status: RepairLoopFinalStatus = "FAILED"
+        session_state = session.state
+        validation_history_payload = list(session.validation_report_history or [])
+        debugging_history_payload = list(session.debugging_report_history or [])
+        code_history_payload = list(session.code_artifact_history or [])
 
         for attempt in range(1, max_iter + 1):
             validation = ValidationAgent(mode="static").validate(
@@ -32,7 +52,16 @@ class RepairService:
                 artifact=current_artifact,
                 plan=plan,
             )
-            self.storage.save_validation_report(project_id, validation)
+            validation_history_payload.append(validation.model_dump())
+            session = await self.repository.update_session_state(
+                self.db,
+                session.id,
+                session_state,
+                validation_result=validation.model_dump(),
+                validation_report=validation.model_dump(),
+                validation_report_history=validation_history_payload,
+            )
+            session_state = session.state
             validation_reports.append(validation)
             final_validation = validation
 
@@ -40,13 +69,22 @@ class RepairService:
                 final_status = "VERIFIED"
                 break
 
-            debugging = DebuggingAgent(mode="rule_based").debug(
+            debugging = await DebuggingAgent(mode="llm").debug(
                 project_id=project_id,
                 plan=plan,
                 artifact=current_artifact,
                 validation=validation,
+                iteration=attempt,
             )
-            self.storage.save_debugging_report(project_id, debugging)
+            debugging_history_payload.append(debugging.model_dump())
+            session = await self.repository.update_session_state(
+                self.db,
+                session.id,
+                session_state,
+                debugging_report=debugging.model_dump(),
+                debugging_report_history=debugging_history_payload,
+            )
+            session_state = session.state
             debugging_reports.append(debugging)
 
             if debugging.status != "PATCH_ADVICE_GENERATED":
@@ -57,14 +95,23 @@ class RepairService:
                 final_status = "ITERATION_LIMIT_REACHED"
                 break
 
-            current_artifact = CodeGenerationAgent(mode="template_based").generate_code(
+            current_artifact = await CodeGenerationAgent(mode="template_based").generate_code(
                 project_id=project_id,
                 plan=plan,
                 patch_advice=debugging.patchAdvice,
                 suggested_regeneration_prompt=debugging.suggestedRegenerationPrompt,
                 iteration=current_artifact.iteration + 1,
             )
-            self.storage.save_code_artifact(project_id, current_artifact)
+            code_history_payload.append(current_artifact.model_dump())
+            session = await self.repository.update_session_state(
+                self.db,
+                session.id,
+                session_state,
+                code_artifact=current_artifact.model_dump(),
+                code_artifact_history=code_history_payload,
+                st_code=current_artifact.source,
+            )
+            session_state = session.state
             code_versions.append(current_artifact)
 
         if final_validation is None:
@@ -81,7 +128,13 @@ class RepairService:
             validationReports=validation_reports,
             summary=self._summary(final_status, len(validation_reports), len(debugging_reports)),
         )
-        self.storage.save_repair_loop_report(project_id, report)
+        await self.repository.update_session_state(
+            self.db,
+            session.id,
+            session_state,
+            repair_loop_report=report.model_dump(),
+        )
+        await self.db.commit()
         return report
 
     @staticmethod

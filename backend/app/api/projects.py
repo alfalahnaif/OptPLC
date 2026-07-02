@@ -14,6 +14,7 @@ from app.schemas.contracts import (
     Project,
     RepairLoopReport,
     RequirementInput,
+    RequirementPayload,
     ValidationReport,
     WorkflowEvent,
 )
@@ -159,6 +160,51 @@ async def submit_requirements(
         ) from exc
 
 
+@router.get("/{project_id}/requirements", response_model=RequirementPayload)
+async def get_requirements(
+    project_id: str,
+    service: ProjectService = Depends(get_project_service),
+) -> RequirementPayload:
+    try:
+        requirements = await service.get_requirements(project_id)
+    except LookupError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Project {project_id} was not found.",
+        ) from exc
+    if requirements is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Requirements for project {project_id} were not found.",
+        )
+    return requirements
+
+
+@router.post("/{project_id}/analyze-requirement")
+async def analyze_requirement(
+    project_id: str,
+    body: dict,
+    service: ProjectService = Depends(get_project_service),
+) -> dict:
+    text = str(body.get("text", ""))
+    constraints = body.get("safetyConstraints", [])
+    if not isinstance(constraints, list):
+        constraints = []
+    safe_constraints = [item for item in constraints if isinstance(item, str)]
+    if not text.strip():
+        return {
+            "domain": "Unknown",
+            "confidence": 0.0,
+            "inferred_inputs": [],
+            "suggested_outputs": [],
+            "suggested_internals": [],
+            "safety_constraints": [],
+            "suggested_constraints": [],
+            "source": "empty",
+        }
+    return await service.analyze_requirement(project_id, text, safe_constraints)
+
+
 @router.post("/{project_id}/generate", response_model=CodeArtifact)
 async def generate_code(
     project_id: str,
@@ -176,6 +222,26 @@ async def generate_code(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(exc),
         ) from exc
+
+
+@router.get("/{project_id}/code", response_model=CodeArtifact)
+async def get_code(
+    project_id: str,
+    service: ProjectService = Depends(get_project_service),
+) -> CodeArtifact:
+    try:
+        artifact = await service.get_code(project_id)
+    except LookupError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Project {project_id} was not found.",
+        ) from exc
+    if artifact is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Code artifact for project {project_id} was not found.",
+        )
+    return artifact
 
 
 @router.post("/{project_id}/validate", response_model=ValidationReport)
@@ -197,6 +263,26 @@ async def validate_code(
         ) from exc
 
 
+@router.get("/{project_id}/validation", response_model=ValidationReport)
+async def get_validation(
+    project_id: str,
+    service: ProjectService = Depends(get_project_service),
+) -> ValidationReport:
+    try:
+        report = await service.get_validation(project_id)
+    except LookupError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Project {project_id} was not found.",
+        ) from exc
+    if report is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Validation report for project {project_id} was not found.",
+        )
+    return report
+
+
 @router.post("/{project_id}/debug", response_model=DebuggingReport)
 async def debug_code(
     project_id: str,
@@ -216,6 +302,26 @@ async def debug_code(
         ) from exc
 
 
+@router.get("/{project_id}/debug", response_model=DebuggingReport)
+async def get_debugging(
+    project_id: str,
+    service: ProjectService = Depends(get_project_service),
+) -> DebuggingReport:
+    try:
+        report = await service.get_debugging(project_id)
+    except LookupError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Project {project_id} was not found.",
+        ) from exc
+    if report is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Debugging report for project {project_id} was not found.",
+        )
+    return report
+
+
 @router.post("/{project_id}/optimize", response_model=OptimizationReport)
 async def optimize_code(
     project_id: str,
@@ -233,6 +339,26 @@ async def optimize_code(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(exc),
         ) from exc
+
+
+@router.get("/{project_id}/optimization", response_model=OptimizationReport)
+async def get_optimization(
+    project_id: str,
+    service: ProjectService = Depends(get_project_service),
+) -> OptimizationReport:
+    try:
+        report = await service.get_optimization(project_id)
+    except LookupError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Project {project_id} was not found.",
+        ) from exc
+    if report is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Optimization report for project {project_id} was not found.",
+        )
+    return report
 
 
 @router.post("/{project_id}/repair-loop", response_model=RepairLoopReport)
@@ -271,3 +397,23 @@ async def create_plan(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(exc),
         ) from exc
+
+
+@router.get("/{project_id}/plan", response_model=PlanObject)
+async def get_plan(
+    project_id: str,
+    service: ProjectService = Depends(get_project_service),
+) -> PlanObject:
+    try:
+        plan = await service.get_plan(project_id)
+    except LookupError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Project {project_id} was not found.",
+        ) from exc
+    if plan is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Plan object for project {project_id} was not found.",
+        )
+    return plan

@@ -32,6 +32,49 @@ export interface RequirementInput {
     minMaintainabilityIndex: number;
     maxIterations: number;
   };
+  confirmedOutputs?: string[];
+  confirmedInputs?: string[];
+  domain?: string;
+  complexityTier?: string;
+}
+
+export interface RequirementPayload {
+  projectId: string;
+  text: string;
+  safetyConstraints: string[];
+  confirmedOutputs?: string[];
+  confirmedInputs?: string[];
+  performanceTargets: {
+    maxScanTimeMs: number;
+    maxCyclomaticComplexity: number;
+    minMaintainabilityIndex: number;
+    maxIterations: number;
+  };
+  domain?: string | null;
+  complexityTier?: string | null;
+  submittedAt?: string | null;
+  updatedAt?: string | null;
+}
+
+export interface AnalysisSignal {
+  name: string;
+  type: "BOOL" | "INT" | "REAL" | "TIME";
+  source?: "Operator" | "Safety" | "Sensor" | "Timer";
+  description?: string;
+  confirmed?: boolean;
+}
+
+export interface AnalysisResult {
+  domain: string;
+  confidence: number;
+  inferred_inputs: AnalysisSignal[];
+  suggested_outputs: AnalysisSignal[];
+  suggested_internals: AnalysisSignal[];
+  safety_constraints: string[];
+  suggested_constraints: string[];
+  projectId?: string;
+  analyzedAt?: string;
+  source?: "llm" | "heuristic" | "empty";
 }
 
 export interface PlanSignal {
@@ -42,14 +85,44 @@ export interface PlanSignal {
   description: string;
 }
 
+export interface RAGSource {
+  id: string;
+  name: string;
+  similarity?: number;
+  domain?: string;
+  patternType?: string;
+}
+
+export interface CodeMetadata {
+  generator: string;
+  iecStandard: "IEC 61131-3";
+  sourcePlanId: string;
+  createdAt: string;
+  iteration: number;
+  ragSources?: RAGSource[];
+  llmProvider?: string;
+  llmModel?: string;
+  generationMode?: string;
+  tokensUsed?: number;
+  generationTimeMs?: number;
+}
+
 export interface PlanObject {
   projectId: string;
   agent: string;
   generatedAt: string;
   inputs: PlanSignal[];
   outputs: PlanSignal[];
+  internalVars?: Array<{
+    name: string;
+    type: string;
+    description: string;
+  }>;
   logicRules: string[];
   safetyConstraints: string[];
+  llmProvider?: string;
+  llmModel?: string;
+  tokensUsed?: number;
   scope: {
     standard: "IEC 61131-3";
     edition: string;
@@ -92,13 +165,7 @@ export interface CodeArtifact {
     cyclomaticComplexity: number;
     maintainabilityIndex: number;
   };
-  metadata: {
-    generator: string;
-    iecStandard: "IEC 61131-3";
-    sourcePlanId: string;
-    createdAt: string;
-    iteration: number;
-  };
+  metadata: CodeMetadata;
 }
 
 export type ValidationStatus = "VERIFIED" | "SYNTAX_ERROR" | "FORMAL_VIOLATION" | "TIMEOUT";
@@ -145,6 +212,9 @@ export interface DebuggingReport {
   createdAt: string;
   debugger: string;
   regeneratedArtifactId?: string;
+  llmProvider?: string;
+  llmModel?: string;
+  tokensUsed?: number;
 }
 
 export type OptimizationStatus = "OPTIMIZED" | "NO_CHANGES" | "ROLLED_BACK" | "CANNOT_OPTIMIZE";
@@ -244,6 +314,94 @@ export interface BenchmarkCase {
   status: "passed" | "warning" | "failed" | "pending";
   runtimeMs?: number;
   optimizationGainPercent?: number;
+}
+
+export interface BenchmarkCaseDefinition {
+  id: string;
+  name: string;
+  domain: string;
+  complexity: "simple" | "medium" | "complex";
+  requirement: string;
+  safetyConstraints: string[];
+  expectedInputs: string[];
+  expectedOutputs: string[];
+  expectedProperties: Array<{
+    id: string;
+    description: string;
+  }>;
+}
+
+export interface BenchmarkCaseCatalogItem {
+  id: string;
+  name: string;
+  domain: string;
+  complexity: "simple" | "medium" | "complex";
+  caseId?: string;
+  case_id?: string;
+  caseName?: string;
+  title?: string;
+}
+
+export type BenchmarkMode = "rule_based" | "llm" | "llm_rag";
+
+export interface BenchmarkCaseResult {
+  caseId: string;
+  mode: BenchmarkMode;
+  domain: string;
+  verified: boolean;
+  validationStatus?: ValidationStatus | null;
+  repairIterations: number;
+  generationTimeMs: number;
+  metrics: StructuredTextMetrics;
+  ragSourcesUsed: string[];
+  llmProvider?: string | null;
+  llmModel?: string | null;
+  generatedCode: string;
+  error?: string | null;
+}
+
+export interface BenchmarkComparisonDelta {
+  locDelta: number;
+  ccDelta: number;
+  miDelta: number;
+  scanDelta: number;
+  repairIterations: number;
+  verified?: boolean | null;
+}
+
+export interface BenchmarkComparisonResult {
+  caseId: string;
+  results: Record<string, BenchmarkCaseResult | { error: string; mode?: string }>;
+  comparison: {
+    llmVsBaseline: BenchmarkComparisonDelta;
+    ragVsLlm: BenchmarkComparisonDelta;
+    ragVsBaseline: BenchmarkComparisonDelta;
+  };
+}
+
+export interface BenchmarkSummaryResponse {
+  totalRuns: number;
+  byMode: Record<BenchmarkMode, {
+    avgLoc: number;
+    avgCC: number;
+    verificationRate: number;
+    avgRepairIterations: number;
+  }>;
+  bestMode: BenchmarkMode | "none";
+  cases: Array<{
+    id: string;
+    name: string;
+    results: Record<string, BenchmarkCaseResult | { error: string; mode?: string }>;
+  }>;
+}
+
+export interface BenchmarkSuiteRunResponse {
+  runId: string;
+  completedAt: string;
+  totalCases: number;
+  totalRuns: number;
+  cases: BenchmarkComparisonResult[];
+  summary: BenchmarkSummaryResponse;
 }
 
 export interface FinalReport {

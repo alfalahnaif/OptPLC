@@ -1,0 +1,16 @@
+{
+  "id": "PAT-007",
+  "name": "Fault Acknowledgment and Reset",
+  "domain": "Generic",
+  "pattern_type": "Fault Reset",
+  "description": "Standard two-step fault reset. Fault latches on any safety event. Reset only when all conditions are safe AND operator presses Reset_PB.",
+  "tags": ["fault", "reset", "latch", "acknowledge", "safety"],
+  "safety_level": "critical",
+  "st_snippet": "(* Fault latching — any safety event sets fault *)\nIF NOT Emergency_Stop OR Abort_PB OR Overload THEN\n    Fault_Latched := TRUE;\nEND_IF;\n\n(* Two-condition reset: safe state AND operator action *)\nIF Reset_PB\n   AND Emergency_Stop      (* E-Stop healthy *)\n   AND NOT Abort_PB        (* Abort cleared *)\n   AND NOT Overload        (* Overload cleared *)\n   AND Fault_Latched THEN  (* Only resets if actually faulted *)\n    Fault_Latched := FALSE;\n    Step_State := 0;       (* Return to safe idle *)\nEND_IF;",
+  "safety_notes": "Never allow Reset_PB to clear fault without verifying all safety conditions. Step_State must return to 0 on reset to prevent resuming mid-sequence.",
+  "common_mistakes": [
+    "Reset without checking E-Stop health — allows reset while still in danger",
+    "Not resetting Step_State — sequence resumes from mid-point after reset"
+  ],
+  "applicable_rules": ["BT-7", "MC-3", "GEN-3"]
+}

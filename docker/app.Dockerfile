@@ -7,12 +7,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Clone the official public Beremiz MATIEC repository and build it
-RUN git clone --depth 1 https://github.com/beremiz/matiec.git /tmp/matiec \
-    && cd /tmp/matiec \
+RUN git clone --depth 1 https://github.com/beremiz/matiec.git /matiec \
+    && cd /matiec \
     && autoreconf -i \
     && ./configure \
     && make -j"$(nproc)" \
-    && install -m 0755 /tmp/matiec/iec2c /usr/local/bin/iec2c
+    && install -m 0755 /matiec/iec2c /usr/local/bin/iec2c \
+    && mkdir -p /usr/local/share/matiec \
+    && cp -r /matiec/lib /usr/local/share/matiec/lib \
+    && chmod -R 755 /usr/local/share/matiec/lib
 
 # Stage 2: Final Runtime Environment
 FROM python:3.11-slim-bookworm
@@ -26,6 +29,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Copy the compiled MATIEC binary from the builder stage
 COPY --from=builder /usr/local/bin/iec2c /usr/local/bin/iec2c
+# Copy MATIEC standard library files from builder stage
+COPY --from=builder /usr/local/share/matiec/lib /usr/local/share/matiec/lib
 
 # Create a placeholder for PLCverif executable
 RUN touch /usr/local/bin/plcverif && chmod +x /usr/local/bin/plcverif
@@ -50,6 +55,7 @@ RUN python -m pip install --default-timeout=1000 --retries 10 \
 # Copy the rest of the application code
 # ننسخ محتويات مجلد backend إلى داخل المجلد الحالي في الحاوية
 COPY backend/ .
+COPY backend/knowledge_base /app/knowledge_base
 
 EXPOSE 8000
 

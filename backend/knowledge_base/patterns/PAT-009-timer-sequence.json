@@ -1,0 +1,16 @@
+{
+  "id": "PAT-009",
+  "name": "Timer-Based Multi-Step Sequence",
+  "domain": "Process Control",
+  "pattern_type": "Timed Sequence",
+  "description": "Automatic timed sequence using TON timers. Each step has configurable duration. Sequence_Complete flag set when all steps done.",
+  "tags": ["timer", "sequence", "TON", "automatic", "steps", "timed"],
+  "safety_level": "medium",
+  "st_snippet": "Step_Timer(IN := TRUE, PT := Step_Duration[Step_Index]);\nIF Step_Timer.Q THEN\n    Step_Timer(IN := FALSE);\n    Step_Index := Step_Index + 1;\n    IF Step_Index > MAX_STEP THEN\n        Step_Index := 0;\n        Sequence_Complete := TRUE;\n    END_IF;\nEND_IF;\n\n(* Output assignment based on step *)\nCASE Step_Index OF\n  0: Output_A := TRUE; Output_B := FALSE;\n  1: Output_A := FALSE; Output_B := TRUE;\n  ELSE: Output_A := FALSE; Output_B := FALSE;\nEND_CASE;",
+  "safety_notes": "Always check Step_Index <= MAX_STEP to prevent array overflow. IN flag must be reset before next step to retrigger timer.",
+  "common_mistakes": [
+    "Not resetting IN flag — timer never retriggers",
+    "Missing bounds check on Step_Index — can exceed array size"
+  ],
+  "applicable_rules": ["TC-4", "GEN-1"]
+}

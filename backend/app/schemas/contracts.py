@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator
 
 ProjectStatus = Literal["draft", "planned", "generated", "validated", "optimized", "failed"]
 AgentStatus = Literal["pending", "running", "completed", "failed"]
@@ -39,17 +39,40 @@ class CreateProjectRequest(ContractModel):
 
 
 class PerformanceTargets(ContractModel):
-    maxScanTimeMs: float
-    maxCyclomaticComplexity: int
-    minMaintainabilityIndex: int
-    maxIterations: int
+    maxScanTimeMs: float = 5
+    maxCyclomaticComplexity: int = 8
+    minMaintainabilityIndex: int = 75
+    maxIterations: int = 5
 
 
 class RequirementInput(ContractModel):
     projectId: str
     text: str = Field(min_length=1)
-    safetyConstraints: list[str]
-    performanceTargets: PerformanceTargets
+    safetyConstraints: list[str] = Field(
+        default_factory=list,
+        validation_alias=AliasChoices("safetyConstraints", "safety_constraints"),
+        serialization_alias="safetyConstraints",
+    )
+    performanceTargets: PerformanceTargets = Field(
+        validation_alias=AliasChoices("performanceTargets", "performance_targets"),
+        serialization_alias="performanceTargets",
+    )
+    confirmedOutputs: list[str] = Field(
+        default_factory=list,
+        validation_alias=AliasChoices("confirmedOutputs", "confirmed_outputs"),
+        serialization_alias="confirmedOutputs",
+    )
+    confirmedInputs: list[str] = Field(
+        default_factory=list,
+        validation_alias=AliasChoices("confirmedInputs", "confirmed_inputs"),
+        serialization_alias="confirmedInputs",
+    )
+    domain: str | None = None
+    complexityTier: str | None = Field(
+        default=None,
+        validation_alias=AliasChoices("complexityTier", "complexity_tier"),
+        serialization_alias="complexityTier",
+    )
 
     @field_validator("text")
     @classmethod
@@ -57,6 +80,34 @@ class RequirementInput(ContractModel):
         if not value.strip():
             raise ValueError("Requirement text must not be empty.")
         return value
+
+
+class RequirementPayload(ContractModel):
+    projectId: str
+    text: str
+    safetyConstraints: list[str] = Field(
+        default_factory=list,
+        validation_alias=AliasChoices("safetyConstraints", "safety_constraints"),
+        serialization_alias="safetyConstraints",
+    )
+    confirmedOutputs: list[str] = Field(
+        default_factory=list,
+        validation_alias=AliasChoices("confirmedOutputs", "confirmed_outputs"),
+        serialization_alias="confirmedOutputs",
+    )
+    confirmedInputs: list[str] = Field(
+        default_factory=list,
+        validation_alias=AliasChoices("confirmedInputs", "confirmed_inputs"),
+        serialization_alias="confirmedInputs",
+    )
+    performanceTargets: PerformanceTargets = Field(
+        validation_alias=AliasChoices("performanceTargets", "performance_targets"),
+        serialization_alias="performanceTargets",
+    )
+    domain: str | None = None
+    complexityTier: str | None = None
+    submittedAt: str | None = None
+    updatedAt: str | None = None
 
 
 class PlanSignal(ContractModel):
@@ -74,6 +125,12 @@ class PlanSignal(ContractModel):
         return value
 
 
+class InternalVar(ContractModel):
+    name: str
+    type: Literal["BOOL", "INT", "REAL", "TIME"] = "BOOL"
+    description: str = ""
+
+
 class PlanScope(ContractModel):
     standard: Literal["IEC 61131-3"]
     edition: str
@@ -83,13 +140,18 @@ class PlanScope(ContractModel):
 
 class PlanObject(ContractModel):
     projectId: str
+    domain: str = Field(min_length=1)
     agent: str
     generatedAt: str
     inputs: list[PlanSignal] = Field(min_length=1)
-    outputs: list[PlanSignal] = Field(min_length=1)
+    outputs: list[PlanSignal]
+    internalVars: list[InternalVar] = Field(default_factory=list)
     logicRules: list[str]
     safetyConstraints: list[str]
     scope: PlanScope
+    llmProvider: str | None = None
+    llmModel: str | None = None
+    tokensUsed: int | None = None
 
 
 class AgentMessage(ContractModel):
@@ -119,12 +181,26 @@ class CodeMetrics(ContractModel):
     maintainabilityIndex: int
 
 
+class RAGSource(ContractModel):
+    id: str
+    name: str
+    similarity: float | None = None
+    domain: str | None = None
+    patternType: str | None = None
+
+
 class CodeMetadata(ContractModel):
     generator: str
     iecStandard: Literal["IEC 61131-3"]
     sourcePlanId: str
     createdAt: str
     iteration: int
+    ragSources: list[RAGSource] = Field(default_factory=list)
+    llmProvider: str | None = None
+    llmModel: str | None = None
+    generationMode: str | None = None
+    tokensUsed: int | None = None
+    generationTimeMs: int | None = None
 
 
 class CodeArtifact(ContractModel):
@@ -187,6 +263,9 @@ class DebuggingReport(ContractModel):
     createdAt: str
     debugger: str
     regeneratedArtifactId: str | None = None
+    llmProvider: str | None = None
+    llmModel: str | None = None
+    tokensUsed: int | None = None
 
 
 class OptimizationPass(ContractModel):
@@ -298,6 +377,121 @@ class BenchmarkCase(ContractModel):
     status: Literal["passed", "warning", "failed", "pending"]
     runtimeMs: float | None = None
     optimizationGainPercent: float | None = None
+
+
+BenchmarkMode = Literal["rule_based", "llm", "llm_rag"]
+
+
+class BenchmarkExpectedProperty(ContractModel):
+    id: str
+    description: str
+
+
+class BenchmarkCaseCatalogItem(ContractModel):
+    id: str = Field(validation_alias=AliasChoices("id", "caseId", "case_id"), serialization_alias="id")
+    name: str = Field(validation_alias=AliasChoices("name", "caseName", "title"), serialization_alias="name")
+    domain: str
+    complexity: Literal["simple", "medium", "complex"] = Field(
+        validation_alias=AliasChoices("complexity", "complexity_tier"),
+        serialization_alias="complexity",
+    )
+
+
+class BenchmarkCaseDefinition(ContractModel):
+    id: str = Field(validation_alias=AliasChoices("id", "case_id"), serialization_alias="id")
+    name: str
+    domain: str
+    complexity: Literal["simple", "medium", "complex"] = Field(
+        validation_alias=AliasChoices("complexity", "complexity_tier"),
+        serialization_alias="complexity",
+    )
+    requirement: str
+    expectedInputs: list[str] = Field(
+        default_factory=list,
+        validation_alias=AliasChoices("expectedInputs", "expected_inputs"),
+        serialization_alias="expectedInputs",
+    )
+    expectedOutputs: list[str] = Field(
+        default_factory=list,
+        validation_alias=AliasChoices("expectedOutputs", "expected_outputs"),
+        serialization_alias="expectedOutputs",
+    )
+    safetyConstraints: list[str] = Field(
+        default_factory=list,
+        validation_alias=AliasChoices("safetyConstraints", "safety_constraints"),
+        serialization_alias="safetyConstraints",
+    )
+    expectedProperties: list[BenchmarkExpectedProperty] = Field(
+        default_factory=list,
+        validation_alias=AliasChoices("expectedProperties", "expected_properties"),
+        serialization_alias="expectedProperties",
+    )
+
+
+class BenchmarkCaseResult(ContractModel):
+    caseId: str
+    mode: BenchmarkMode
+    domain: str
+    verified: bool
+    validationStatus: ValidationStatus | None = None
+    repairIterations: int
+    generationTimeMs: int
+    metrics: StructuredTextMetrics
+    ragSourcesUsed: list[str] = Field(default_factory=list)
+    llmProvider: str | None = None
+    llmModel: str | None = None
+    generatedCode: str
+    error: str | None = None
+
+
+class BenchmarkRunRequest(ContractModel):
+    caseId: str
+    mode: BenchmarkMode = "llm"
+
+
+class BenchmarkCompareRequest(ContractModel):
+    caseId: str
+
+
+class BenchmarkComparisonDelta(ContractModel):
+    locDelta: float
+    ccDelta: float
+    miDelta: float
+    scanDelta: float
+    repairIterations: int
+    verified: bool | None = None
+
+
+class BenchmarkComparison(ContractModel):
+    llmVsBaseline: BenchmarkComparisonDelta
+    ragVsLlm: BenchmarkComparisonDelta
+    ragVsBaseline: BenchmarkComparisonDelta
+
+
+class BenchmarkComparisonResult(ContractModel):
+    caseId: str
+    results: dict[BenchmarkMode, BenchmarkCaseResult | dict[str, str]]
+    comparison: BenchmarkComparison
+
+
+class BenchmarkSummaryModeStats(ContractModel):
+    avgLoc: float
+    avgCC: float
+    verificationRate: float
+    avgRepairIterations: float
+
+
+class BenchmarkSummaryCaseResult(ContractModel):
+    id: str
+    name: str
+    results: dict[str, BenchmarkCaseResult | dict[str, str]]
+
+
+class BenchmarkSummaryResponse(ContractModel):
+    totalRuns: int
+    byMode: dict[BenchmarkMode, BenchmarkSummaryModeStats]
+    bestMode: BenchmarkMode | Literal["none"]
+    cases: list[BenchmarkSummaryCaseResult]
 
 
 class FinalReport(ContractModel):

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { CodeArtifact, CreateProjectRequest, DebuggingReport, PlanObject, Project, RepairLoopReport, RequirementInput, ValidationReport, WorkflowEvent } from "@/lib/api-contracts";
+import type { CodeArtifact, CreateProjectRequest, DebuggingReport, PlanObject, Project, RepairLoopReport, RequirementInput, RequirementPayload, ValidationReport, WorkflowEvent } from "@/lib/api-contracts";
 import {
   createProject,
   debugCode,
@@ -9,6 +9,7 @@ import {
   getHealth,
   getProject,
   getProjects,
+  getRequirements,
   runRepairLoop,
   submitRequirements,
   validateCode
@@ -107,6 +108,42 @@ describe("project API client transport selection", () => {
         method: "POST",
         body: JSON.stringify(request)
       })
+    );
+  });
+
+  it("calls GET /api/projects/{id}/requirements for persisted requirements", async () => {
+    const payload: RequirementPayload = {
+      projectId: "PRJ-0421",
+      text: "Persisted requirement",
+      safetyConstraints: ["Constraint A"],
+      performanceTargets: {
+        maxScanTimeMs: 5,
+        maxCyclomaticComplexity: 8,
+        minMaintainabilityIndex: 75,
+        maxIterations: 5
+      },
+      domain: "Motor Control",
+      complexityTier: "medium",
+      submittedAt: "2026-05-17T09:42:18Z",
+      updatedAt: "2026-05-17T09:42:18Z"
+    };
+    const fetchMock = stubRealApi(payload);
+
+    await expect(getRequirements("PRJ-0421")).resolves.toEqual(payload);
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://api.test/api/projects/PRJ-0421/requirements",
+      expect.objectContaining({ method: "GET" })
+    );
+  });
+
+  it("maps GET /requirements 404 to null in real mode", async () => {
+    const fetchMock = stubRealApi({ detail: "Requirements for project PRJ-0421 were not found." }, 404);
+
+    await expect(getRequirements("PRJ-0421")).resolves.toBeNull();
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://api.test/api/projects/PRJ-0421/requirements",
+      expect.objectContaining({ method: "GET" })
     );
   });
 

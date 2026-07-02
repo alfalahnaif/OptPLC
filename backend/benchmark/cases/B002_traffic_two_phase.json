@@ -1,0 +1,31 @@
+{
+  "id": "B002",
+  "name": "Two-Phase Traffic Light",
+  "domain": "Traffic Control",
+  "complexity": "simple",
+  "requirement": "Control traffic lights at a single junction. Phase A: North-South green (30s), then amber (5s). Phase B: East-West green (25s), then amber (5s). Both must never be green simultaneously.",
+  "expected_inputs": [],
+  "expected_outputs": [
+    "NS_Red",
+    "NS_Green",
+    "NS_Amber",
+    "EW_Red",
+    "EW_Green",
+    "EW_Amber"
+  ],
+  "safety_constraints": [
+    "North-South and East-West green outputs must never be true at the same time.",
+    "Each green phase must transition through amber before red.",
+    "A deterministic safe startup phase must set both directions to red."
+  ],
+  "expected_properties": [
+    {
+      "id": "B002-P1",
+      "description": "Mutual exclusion of NS_Green and EW_Green."
+    },
+    {
+      "id": "B002-P2",
+      "description": "Amber intermediary phase is present for both directions."
+    }
+  ]
+}

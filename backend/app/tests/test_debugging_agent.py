@@ -2,34 +2,36 @@ import pytest
 
 from app.agents import CodeGenerationAgent, DebuggingAgent, PlanningAgent, ValidationAgent
 
+pytestmark = pytest.mark.asyncio
 
-def test_verified_validation_returns_not_required() -> None:
-    plan, artifact, validation = validated_artifacts("PRJ-MOTOR", "Motor Control")
 
-    report = DebuggingAgent().debug(project_id="PRJ-MOTOR", plan=plan, artifact=artifact, validation=validation)
+async def test_verified_validation_returns_not_required() -> None:
+    plan, artifact, validation = await validated_artifacts("PRJ-MOTOR", "Motor Control")
+
+    report = await DebuggingAgent().debug(project_id="PRJ-MOTOR", plan=plan, artifact=artifact, validation=validation)
 
     assert report.status == "NOT_REQUIRED"
     assert report.sourceValidationStatus == "VERIFIED"
     assert "No debugging required" in report.rootCauseSummary
 
 
-def test_syntax_error_missing_end_program_returns_patch_advice() -> None:
-    plan, artifact, _ = validated_artifacts("PRJ-MOTOR", "Motor Control")
+async def test_syntax_error_missing_end_program_returns_patch_advice() -> None:
+    plan, artifact, _ = await validated_artifacts("PRJ-MOTOR", "Motor Control")
     validation = ValidationAgent().validate(
         project_id="PRJ-MOTOR",
         artifact=artifact.model_copy(update={"source": artifact.source.replace("END_PROGRAM", "")}),
         plan=plan,
     )
 
-    report = DebuggingAgent().debug(project_id="PRJ-MOTOR", plan=plan, artifact=artifact, validation=validation)
+    report = await DebuggingAgent().debug(project_id="PRJ-MOTOR", plan=plan, artifact=artifact, validation=validation)
 
     assert report.status == "PATCH_ADVICE_GENERATED"
     assert report.errorType == "missing_end_pou"
     assert "END_PROGRAM" in " ".join(report.patchAdvice)
 
 
-def test_undeclared_variable_error_returns_targeted_advice() -> None:
-    plan, artifact, _ = validated_artifacts("PRJ-GENERIC", "Packaging")
+async def test_undeclared_variable_error_returns_targeted_advice() -> None:
+    plan, artifact, _ = await validated_artifacts("PRJ-GENERIC", "Packaging")
     invalid_source = artifact.source.replace("Process_Enable := Run_State AND NOT Fault_State;", "Ghost_Output := TRUE;")
     validation = ValidationAgent().validate(
         project_id="PRJ-GENERIC",
@@ -37,15 +39,15 @@ def test_undeclared_variable_error_returns_targeted_advice() -> None:
         plan=plan,
     )
 
-    report = DebuggingAgent().debug(project_id="PRJ-GENERIC", plan=plan, artifact=artifact, validation=validation)
+    report = await DebuggingAgent().debug(project_id="PRJ-GENERIC", plan=plan, artifact=artifact, validation=validation)
 
     assert report.errorType == "undeclared_assigned_variable"
     assert "Ghost_Output" in report.rootCauseSummary
     assert any("Declare Ghost_Output" in item for item in report.patchAdvice)
 
 
-def test_motor_formal_violation_returns_shutdown_patch_advice() -> None:
-    plan, artifact, _ = validated_artifacts("PRJ-MOTOR", "Motor Control")
+async def test_motor_formal_violation_returns_shutdown_patch_advice() -> None:
+    plan, artifact, _ = await validated_artifacts("PRJ-MOTOR", "Motor Control")
     unsafe_source = """PROGRAM Motor_Controller
 VAR_INPUT
     Start_PB : BOOL;
@@ -75,15 +77,15 @@ END_PROGRAM"""
         plan=plan,
     )
 
-    report = DebuggingAgent().debug(project_id="PRJ-MOTOR", plan=plan, artifact=artifact, validation=validation)
+    report = await DebuggingAgent().debug(project_id="PRJ-MOTOR", plan=plan, artifact=artifact, validation=validation)
 
     assert report.errorType == "motor_safety_shutdown"
     assert "emergency stop" in report.rootCauseSummary.lower()
     assert any("Safety_OK" in item for item in report.patchAdvice)
 
 
-def test_traffic_formal_violation_returns_conflicting_green_advice() -> None:
-    plan, artifact, _ = validated_artifacts("PRJ-TRAFFIC", "Traffic Control")
+async def test_traffic_formal_violation_returns_conflicting_green_advice() -> None:
+    plan, artifact, _ = await validated_artifacts("PRJ-TRAFFIC", "Traffic Control")
     unsafe_source = """PROGRAM Traffic_Controller
 VAR_INPUT
     Vehicle_Detect : BOOL;
@@ -108,14 +110,14 @@ END_PROGRAM"""
         plan=plan,
     )
 
-    report = DebuggingAgent().debug(project_id="PRJ-TRAFFIC", plan=plan, artifact=artifact, validation=validation)
+    report = await DebuggingAgent().debug(project_id="PRJ-TRAFFIC", plan=plan, artifact=artifact, validation=validation)
 
     assert report.errorType == "traffic_conflicting_green"
     assert any("Ped_Walk" in item for item in report.patchAdvice)
 
 
-def test_tank_formal_violation_returns_high_low_safety_advice() -> None:
-    plan, artifact, _ = validated_artifacts("PRJ-TANK", "Process Control")
+async def test_tank_formal_violation_returns_high_low_safety_advice() -> None:
+    plan, artifact, _ = await validated_artifacts("PRJ-TANK", "Process Control")
     unsafe_source = """PROGRAM Tank_Controller
 VAR_INPUT
     Level_PV : REAL;
@@ -139,14 +141,14 @@ END_PROGRAM"""
         plan=plan,
     )
 
-    report = DebuggingAgent().debug(project_id="PRJ-TANK", plan=plan, artifact=artifact, validation=validation)
+    report = await DebuggingAgent().debug(project_id="PRJ-TANK", plan=plan, artifact=artifact, validation=validation)
 
     assert report.errorType == "tank_level_safety"
     assert any("High_SP" in item or "Low_SP" in item for item in report.patchAdvice)
 
 
-def test_timeout_returns_cannot_debug() -> None:
-    plan, artifact, validation = validated_artifacts("PRJ-MOTOR", "Motor Control")
+async def test_timeout_returns_cannot_debug() -> None:
+    plan, artifact, validation = await validated_artifacts("PRJ-MOTOR", "Motor Control")
     timeout_report = validation.model_copy(update={
         "status": "TIMEOUT",
         "summary": "Formal solver timed out.",
@@ -154,32 +156,37 @@ def test_timeout_returns_cannot_debug() -> None:
         "formalPassed": False,
     })
 
-    report = DebuggingAgent().debug(project_id="PRJ-MOTOR", plan=plan, artifact=artifact, validation=timeout_report)
+    report = await DebuggingAgent().debug(project_id="PRJ-MOTOR", plan=plan, artifact=artifact, validation=timeout_report)
 
     assert report.status == "CANNOT_DEBUG"
     assert report.errorType == "verification_timeout"
     assert "Reduce code complexity" in " ".join(report.patchAdvice)
 
 
-def test_llm_mode_is_placeholder_only() -> None:
-    plan, artifact, validation = validated_artifacts("PRJ-MOTOR", "Motor Control")
+async def test_llm_mode_falls_back_to_rule_based() -> None:
+    plan, artifact, validation = await validated_artifacts("PRJ-MOTOR", "Motor Control")
 
-    with pytest.raises(NotImplementedError, match="reserved for future integration"):
-        DebuggingAgent(mode="llm").debug(project_id="PRJ-MOTOR", plan=plan, artifact=artifact, validation=validation)
+    report = await DebuggingAgent(mode="llm").debug(
+        project_id="PRJ-MOTOR",
+        plan=plan,
+        artifact=artifact,
+        validation=validation,
+    )
+    assert report.status == "NOT_REQUIRED"
 
 
-def validated_artifacts(project_id: str, domain: str):
+async def validated_artifacts(project_id: str, domain: str):
     requirements = {
         "Motor Control": "Motor start stop with emergency stop and overload protection.",
         "Traffic Control": "Traffic light controller with pedestrian request.",
         "Process Control": "Tank level control with high high trip and inlet valve.",
         "Packaging": "Coordinate a generic process enable with reset.",
     }
-    plan = PlanningAgent().generate_plan(
+    plan = await PlanningAgent().generate_plan(
         project_id=project_id,
         requirement_text=requirements.get(domain, "Generic PLC control requirement."),
         domain=domain,
     )
-    artifact = CodeGenerationAgent().generate_code(project_id=project_id, plan=plan)
+    artifact = await CodeGenerationAgent().generate_code(project_id=project_id, plan=plan)
     validation = ValidationAgent().validate(project_id=project_id, artifact=artifact, plan=plan)
     return plan, artifact, validation

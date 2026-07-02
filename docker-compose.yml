@@ -9,6 +9,6 @@ services:
     env_file:
       - ./backend/.env
     volumes:
-      - ./plcforge.db:/app/plcforge.db
+      - ./backend/plcforge.db:/app/plcforge.db
       - ./rag_db:/app/rag_db
     restart: unless-stopped

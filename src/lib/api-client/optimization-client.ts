@@ -6,7 +6,7 @@ import {
   optimizedStructuredText
 } from "@/lib/mock-data";
 
-import { apiRequest } from "./fetch-transport";
+import { ApiError, apiRequest } from "./fetch-transport";
 import { isMockApiEnabled } from "./config";
 import { mockResolve } from "./mock-transport";
 
@@ -25,9 +25,18 @@ const optimizationReportCache = new Map<string, OptimizationReport>();
 
 export async function optimizeCode(projectId: string): Promise<OptimizationReport> {
   if (!isMockApiEnabled()) {
-    const report = await apiRequest<OptimizationReport>(projectEndpoint(API_ENDPOINTS.optimizeCode, projectId), {
-      method: "POST"
-    });
+    let report: OptimizationReport;
+    try {
+      report = await apiRequest<OptimizationReport>(projectEndpoint(API_ENDPOINTS.optimizeCode, projectId), {
+        method: "POST",
+        timeoutMs: 120000
+      });
+    } catch (error) {
+      if (error instanceof ApiError && error.code === "timeout") {
+        throw new Error("Optimization timed out after 2 minutes. Try again.");
+      }
+      throw error;
+    }
     optimizationReportCache.set(projectId, report);
     return report;
   }
@@ -41,7 +50,21 @@ export function getCachedOptimizationReport(projectId: string): OptimizationRepo
   return optimizationReportCache.get(projectId);
 }
 
-export async function getOptimizationPageData(projectId: string): Promise<OptimizationPageData> {
+export async function getOptimizationPageData(projectId: string): Promise<OptimizationPageData | null> {
+  if (!isMockApiEnabled()) {
+    let report: OptimizationReport | null = null;
+    try {
+      report = await apiRequest<OptimizationReport>(projectEndpoint(API_ENDPOINTS.getOptimization, projectId));
+    } catch (error) {
+      if (!(error instanceof ApiError && error.status === 404)) {
+        throw error;
+      }
+    }
+    if (!report) return null;
+    return mockResolve({
+      report
+    });
+  }
   return mockResolve({
     report: await optimizeCode(projectId)
   });
@@ -166,16 +189,24 @@ function codeArtifact({
   };
 }
 
-export async function getMetricsReport(projectId: string): Promise<MetricsReport> {
+export async function getMetricsReport(projectId: string): Promise<MetricsReport | null> {
   if (!isMockApiEnabled()) {
-    return apiRequest<MetricsReport>(projectEndpoint(API_ENDPOINTS.getMetrics, projectId));
+    try {
+      return await apiRequest<MetricsReport>(projectEndpoint(API_ENDPOINTS.getMetrics, projectId));
+    } catch (error) {
+      if (error instanceof ApiError && (error.status === 400 || error.status === 404)) {
+        return null;
+      }
+      throw error;
+    }
   }
 
   return mockResolve(mockMetricsReport(projectId));
 }
 
-export async function getMetricsPageData(projectId: string): Promise<MetricsPageData> {
+export async function getMetricsPageData(projectId: string): Promise<MetricsPageData | null> {
   const report = await getMetricsReport(projectId);
+  if (!report) return null;
   return mockResolve({
     report,
     metricsCards: metricCardsFromReport(report),

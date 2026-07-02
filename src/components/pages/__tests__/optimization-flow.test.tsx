@@ -1,7 +1,8 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { OptimizationPage } from "@/components/pages/optimization-page";
+import { MetricsPage } from "@/components/pages/metrics-page";
 import { CodePage } from "@/components/pages/code-page";
 import type { CodeArtifact, OptimizationReport, OptimizationStatus, StructuredTextMetrics, ValidationStatus } from "@/lib/api-contracts";
 import { optimizeCode } from "@/lib/api-client";
@@ -32,7 +33,7 @@ describe("Optimization frontend flow", () => {
 
     render(<OptimizationPage projectId="PRJ-0421" />);
 
-    expect(await screen.findByText("Real Static Optimizer")).toBeInTheDocument();
+    expect(await screen.findByText("Real Backend OptimizationReport")).toBeInTheDocument();
     expect((await screen.findAllByText("OPTIMIZED")).length).toBeGreaterThan(0);
     expect(await screen.findByText("Structural Simplification")).toBeInTheDocument();
     expect(await screen.findByText("Logic Compaction")).toBeInTheDocument();
@@ -73,6 +74,50 @@ describe("Optimization frontend flow", () => {
     expect(await screen.findByText("Revalidation FORMAL_VIOLATION")).toBeInTheDocument();
   });
 
+  it("Optimization page shows empty guidance when report is missing", async () => {
+    vi.stubEnv("NEXT_PUBLIC_USE_MOCK_API", "false");
+    vi.stubEnv("NEXT_PUBLIC_API_BASE_URL", "http://api.test");
+    stubFetch({ detail: "Optimization report for project PRJ-0421 was not found." }, 404);
+
+    render(<OptimizationPage projectId="PRJ-0421" />);
+
+    expect(await screen.findByText("No optimization results")).toBeInTheDocument();
+    expect(await screen.findByText("Run optimization before viewing results.")).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Run Optimization Now" })).toBeInTheDocument();
+  });
+
+  it("Run Optimization Now creates and renders persisted report", async () => {
+    vi.stubEnv("NEXT_PUBLIC_USE_MOCK_API", "false");
+    vi.stubEnv("NEXT_PUBLIC_API_BASE_URL", "http://api.test");
+    let optimized = false;
+    const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/optimization")) {
+        if (!optimized) {
+          return Promise.resolve(new Response(JSON.stringify({ detail: "Optimization report for project PRJ-0421 was not found." }), { status: 404, headers: { "Content-Type": "application/json" } }));
+        }
+        return Promise.resolve(new Response(JSON.stringify(optimizationReport("PRJ-0421", "OPTIMIZED")), { status: 200, headers: { "Content-Type": "application/json" } }));
+      }
+      if (url.endsWith("/optimize") && init?.method === "POST") {
+        optimized = true;
+        return Promise.resolve(new Response(JSON.stringify(optimizationReport("PRJ-0421", "OPTIMIZED")), { status: 200, headers: { "Content-Type": "application/json" } }));
+      }
+      return Promise.resolve(new Response(JSON.stringify({ detail: "Unhandled request" }), { status: 500, headers: { "Content-Type": "application/json" } }));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<OptimizationPage projectId="PRJ-0421" />);
+    fireEvent.click(await screen.findByRole("button", { name: "Run Optimization Now" }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "http://api.test/api/projects/PRJ-0421/optimize",
+        expect.objectContaining({ method: "POST" })
+      );
+    });
+    expect(await screen.findByText("Structural Simplification")).toBeInTheDocument();
+  });
+
   it("before and after metrics plus rollback events render correctly", async () => {
     vi.stubEnv("NEXT_PUBLIC_USE_MOCK_API", "false");
     vi.stubEnv("NEXT_PUBLIC_API_BASE_URL", "http://api.test");
@@ -99,19 +144,56 @@ describe("Optimization frontend flow", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("Code page shows optimized code tab after optimization report is cached", async () => {
+  it("Code page renders latest persisted code artifact in real mode", async () => {
     vi.stubEnv("NEXT_PUBLIC_USE_MOCK_API", "false");
     vi.stubEnv("NEXT_PUBLIC_API_BASE_URL", "http://api.test");
-    stubFetch(optimizationReport("PRJ-OPT-CODE", "OPTIMIZED"));
+    const optimized = optimizationReport("PRJ-OPT-CODE", "OPTIMIZED");
+    const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/optimization")) return Promise.resolve(new Response(JSON.stringify(optimized), { status: 200, headers: { "Content-Type": "application/json" } }));
+      if (url.endsWith("/code")) return Promise.resolve(new Response(JSON.stringify(optimized.optimizedCode), { status: 200, headers: { "Content-Type": "application/json" } }));
+      return Promise.resolve(new Response(JSON.stringify({}), { status: 404, headers: { "Content-Type": "application/json" } }));
+    });
+    vi.stubGlobal("fetch", fetchMock);
 
     render(<OptimizationPage projectId="PRJ-OPT-CODE" />);
-    expect(await screen.findByText("Real Static Optimizer")).toBeInTheDocument();
+    expect(await screen.findByText("Real Backend OptimizationReport")).toBeInTheDocument();
 
     render(<CodePage projectId="PRJ-OPT-CODE" />);
 
-    expect(await screen.findByRole("tab", { name: "Optimized" })).toBeInTheDocument();
+    expect(await screen.findByText("Real Backend CodeArtifact")).toBeInTheDocument();
     expect((await screen.findAllByText("motor_controller_optimized.st")).length).toBeGreaterThan(0);
     expect((await screen.findAllByText("static_optimizer.v1")).length).toBeGreaterThan(0);
+  });
+
+  it("Metrics page shows real backend metrics badge in real mode", async () => {
+    vi.stubEnv("NEXT_PUBLIC_USE_MOCK_API", "false");
+    vi.stubEnv("NEXT_PUBLIC_API_BASE_URL", "http://api.test");
+    const report = {
+      projectId: "PRJ-0421",
+      source: { selected: "generated_code", generatedCode: "PRJ-0421-code-iter-1" },
+      beforeMetrics: { loc: 30, cyclomaticComplexity: 6, maintainabilityIndex: 70, estimatedScanTimeMs: 3.2 },
+      afterMetrics: { loc: 28, cyclomaticComplexity: 5, maintainabilityIndex: 74, estimatedScanTimeMs: 2.9 },
+      metricsDelta: {
+        locDelta: -2,
+        cyclomaticComplexityDelta: -1,
+        maintainabilityIndexDelta: 4,
+        estimatedScanTimeDelta: -0.3,
+        locReductionPercent: 6.7,
+        complexityReductionPercent: 16.7,
+        maintainabilityImprovementPercent: 5.7,
+        scanTimeReductionPercent: 9.4
+      },
+      history: [],
+      latestValidationStatus: "VERIFIED",
+      latestOptimizationStatus: "OPTIMIZED",
+      createdAt: "2026-05-19T10:00:00Z",
+      summary: "Metrics report."
+    };
+    stubFetch(report);
+
+    render(<MetricsPage projectId="PRJ-0421" />);
+    expect(await screen.findByText("Real Backend MetricsReport")).toBeInTheDocument();
   });
 });
 

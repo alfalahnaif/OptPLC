@@ -1,0 +1,16 @@
+{
+  "id": "PAT-011",
+  "name": "Dual-Channel Safety Input Monitoring",
+  "domain": "Safety Interlock",
+  "pattern_type": "Dual Channel",
+  "description": "Two independent safety channels that must both agree. Discrepancy detection triggers fault. Common for light curtains, safety gates.",
+  "tags": ["dual channel", "safety", "redundancy", "discrepancy", "light curtain", "gate"],
+  "safety_level": "critical",
+  "st_snippet": "(* Both channels must agree within tolerance *)\nChannel_Discrepancy := (Channel_1 XOR Channel_2);\n\n(* Discrepancy timer — allow brief transition time *)\nDiscrepancy_Timer(IN := Channel_Discrepancy, PT := T#100ms);\n\n(* Fault if channels disagree for more than 100ms *)\nIF Discrepancy_Timer.Q THEN\n    Safety_Fault := TRUE;\nEND_IF;\n\n(* Safe output only when both channels healthy and no fault *)\nSafe_Output := Channel_1 AND Channel_2 AND NOT Safety_Fault;",
+  "safety_notes": "XOR detects disagreement between channels. Short timer allows for transition delay. Once Safety_Fault latches, requires manual reset and maintenance.",
+  "common_mistakes": [
+    "No discrepancy detection — single point of failure",
+    "Too long discrepancy timeout — allows unsafe operation"
+  ],
+  "applicable_rules": ["SI-1", "SI-2", "SI-3"]
+}

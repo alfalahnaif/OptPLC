@@ -9,6 +9,8 @@ from app.schemas.contracts import CodeArtifact, CodeMetadata, CodeMetrics
 from app.services.metrics_service import MetricsService
 from app.storage.memory import store
 
+pytestmark = pytest.mark.asyncio
+
 
 def test_optimization_fails_with_400_if_no_code_artifact_exists(client: TestClient) -> None:
     project_id = create_project(client)
@@ -96,8 +98,8 @@ def test_verified_motor_code_optimizes_and_remains_verified(client: TestClient) 
     }
 
 
-def test_optimization_metrics_improve_or_stay_equal() -> None:
-    plan, artifact = save_verified_motor_inputs()
+async def test_optimization_metrics_improve_or_stay_equal() -> None:
+    plan, artifact = await save_verified_motor_inputs()
     validation = store.get_validation_report("PRJ-0421")
     assert validation is not None
 
@@ -114,8 +116,8 @@ def test_optimization_metrics_improve_or_stay_equal() -> None:
     assert report.afterMetrics.estimatedScanTimeMs <= report.beforeMetrics.estimatedScanTimeMs
 
 
-def test_rollback_occurs_if_optimization_pass_breaks_validation(monkeypatch: pytest.MonkeyPatch) -> None:
-    plan, artifact = save_verified_motor_inputs()
+async def test_rollback_occurs_if_optimization_pass_breaks_validation(monkeypatch: pytest.MonkeyPatch) -> None:
+    plan, artifact = await save_verified_motor_inputs()
     validation = store.get_validation_report("PRJ-0421")
     assert validation is not None
 
@@ -157,8 +159,8 @@ def test_optimization_report_is_stored_in_memory(client: TestClient) -> None:
     assert asyncio.run(_has_optimization_report()) is True
 
 
-def test_llm_mode_raises_not_implemented() -> None:
-    plan, artifact = save_verified_motor_inputs()
+async def test_llm_mode_raises_not_implemented() -> None:
+    plan, artifact = await save_verified_motor_inputs()
     validation = store.get_validation_report("PRJ-0421")
     assert validation is not None
 
@@ -193,13 +195,13 @@ END_PROGRAM
     assert metrics.estimatedScanTimeMs > 0
 
 
-def save_verified_motor_inputs(save_validation: bool = True):
-    plan = PlanningAgent().generate_plan(
+async def save_verified_motor_inputs(save_validation: bool = True):
+    plan = await PlanningAgent().generate_plan(
         project_id="PRJ-0421",
         requirement_text="Motor start stop with emergency stop and overload protection.",
         domain="Motor Control",
     )
-    artifact = CodeGenerationAgent().generate_code(project_id="PRJ-0421", plan=plan)
+    artifact = await CodeGenerationAgent().generate_code(project_id="PRJ-0421", plan=plan)
     store.save_plan("PRJ-0421", plan)
     store.save_code_artifact("PRJ-0421", artifact)
     if save_validation:

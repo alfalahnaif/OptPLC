@@ -1,8 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { useState } from "react";
 import { ArrowRight, Bug, FileDiff, Lightbulb, RotateCcw, TerminalSquare } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 import { DebuggingModeBadge } from "@/components/common/debugging-mode-badge";
 import { PageStateGate, type PageState } from "@/components/common/page-state";
@@ -13,25 +13,35 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { DebuggingReport, RepairLoopReport } from "@/lib/api-contracts";
-import { ACTIVE_PROJECT_ID, getDebuggingPageData, projectPath, runRepairLoop, useApiResource } from "@/lib/api-client";
+import { ACTIVE_PROJECT_ID, debugCode, getDebuggingReport, getValidationReport, optimizeCode, projectPath, runRepairLoop, useApiResource } from "@/lib/api-client";
 
 type DebuggingStatus = DebuggingReport["status"];
 
 export function DebuggingPage({ projectId = ACTIVE_PROJECT_ID, state }: { projectId?: string; state?: PageState } = {}) {
+  const router = useRouter();
+  const [reloadToken, setReloadToken] = useState(0);
   const [repairLoopReport, setRepairLoopReport] = useState<RepairLoopReport | undefined>();
   const [repairLoading, setRepairLoading] = useState(false);
   const [repairError, setRepairError] = useState<string | null>(null);
-  const resource = useApiResource(() => getDebuggingPageData(projectId), [projectId]);
+  const [optimizationLoading, setOptimizationLoading] = useState(false);
+  const [optimizationError, setOptimizationError] = useState<string | null>(null);
+  const [debugLoading, setDebugLoading] = useState(false);
+  const [debugError, setDebugError] = useState<string | null>(null);
+  const resource = useApiResource(() => getDebuggingReport(projectId), [projectId, reloadToken]);
+  const validationResource = useApiResource(() => getValidationReport(projectId), [projectId]);
   const effectiveState = state ?? resource.state;
-  const data = resource.data;
-  const report = data?.report;
-  const activeRepairLoopReport = repairLoopReport ?? data?.repairLoopReport;
+  const report = resource.data;
+  const validation = validationResource.data;
+  const noDebuggingRequired = report?.status === "NOT_REQUIRED" || (effectiveState === "empty" && validation?.status === "VERIFIED");
+  const missingValidation = effectiveState === "empty" && validationResource.state === "empty";
+  const needsDebugGeneration = effectiveState === "empty" && (validation?.status === "SYNTAX_ERROR" || validation?.status === "FORMAL_VIOLATION");
+  const showRepairActions = report?.status === "PATCH_ADVICE_GENERATED";
+  const activeRepairLoopReport = repairLoopReport;
   const stateView =
-    effectiveState !== "ready" || !report ? (
+    effectiveState === "loading" || effectiveState === "error" ? (
       <PageStateGate
-        state={effectiveState === "ready" ? "loading" : effectiveState}
+        state={effectiveState}
         loading={{ title: "Loading debugging feedback", description: "Generating rule-based patch advice from the latest validation report." }}
-        empty={{ title: "No debugging feedback", description: "Run validation before requesting debugging advice." }}
         error={{
           title: "Debugging feedback unavailable",
           description: debuggingErrorDescription(resource.error)
@@ -50,21 +60,31 @@ export function DebuggingPage({ projectId = ACTIVE_PROJECT_ID, state }: { projec
           <>
             <DebuggingModeBadge />
             {report ? <DebuggingStatusBadge status={report.status} /> : null}
-            <Button variant="outline"><RotateCcw /> Replay failure</Button>
-            <Button onClick={() => void handleRunRepairLoop()} disabled={repairLoading}>
-              {repairLoading ? "Repairing..." : "Run Repair Loop"}
-            </Button>
-            {report?.status === "NOT_REQUIRED" || activeRepairLoopReport?.finalStatus === "VERIFIED" ? (
-              <Button asChild>
-                <Link href={projectPath(projectId, "optimization")}>
-                  Continue to Optimization <ArrowRight />
-                </Link>
+            {showRepairActions ? <Button variant="outline"><RotateCcw /> Replay failure</Button> : null}
+            {showRepairActions ? (
+              <Button onClick={() => void handleRunRepairLoop()} disabled={repairLoading}>
+                {repairLoading ? "Repairing..." : "Run Repair Loop"}
+              </Button>
+            ) : null}
+            {noDebuggingRequired || activeRepairLoopReport?.finalStatus === "VERIFIED" ? (
+              <Button onClick={() => void handleRunOptimization()} disabled={optimizationLoading}>
+                {optimizationLoading ? "Running optimization..." : "Run Optimization"} <ArrowRight />
               </Button>
             ) : null}
           </>
         }
       />
-      {stateView ?? (report ? (
+      {optimizationError ? (
+        <Card className="mb-4 border-red-200 bg-red-50/30 dark:border-red-900 dark:bg-red-950/10">
+          <CardContent className="p-4 text-sm text-red-800 dark:text-red-200">{optimizationError}</CardContent>
+        </Card>
+      ) : null}
+      {noDebuggingRequired ? (
+        <Card>
+          <CardContent className="p-6 text-sm font-medium">No debugging required. The latest validation report is VERIFIED.</CardContent>
+        </Card>
+      ) : null}
+      {!noDebuggingRequired ? stateView ?? (report ? (
         <div className="space-y-5">
           <DebuggingReportView report={report} />
           {repairError ? (
@@ -74,7 +94,30 @@ export function DebuggingPage({ projectId = ACTIVE_PROJECT_ID, state }: { projec
           ) : null}
           {activeRepairLoopReport ? <RepairLoopPanel report={activeRepairLoopReport} /> : null}
         </div>
-      ) : null)}
+      ) : missingValidation ? (
+        <Card>
+          <CardContent className="p-6 text-sm">Run validation before requesting debugging advice.</CardContent>
+        </Card>
+      ) : needsDebugGeneration ? (
+        <Card>
+          <CardContent className="flex min-h-48 flex-col items-center justify-center gap-3 p-6 text-center">
+            <p className="text-sm text-muted-foreground">Validation failed but no persisted debugging report exists yet.</p>
+            {debugError ? (
+              <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-900 dark:bg-red-950/30 dark:text-red-200">
+                {debugError}
+              </div>
+            ) : null}
+            <Button onClick={() => void handleGenerateDebugging()} disabled={debugLoading}>
+              {debugLoading ? "Generating debugging advice..." : "Generate Debugging Advice"}
+            </Button>
+          </CardContent>
+        </Card>
+      ) : (
+        <PageStateGate
+          state="empty"
+          empty={{ title: "No debugging feedback", description: "Run validation/debugging before viewing debugging advice." }}
+        />
+      )) : null}
     </>
   );
 
@@ -87,6 +130,32 @@ export function DebuggingPage({ projectId = ACTIVE_PROJECT_ID, state }: { projec
       setRepairError(error instanceof Error ? repairLoopErrorDescription(error) : "Repair loop failed.");
     } finally {
       setRepairLoading(false);
+    }
+  }
+
+  async function handleRunOptimization() {
+    setOptimizationError(null);
+    setOptimizationLoading(true);
+    try {
+      await optimizeCode(projectId);
+      router.push(projectPath(projectId, "optimization"));
+    } catch (error) {
+      setOptimizationError(error instanceof Error ? error.message : "Optimization failed.");
+    } finally {
+      setOptimizationLoading(false);
+    }
+  }
+
+  async function handleGenerateDebugging() {
+    setDebugError(null);
+    setDebugLoading(true);
+    try {
+      await debugCode(projectId);
+      setReloadToken((value) => value + 1);
+    } catch (error) {
+      setDebugError(error instanceof Error ? error.message : "Unable to generate debugging advice.");
+    } finally {
+      setDebugLoading(false);
     }
   }
 }

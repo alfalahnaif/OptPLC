@@ -8,7 +8,7 @@ export function CodeGenerationModeBadge() {
 
   return (
     <Badge tone={mockMode ? "info" : "success"} dot>
-      {mockMode ? "Mock Code Generator" : "Real Template Code Generator"}
+      {mockMode ? "Mock Code Generator" : "Real Backend CodeArtifact"}
     </Badge>
   );
 }

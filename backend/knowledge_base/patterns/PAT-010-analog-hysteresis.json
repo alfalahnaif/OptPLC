@@ -1,0 +1,16 @@
+{
+  "id": "PAT-010",
+  "name": "Analog Threshold with Hysteresis Band",
+  "domain": "Process Control",
+  "pattern_type": "Hysteresis Control",
+  "description": "Prevents output chatter near setpoint. Turns ON above upper threshold, OFF below lower threshold. Separate alarm band.",
+  "tags": ["analog", "threshold", "hysteresis", "PID", "setpoint", "alarm"],
+  "safety_level": "medium",
+  "st_snippet": "(* Hysteresis control — prevents chatter near setpoint *)\nIF Process_Value > High_Setpoint THEN\n    Control_Output := TRUE;\nEND_IF;\nIF Process_Value < Low_Setpoint THEN\n    Control_Output := FALSE;\nEND_IF;\n\n(* Alarm detection outside safe band *)\nHigh_Alarm    := Process_Value > High_High_Setpoint;\nLow_Alarm     := Process_Value < Low_Low_Setpoint;\nProcess_Fault := High_Alarm OR Low_Alarm;",
+  "safety_notes": "High_Setpoint must be greater than Low_Setpoint to form valid band. Alarms at High_High/Low_Low provide early warning before safety shutdown.",
+  "common_mistakes": [
+    "High_Setpoint <= Low_Setpoint — output oscillates rapidly",
+    "No alarm outside normal operating band"
+  ],
+  "applicable_rules": ["PC-1", "PC-2"]
+}

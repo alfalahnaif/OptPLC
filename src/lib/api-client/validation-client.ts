@@ -3,7 +3,7 @@ import { API_ENDPOINTS, projectEndpoint } from "@/lib/api-contracts";
 import { requirement, validation } from "@/lib/mock-data";
 
 import { isMockApiEnabled } from "./config";
-import { apiRequest } from "./fetch-transport";
+import { ApiError, apiRequest } from "./fetch-transport";
 import { mockResolve } from "./mock-transport";
 
 export type ValidationPageData = {
@@ -60,13 +60,16 @@ function mockValidationReport(projectId: string): ValidationReport {
   };
 }
 
-export async function getValidationPageData(projectId: string): Promise<ValidationPageData> {
-  const report = await validateCode(projectId);
+export async function getValidationPageData(projectId: string): Promise<ValidationPageData | null> {
+  const report = !isMockApiEnabled()
+    ? await getValidationReport(projectId)
+    : await validateCode(projectId);
+  if (!report) return null;
   return mockResolve({
     requirement,
     validation,
     report,
-    repairLoopReport: repairLoopCache.get(projectId)
+    repairLoopReport: isMockApiEnabled() ? repairLoopCache.get(projectId) : undefined
   });
 }
 
@@ -103,7 +106,8 @@ export async function debugCode(projectId: string): Promise<DebuggingReport> {
 export async function runRepairLoop(projectId: string): Promise<RepairLoopReport> {
   if (!isMockApiEnabled()) {
     const report = await apiRequest<RepairLoopReport>(projectEndpoint(API_ENDPOINTS.repairLoop, projectId), {
-      method: "POST"
+      method: "POST",
+      timeoutMs: 120000
     });
     repairLoopCache.set(projectId, report);
     return report;
@@ -118,12 +122,40 @@ export function getCachedRepairLoopReport(projectId: string): RepairLoopReport |
   return repairLoopCache.get(projectId);
 }
 
-export async function getDebuggingPageData(projectId: string): Promise<DebuggingPageData> {
+export async function getDebuggingPageData(projectId: string): Promise<DebuggingPageData | null> {
+  const report = !isMockApiEnabled()
+    ? await getDebuggingReport(projectId)
+    : await debugCode(projectId);
+  if (!report) return null;
   return mockResolve({
     validation,
-    report: await debugCode(projectId),
-    repairLoopReport: repairLoopCache.get(projectId)
+    report,
+    repairLoopReport: isMockApiEnabled() ? repairLoopCache.get(projectId) : undefined
   });
+}
+
+export async function getValidationReport(projectId: string): Promise<ValidationReport | null> {
+  if (isMockApiEnabled()) {
+    return validateCode(projectId);
+  }
+  try {
+    return await apiRequest<ValidationReport>(projectEndpoint(API_ENDPOINTS.getValidation, projectId));
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) return null;
+    throw error;
+  }
+}
+
+export async function getDebuggingReport(projectId: string): Promise<DebuggingReport | null> {
+  if (isMockApiEnabled()) {
+    return debugCode(projectId);
+  }
+  try {
+    return await apiRequest<DebuggingReport>(projectEndpoint(API_ENDPOINTS.getDebug, projectId));
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) return null;
+    throw error;
+  }
 }
 
 function mockRepairLoopReport(projectId: string): RepairLoopReport {

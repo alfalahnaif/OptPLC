@@ -1,10 +1,9 @@
-import type { CreateProjectRequest, Project, RequirementInput, WorkflowEvent } from "@/lib/api-contracts";
+import type { AnalysisResult, CreateProjectRequest, Project, RequirementInput, RequirementPayload, WorkflowEvent } from "@/lib/api-contracts";
 import { API_ENDPOINTS, projectEndpoint } from "@/lib/api-contracts";
 import {
   currentProject,
   dashboardKpis,
   domainYield,
-  planObject,
   projects,
   requirement,
   serviceStatus,
@@ -13,8 +12,8 @@ import {
 } from "@/lib/mock-data";
 
 import { isMockApiEnabled } from "./config";
-import { apiRequest } from "./fetch-transport";
-import { cloneMock, mockResolve } from "./mock-transport";
+import { ApiError, apiRequest } from "./fetch-transport";
+import { mockResolve } from "./mock-transport";
 
 export const ACTIVE_PROJECT_ID = currentProject.id;
 
@@ -42,8 +41,19 @@ export type DashboardPageData = {
 };
 
 export type RequirementPageData = {
-  requirement: typeof requirement;
-  derivedPlan: typeof planObject;
+  requirementText: string;
+  projectDomain: string;
+  projectComplexityTier?: string;
+  userSafetyConstraints: string[];
+  suggestedSafetyConstraints: string[];
+  confirmedOutputs: string[];
+  confirmedInputs: string[];
+  performanceTargets: {
+    maxScanTimeMs: number;
+    maxCyclomaticComplexity: number;
+    minMaintainabilityIndex: number;
+    maxIterations: number;
+  };
 };
 
 export type SettingsPageData = {
@@ -55,6 +65,13 @@ export type HealthResponse = {
   service: string;
   version: string;
   timestamp: string;
+};
+
+const DEFAULT_REQUIREMENT_TARGETS = {
+  maxScanTimeMs: 5,
+  maxCyclomaticComplexity: 8,
+  minMaintainabilityIndex: 75,
+  maxIterations: 5
 };
 
 export async function createProject(request: CreateProjectRequest): Promise<Project> {
@@ -145,6 +162,7 @@ export async function getRequirementInput(projectId: string): Promise<Requiremen
     projectId,
     text: requirement.text,
     safetyConstraints: [...requirement.constraints],
+    confirmedOutputs: [],
     performanceTargets: {
       maxScanTimeMs: requirement.performanceTargets.scanTimeMs,
       maxCyclomaticComplexity: requirement.performanceTargets.cyclomaticComplexity,
@@ -155,11 +173,58 @@ export async function getRequirementInput(projectId: string): Promise<Requiremen
 }
 
 export async function getRequirementPageData(projectId: string): Promise<RequirementPageData> {
-  const derivedPlan = cloneMock(planObject);
-  derivedPlan.projectId = projectId;
+  const [persisted, project] = await Promise.all([getRequirements(projectId), getProject(projectId)]);
+  const projectDomain = persisted?.domain?.trim() || project.domain;
+  if (!persisted) {
+    return mockResolve({
+      requirementText: "",
+      projectDomain,
+      projectComplexityTier: undefined,
+      userSafetyConstraints: [],
+      suggestedSafetyConstraints: [],
+      confirmedOutputs: [],
+      confirmedInputs: [],
+      performanceTargets: DEFAULT_REQUIREMENT_TARGETS
+    });
+  }
+
   return mockResolve({
-    requirement,
-    derivedPlan
+    requirementText: persisted.text,
+    projectDomain,
+    projectComplexityTier: persisted.complexityTier ?? undefined,
+    userSafetyConstraints: [...persisted.safetyConstraints],
+    suggestedSafetyConstraints: [],
+    confirmedOutputs: [...(persisted.confirmedOutputs ?? [])],
+    confirmedInputs: [...(persisted.confirmedInputs ?? [])],
+    performanceTargets: persisted.performanceTargets
+  });
+}
+
+export async function getRequirements(projectId: string): Promise<RequirementPayload | null> {
+  if (!isMockApiEnabled()) {
+    try {
+      return await apiRequest<RequirementPayload>(projectEndpoint(API_ENDPOINTS.getRequirements, projectId));
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 404) {
+        return null;
+      }
+      throw error;
+    }
+  }
+
+  return mockResolve({
+    projectId,
+    text: requirement.text,
+    safetyConstraints: [...requirement.constraints],
+    confirmedOutputs: [],
+    performanceTargets: {
+      maxScanTimeMs: requirement.performanceTargets.scanTimeMs,
+      maxCyclomaticComplexity: requirement.performanceTargets.cyclomaticComplexity,
+      minMaintainabilityIndex: requirement.performanceTargets.maintainability,
+      maxIterations: requirement.performanceTargets.maxIterations
+    },
+    submittedAt: "2026-05-17T09:42:18Z",
+    updatedAt: "2026-05-17T09:42:18Z"
   });
 }
 
@@ -184,6 +249,35 @@ export async function submitRequirements(request: RequirementInput): Promise<Wor
     outputSummary: "Requirement envelope stored; ready for Plan Object generation",
     durationMs: 4200,
     createdAt: "2026-05-17T09:42:18Z"
+  });
+}
+
+export async function analyzeRequirement(
+  projectId: string,
+  text: string,
+  safetyConstraints: string[]
+): Promise<AnalysisResult> {
+  if (!isMockApiEnabled()) {
+    return apiRequest<AnalysisResult, { text: string; safetyConstraints: string[] }>(
+      projectEndpoint(API_ENDPOINTS.analyzeRequirement, projectId),
+      {
+        method: "POST",
+        body: { text, safetyConstraints }
+      }
+    );
+  }
+
+  return mockResolve({
+    domain: "Motor Control",
+    confidence: 0.72,
+    inferred_inputs: [],
+    suggested_outputs: [],
+    suggested_internals: [],
+    safety_constraints: [...safetyConstraints],
+    suggested_constraints: [],
+    projectId,
+    analyzedAt: new Date().toISOString(),
+    source: "heuristic"
   });
 }
 

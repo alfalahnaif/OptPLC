@@ -1,0 +1,17 @@
+{
+  "id": "PAT-003",
+  "name": "Motor DOL Starter with Latch",
+  "domain": "Motor Control",
+  "pattern_type": "Run Latch",
+  "description": "Direct-on-line motor starter. Run latch with Start/Stop interlocking, E-Stop override, overload protection, and status lamps.",
+  "tags": ["motor", "DOL", "start", "stop", "latch", "overload", "lamp"],
+  "safety_level": "high",
+  "st_snippet": "(* Run latch *)\nIF Start_PB AND NOT Stop_PB AND Emergency_Stop\n   AND NOT Overload AND NOT Fault_State THEN\n    Run_Latch := TRUE;\nEND_IF;\nIF NOT Stop_PB OR NOT Emergency_Stop OR Overload THEN\n    Run_Latch := FALSE;\nEND_IF;\n\n(* Outputs *)\nMotor_Run  := Run_Latch AND NOT Fault_State;\nReady_Lamp := NOT Fault_State AND NOT Motor_Run;\nFault_Lamp := Fault_State OR Overload;",
+  "safety_notes": "Stop_PB is NC-wired: NOT Stop_PB = stop pressed. Emergency_Stop is NC: FALSE = emergency active. Overload signal TRUE = fault detected. Motor_Run is gated by Fault_State as final guard.",
+  "common_mistakes": [
+    "Using normally-open E-Stop logic — opposite of IEC safety convention",
+    "Not interlocking Motor_Run with Fault_State",
+    "Missing overload in the fault condition"
+  ],
+  "applicable_rules": ["MC-1", "MC-2", "MC-3", "MC-4"]
+}

@@ -1,0 +1,16 @@
+{
+  "id": "PAT-012",
+  "name": "HMI Status and Feedback Signals",
+  "domain": "Generic",
+  "pattern_type": "Status Feedback",
+  "description": "Standard HMI status outputs: Ready lamp, Running lamp, Fault lamp, Step indicator. Provides clear operator feedback.",
+  "tags": ["HMI", "lamp", "status", "feedback", "operator", "display"],
+  "safety_level": "medium",
+  "st_snippet": "(* HMI status lamps — update at end of scan *)\nReady_Lamp   := NOT Fault_State AND NOT Running;\nRunning_Lamp := Running AND NOT Fault_State;\nFault_Lamp   := Fault_State;\nStep_Display := Step_State;   (* INT → HMI numeric display *)\n\n(* Alarm beacon — flashing handled by HMI, we just send the bit *)\nAlarm_Beacon := Fault_State OR High_High_Alarm OR Low_Low_Alarm;",
+  "safety_notes": "Fault_Lamp must be independent from Running_Lamp. Alarm_Beacon should activate on any critical condition. Step_Display helps operators understand sequence progress.",
+  "common_mistakes": [
+    "Fault_Lamp tied to Running state — can miss fault condition",
+    "No visual distinction between Ready and Running"
+  ],
+  "applicable_rules": ["MC-4", "GEN-1"]
+}

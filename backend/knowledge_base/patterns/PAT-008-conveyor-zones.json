@@ -1,0 +1,16 @@
+{
+  "id": "PAT-008",
+  "name": "Conveyor Zone Permissive Chain",
+  "domain": "Conveyor Control",
+  "pattern_type": "Permissive Chain",
+  "description": "Multi-zone conveyor where each upstream zone enables only when downstream zone is running. Prevents material pileup.",
+  "tags": ["conveyor", "zone", "permissive", "anti-collision", "belt"],
+  "safety_level": "medium",
+  "st_snippet": "(* Enable from downstream to upstream *)\nZone3_Run := NOT Zone3_Blocked AND Emergency_Stop AND NOT Fault_State;\nZone2_Run := Zone3_Run AND NOT Zone2_Blocked;\nZone1_Run := Zone2_Run AND NOT Zone1_Blocked;\n\n(* E-Stop kills all zones *)\nIF NOT Emergency_Stop OR Fault_State THEN\n    Zone1_Run := FALSE;\n    Zone2_Run := FALSE;\n    Zone3_Run := FALSE;\nEND_IF;",
+  "safety_notes": "Always enable downstream zones first. E-Stop force-off placed after all assignments. Each zone independently blocked by its own sensor.",
+  "common_mistakes": [
+    "Enabling upstream before downstream — causes pileup",
+    "Not placing E-Stop force-off after all zone assignments"
+  ],
+  "applicable_rules": ["GEN-3", "MC-1"]
+}

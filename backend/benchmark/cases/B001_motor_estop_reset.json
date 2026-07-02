@@ -1,0 +1,34 @@
+{
+  "id": "B001",
+  "name": "Motor DOL with E-Stop and Reset",
+  "domain": "Motor Control",
+  "complexity": "simple",
+  "requirement": "Control a three-phase motor M-01 via Start_PB. Stop_PB or E_Stop immediately de-energizes the motor. After E_Stop or Overload, motor must not restart until Reset_PB is pressed while E_Stop is healthy.",
+  "expected_inputs": [
+    "Start_PB",
+    "Stop_PB",
+    "E_Stop",
+    "Overload",
+    "Reset_PB"
+  ],
+  "expected_outputs": [
+    "Motor_Run",
+    "Ready_Lamp",
+    "Fault_Lamp"
+  ],
+  "safety_constraints": [
+    "Motor must de-energize immediately when Stop_PB or E_Stop is active.",
+    "Overload must latch fault and block restart.",
+    "Reset_PB must be required after E_Stop or Overload before a new start."
+  ],
+  "expected_properties": [
+    {
+      "id": "B001-P1",
+      "description": "No auto-restart after emergency stop until reset."
+    },
+    {
+      "id": "B001-P2",
+      "description": "Motor output is false whenever E_Stop is active."
+    }
+  ]
+}

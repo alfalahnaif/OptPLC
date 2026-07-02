@@ -1,0 +1,33 @@
+{
+  "id": "B003",
+  "name": "Tank Level Control",
+  "domain": "Process Control",
+  "complexity": "medium",
+  "requirement": "Maintain water level in tank T-03. Fill_Pump runs when level drops below Low_Level. Fill_Pump stops when High_Level is reached. High_High_Level triggers overflow alarm and stops pump immediately.",
+  "expected_inputs": [
+    "Low_Level",
+    "High_Level",
+    "High_High_Level",
+    "Emergency_Stop"
+  ],
+  "expected_outputs": [
+    "Fill_Pump",
+    "Overflow_Alarm",
+    "System_Ready"
+  ],
+  "safety_constraints": [
+    "High_High_Level must force Fill_Pump off immediately.",
+    "Emergency_Stop must force Fill_Pump off immediately.",
+    "System_Ready must be false during active overflow alarm."
+  ],
+  "expected_properties": [
+    {
+      "id": "B003-P1",
+      "description": "Pump is disabled on high-high level."
+    },
+    {
+      "id": "B003-P2",
+      "description": "Overflow alarm is raised on high-high level."
+    }
+  ]
+}

@@ -2,14 +2,12 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import os
 import re
 import threading
+from abc import ABC, abstractmethod
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Literal
 
-from app.config import settings
 from app.schemas.contracts import (
     CodeArtifact,
     PlanObject,
@@ -17,16 +15,514 @@ from app.schemas.contracts import (
     ValidationReport,
     ValidationSafetyResult,
 )
-from app.services.validation_service import MatiecValidator
+from app.services.transpiler_service import StToSmvTranspiler
+from app.services.validation_service import MatiecValidator, PLCVerifValidator
 
 ValidationMode = Literal["static", "formal"]
 logger = logging.getLogger(__name__)
 
 
+class DomainValidator(ABC):
+    """Base class for all domain-specific validators."""
+
+    domain_id: str = ""
+    domain_name: str = ""
+    rule_prefix: str = ""
+
+    @abstractmethod
+    def detect(
+        self,
+        signal_names: set[str],
+        source: str,
+        plan_domain: str,
+    ) -> bool:
+        """Return True if this validator applies to the given code."""
+
+    @abstractmethod
+    def validate(
+        self,
+        source: str,
+        signal_names: set[str],
+    ) -> list[ValidationSafetyResult]:
+        """Run domain safety rules. Return list of results."""
+
+    @staticmethod
+    def _rule(
+        rule_id: str,
+        description: str,
+        passed: bool,
+        details: str | None = None,
+    ) -> ValidationSafetyResult:
+        return ValidationSafetyResult(
+            id=rule_id,
+            description=description,
+            status="passed" if passed else "failed",
+            details=details if not passed else None,
+        )
+
+
+class SequentialBatchValidator(DomainValidator):
+    domain_id = "sequential_batch"
+    domain_name = "Sequential Batch"
+    rule_prefix = "BT"
+
+    def detect(self, signal_names: set[str], source: str, plan_domain: str) -> bool:
+        upper = source.upper()
+        name_set = {n.upper() for n in signal_names}
+        if {"START_BATCH", "FILL_VALVE", "HEATER", "DRAIN_VALVE"}.issubset(name_set):
+            return True
+        has_fill = any("FILL" in n for n in name_set)
+        has_drain = any("DRAIN" in n for n in name_set)
+        has_step = (
+            re.search(r"\bCASE\b", upper) is not None
+            or re.search(r"\b\w*STEP\w*\s*:\s*INT\b", upper) is not None
+        )
+        plan_domain_lower = plan_domain.lower()
+        domain_match = "batch" in plan_domain_lower or "sequence" in plan_domain_lower
+        return (has_fill and has_drain) or (domain_match and has_step)
+
+    def validate(self, source: str, signal_names: set[str]) -> list[ValidationSafetyResult]:
+        upper = source.upper()
+        lines = source.splitlines()
+        has_fill_signal = any("FILL" in n.upper() for n in signal_names)
+        has_drain_signal = any("DRAIN" in n.upper() for n in signal_names)
+        has_abort_signal = any("ABORT" in n.upper() for n in signal_names)
+        has_reset_signal = any("RESET" in n.upper() for n in signal_names)
+        has_estop_signal = any("E_STOP" in n.upper() or "EMERGENCY" in n.upper() for n in signal_names)
+        R = self._rule
+        results: list[ValidationSafetyResult] = []
+
+        has_case = re.search(r"\bCASE\s+\w+\s+OF\b", upper) is not None
+        has_step_int = re.search(r"\b\w*(?:STEP|STATE)\w*\s*:\s*INT\b", upper) is not None
+        results.append(
+            R(
+                "BT-1",
+                "Sequential batch must use CASE state machine with INT step variable",
+                has_case or has_step_int,
+                "No CASE state machine or INT step variable found",
+            )
+        )
+
+        case_blocks = re.findall(r"CASE\s+\w+\s+OF(.*?)END_CASE", source, re.DOTALL | re.IGNORECASE)
+        has_else = any("ELSE" in block.upper() for block in case_blocks)
+        results.append(
+            R(
+                "BT-2",
+                "CASE statement should have ELSE branch setting outputs to FALSE",
+                has_else or not case_blocks,
+                "CASE missing ELSE branch; undefined state may keep outputs energized",
+            )
+        )
+
+        has_estop = re.search(r"\bEMERGENCY_STOP\b|\bE_STOP\b", upper) is not None
+        has_abort = re.search(r"\bABORT\b", upper) is not None
+        estop_abort_ok = (
+            (not has_estop_signal and not has_abort_signal)
+            or ((not has_estop_signal or has_estop) and (not has_abort_signal or has_abort))
+        )
+        missing_parts = []
+        if has_estop_signal and not has_estop:
+            missing_parts.append("Emergency_Stop")
+        if has_abort_signal and not has_abort:
+            missing_parts.append("Abort")
+        results.append(
+            R(
+                "BT-3",
+                "Emergency stop and abort should be handled when defined by the scenario",
+                estop_abort_ok,
+                f"Missing handling for: {', '.join(missing_parts)}" if missing_parts else None,
+            )
+        )
+
+        has_fault = re.search(r"\bFAULT\w*\b", upper) is not None
+        fault_ok = has_fault or not (has_estop_signal or has_abort_signal)
+        results.append(
+            R(
+                "BT-4",
+                "Fault state should be latched to prevent automatic restart after a trip",
+                fault_ok,
+                "No fault latch variable (e.g. Fault_State/Fault_Latched) found",
+            )
+        )
+
+        fill_true_lines = [
+            idx
+            for idx, line in enumerate(lines)
+            if "FILL_VALVE" in line.upper() and ":= TRUE" in line.upper()
+        ]
+        drain_true_lines = [
+            idx
+            for idx, line in enumerate(lines)
+            if "DRAIN_VALVE" in line.upper() and ":= TRUE" in line.upper()
+        ]
+        conflict = any(abs(fill_idx - drain_idx) < 4 for fill_idx in fill_true_lines for drain_idx in drain_true_lines)
+        conflict_check_applicable = has_fill_signal and has_drain_signal
+        results.append(
+            R(
+                "BT-5",
+                "Fill_Valve and Drain_Valve must never be TRUE simultaneously",
+                (not conflict) if conflict_check_applicable else True,
+                "Fill_Valve and Drain_Valve are both set TRUE in the same code context",
+            )
+        )
+
+        last_case = max((m.start() for m in re.finditer(r"\bCASE\b", upper)), default=-1)
+        last_estop = max((m.start() for m in re.finditer(r"\bEMERGENCY_STOP\b|\bE_STOP\b", upper)), default=-1)
+        scan_ok = (last_case == -1 or last_estop == -1 or last_estop > last_case)
+        results.append(
+            R(
+                "BT-6",
+                "Safety force-off should execute after output assignments in scan order",
+                scan_ok,
+                "Emergency stop check appears before CASE block and may be overridden",
+            )
+        )
+
+        has_reset = re.search(r"\bRESET_PB\b", upper) is not None
+        reset_guarded = re.search(
+            r"RESET_PB\s+AND\s+.{0,100}(?:NOT\s+EMERGENCY_STOP|NOT\s+E_STOP|NOT\s+ABORT|SAFETY_OK)",
+            upper,
+            re.DOTALL,
+        ) is not None
+        reset_ok = (not has_reset_signal) or (not has_reset) or reset_guarded
+        results.append(
+            R(
+                "BT-7",
+                "Reset_PB should only clear faults when safety conditions are healthy",
+                reset_ok,
+                "Reset_PB appears to clear faults without explicit safety health checks",
+            )
+        )
+
+        return results
+
+
+class MotorControlValidator(DomainValidator):
+    domain_id = "motor_control"
+    domain_name = "Motor Control"
+    rule_prefix = "MC"
+
+    def detect(self, signal_names: set[str], source: str, plan_domain: str) -> bool:
+        name_set = {n.upper() for n in signal_names}
+        has_motor = any("MOTOR" in n or "MOTOR_RUN" in n or "RUN" in n for n in name_set)
+        has_stop = any("STOP" in n for n in name_set)
+        has_start = any("START" in n for n in name_set)
+        domain_hint = plan_domain.lower()
+        domain_match = "motor" in domain_hint or "conveyor" in domain_hint
+        return (has_motor and has_stop and has_start) or domain_match
+
+    def validate(self, source: str, signal_names: set[str]) -> list[ValidationSafetyResult]:
+        upper = source.upper()
+        name_set = {n.upper() for n in signal_names}
+        has_motor_signal = any("MOTOR" in n or "RUN" in n for n in name_set)
+        has_start_signal = any("START" in n for n in name_set)
+        has_stop_signal = any("STOP" in n or "E_STOP" in n or "EMERGENCY" in n for n in name_set)
+        has_overload_signal = any("OVERLOAD" in n or "OVER_LOAD" in n for n in name_set)
+        R = self._rule
+
+        has_estop_off = re.search(
+            r"(?:E_STOP|EMERGENCY_STOP|STOP_PB|OVERLOAD).{0,120}:=\s*FALSE",
+            upper,
+            re.DOTALL,
+        ) is not None
+        mc1_passed = (not has_motor_signal) or (not has_stop_signal and not has_overload_signal) or has_estop_off
+
+        has_start_interlock = (
+            re.search(r"START_PB\s+AND\s+NOT\s+(?:STOP|FAULT|E_STOP|OVERLOAD)", upper) is not None
+            or re.search(r"NOT\s+(?:STOP|E_STOP).{0,80}START_PB", upper, re.DOTALL) is not None
+        )
+        mc2_passed = (not has_start_signal) or has_start_interlock
+
+        has_fault = re.search(r"\bFAULT\w*\b", upper) is not None
+        mc3_passed = has_fault or not (has_motor_signal and has_start_signal)
+
+        has_overload = re.search(r"\bOVERLOAD\b|\bOVER_LOAD\b", upper) is not None
+        mc4_passed = (not has_overload_signal) or has_overload
+
+        return [
+            R(
+                "MC-1",
+                "E-Stop or overload must de-energize motor output",
+                mc1_passed,
+                "No evidence that safety trip conditions force motor output FALSE",
+            ),
+            R(
+                "MC-2",
+                "Motor start should check Stop, E-Stop, and fault conditions",
+                mc2_passed,
+                "Start_PB condition does not appear to include safety interlocks",
+            ),
+            R(
+                "MC-3",
+                "Fault latch should prevent automatic motor restart",
+                mc3_passed,
+                "No fault latch variable found",
+            ),
+            R(
+                "MC-4",
+                "Thermal overload condition should be monitored when provided",
+                mc4_passed,
+                "No overload input handling found",
+            ),
+        ]
+
+
+class TrafficControlValidator(DomainValidator):
+    domain_id = "traffic_control"
+    domain_name = "Traffic Control"
+    rule_prefix = "TC"
+
+    def detect(self, signal_names: set[str], source: str, plan_domain: str) -> bool:
+        name_set = {n.upper() for n in signal_names}
+        has_red = any("RED" in n for n in name_set)
+        has_green = any("GREEN" in n for n in name_set)
+        domain_match = "traffic" in plan_domain.lower()
+        return (has_red and has_green) or domain_match
+
+    def validate(self, source: str, signal_names: set[str]) -> list[ValidationSafetyResult]:
+        upper = source.upper()
+        lines = source.splitlines()
+        name_set = {n.upper() for n in signal_names}
+        has_green_signal = any("GREEN" in n for n in name_set)
+        has_amber_signal = any("AMBER" in n or "YELLOW" in n for n in name_set)
+        R = self._rule
+
+        has_phases = re.search(r"\bCASE\b", upper) is not None
+        has_red_phase = re.search(r"\bRED_LIGHT\b|\bRED\b", upper) is not None
+
+        conflict = False
+        for idx, line in enumerate(lines):
+            if "GREEN_LIGHT" in line.upper() and ":= TRUE" in line.upper():
+                context = " ".join(lines[max(0, idx - 2) : idx + 3]).upper()
+                if "AMBER_LIGHT" in context and ":= TRUE" in context:
+                    conflict = True
+                    break
+
+        has_timers = re.search(r"\bTON\b|\bTIMER\b|\b_TIMER\b", upper) is not None
+        conflict_rule_needed = has_green_signal and has_amber_signal
+
+        return [
+            R(
+                "TC-1",
+                "Traffic control should use a phase state machine",
+                has_phases,
+                "No CASE state machine for phase control found",
+            ),
+            R(
+                "TC-2",
+                "Red stop phase must be defined as safe fallback",
+                has_red_phase,
+                "No Red light output found",
+            ),
+            R(
+                "TC-3",
+                "Green and Amber lights must not be active simultaneously",
+                (not conflict) if conflict_rule_needed else True,
+                "Green and Amber both set TRUE in same code context",
+            ),
+            R(
+                "TC-4",
+                "Phase transitions should use timers",
+                has_timers or not has_phases,
+                "No timer (TON) found for phase timing",
+            ),
+        ]
+
+
+class ProcessControlValidator(DomainValidator):
+    domain_id = "process_control"
+    domain_name = "Process Control"
+    rule_prefix = "PC"
+
+    def detect(self, signal_names: set[str], source: str, plan_domain: str) -> bool:
+        name_set = {n.upper() for n in signal_names}
+        has_level = any("LEVEL" in n or "HIGH" in n or "LOW" in n for n in name_set)
+        has_pump = any("PUMP" in n or "VALVE" in n for n in name_set)
+        domain_match = any(token in plan_domain.lower() for token in ["process", "level", "tank", "pump"])
+        return (has_level and has_pump) or domain_match
+
+    def validate(self, source: str, signal_names: set[str]) -> list[ValidationSafetyResult]:
+        upper = source.upper()
+        name_set = {n.upper() for n in signal_names}
+        has_high_signal = any("HIGH_LEVEL" in n or "HIGH" in n for n in name_set)
+        has_estop_signal = any("E_STOP" in n or "EMERGENCY" in n for n in name_set)
+        R = self._rule
+
+        has_high_stop = re.search(
+            r"HIGH_LEVEL.{0,80}:=\s*FALSE|HIGH_LEVEL.{0,80}END_IF",
+            upper,
+            re.DOTALL,
+        ) is not None
+        has_overflow = re.search(r"\bHIGH_HIGH\b|\bOVERFLOW\b|\bHIGH_ALARM\b", upper) is not None
+        has_estop_guard = re.search(r"(?:E_STOP|EMERGENCY).{0,120}:=\s*FALSE", upper, re.DOTALL) is not None
+
+        return [
+            R(
+                "PC-1",
+                "High level sensor should stop fill pump/valve",
+                has_high_stop or not has_high_signal,
+                "No evidence that High_Level stops filling",
+            ),
+            R(
+                "PC-2",
+                "Overflow/high-high alarm protection is recommended",
+                has_overflow or not has_high_signal,
+                "No overflow or high-high alarm handling found",
+            ),
+            R(
+                "PC-3",
+                "Emergency stop must de-energize actuators when E-Stop is defined",
+                has_estop_guard or not has_estop_signal,
+                "No evidence that E-Stop de-energizes pumps/valves",
+            ),
+        ]
+
+
+class SafetyInterlockValidator(DomainValidator):
+    domain_id = "safety_interlock"
+    domain_name = "Safety Interlock"
+    rule_prefix = "SI"
+
+    def detect(self, signal_names: set[str], source: str, plan_domain: str) -> bool:
+        name_set = {n.upper() for n in signal_names}
+        has_interlock = any(
+            keyword in n
+            for n in name_set
+            for keyword in ["INTERLOCK", "PERMISSIVE", "ENABLE", "GUARD"]
+        )
+        domain_match = "interlock" in plan_domain.lower() or "safety" in plan_domain.lower()
+        return has_interlock or domain_match
+
+    def validate(self, source: str, signal_names: set[str]) -> list[ValidationSafetyResult]:
+        upper = source.upper()
+        R = self._rule
+        output_names = [
+            n
+            for n in signal_names
+            if any(keyword in n.upper() for keyword in ["OUTPUT", "VALVE", "MOTOR", "PUMP", "ENABLE"])
+        ]
+
+        has_and_chain = re.search(r"\w+\s+AND\s+\w+\s+AND\s+\w+", upper) is not None
+        has_gated = len(output_names) == 0 or re.search(
+            r"(?:PERMISSIVE|INTERLOCK|ENABLE|ALL_OK).{0,80}:=\s*\w+",
+            upper,
+            re.DOTALL,
+        ) is not None
+        has_estop = re.search(r"\bEMERGENCY\b|\bE_STOP\b|\bSTOP\b", upper) is not None
+
+        return [
+            R(
+                "SI-1",
+                "Safety interlock should use multi-condition AND-chain permissive logic",
+                has_and_chain,
+                "No multi-condition AND chain found for permissive interlocking",
+            ),
+            R(
+                "SI-2",
+                "Process outputs should be gated through permissive conditions",
+                has_gated,
+                "Outputs do not appear to be gated through a permissive variable",
+            ),
+            R(
+                "SI-3",
+                "Emergency stop should override all other conditions when available",
+                has_estop or len(output_names) == 0,
+                "No emergency stop input found in interlock logic",
+            ),
+        ]
+
+
+class GenericValidator(DomainValidator):
+    domain_id = "generic"
+    domain_name = "Generic PLC"
+    rule_prefix = "GEN"
+
+    def detect(self, signal_names: set[str], source: str, plan_domain: str) -> bool:
+        return True
+
+    def validate(self, source: str, signal_names: set[str]) -> list[ValidationSafetyResult]:
+        upper = source.upper()
+        R = self._rule
+        has_program = "PROGRAM" in upper and "END_PROGRAM" in upper
+        results = [
+            R(
+                "GEN-1",
+                "PROGRAM/END_PROGRAM structure must be present",
+                has_program,
+                "Missing PROGRAM or END_PROGRAM declaration",
+            )
+        ]
+
+        var_count = len(re.findall(r"\bVAR\b", source, re.IGNORECASE))
+        endvar_count = len(re.findall(r"\bEND_VAR\b", source, re.IGNORECASE))
+        results.append(
+            R(
+                "GEN-2",
+                "VAR and END_VAR blocks must be balanced",
+                var_count == endvar_count,
+                f"Mismatched VAR/END_VAR: {var_count} VAR vs {endvar_count} END_VAR",
+            )
+        )
+
+        safety_names = [
+            n
+            for n in signal_names
+            if any(keyword in n.upper() for keyword in ["STOP", "FAULT", "ABORT", "EMERGENCY", "SAFE"])
+        ]
+        output_names = [
+            n
+            for n in signal_names
+            if any(keyword in n.upper() for keyword in ["VALVE", "MOTOR", "PUMP", "HEATER", "OUTPUT", "RUN"])
+        ]
+        has_guard = (
+            not safety_names
+            or not output_names
+            or re.search(
+                r"(?:"
+                + "|".join(re.escape(s.upper()) for s in safety_names[:3])
+                + r").{0,200}:=\s*FALSE",
+                upper,
+                re.DOTALL,
+            )
+            is not None
+        )
+        results.append(
+            R(
+                "GEN-3",
+                "Safety inputs should de-energize outputs when active",
+                has_guard,
+                "No evidence that safety inputs set outputs FALSE",
+            )
+        )
+
+        if_count = len(re.findall(r"\bIF\b", source, re.IGNORECASE))
+        endif_count = len(re.findall(r"\bEND_IF\b", source, re.IGNORECASE))
+        results.append(
+            R(
+                "GEN-4",
+                "IF and END_IF must be balanced",
+                if_count == endif_count,
+                f"Mismatched IF/END_IF: {if_count} IF vs {endif_count} END_IF",
+            )
+        )
+
+        return results
+
+
 class ValidationAgent:
+    DOMAIN_VALIDATORS: list[DomainValidator] = [
+        SequentialBatchValidator(),
+        MotorControlValidator(),
+        TrafficControlValidator(),
+        ProcessControlValidator(),
+        SafetyInterlockValidator(),
+        GenericValidator(),
+    ]
+
     def __init__(self, mode: ValidationMode = "static", matiec_validator: MatiecValidator | None = None) -> None:
         self.mode = mode
         self.matiec_validator = matiec_validator or MatiecValidator()
+        self.plcverif_validator = PLCVerifValidator()
 
     def validate(
         self,
@@ -36,14 +532,26 @@ class ValidationAgent:
         plan: PlanObject,
     ) -> ValidationReport:
         if self.mode == "formal":
-            raise NotImplementedError("ValidationAgent formal mode is reserved for future MATIEC/nuXmv/PLCverif integration.")
+            return self._validate_formal(project_id=project_id, artifact=artifact, plan=plan)
         if self.mode != "static":
             raise ValueError(f"Unsupported ValidationAgent mode: {self.mode}")
 
-        syntax_errors = self._syntax_errors_with_optional_matiec(artifact.source)
-        safety_results = [] if syntax_errors else self._safety_results(artifact.source, plan)
+        return self._validate_static(project_id=project_id, artifact=artifact, plan=plan)
+
+    def _validate_static(self, *, project_id: str, artifact: CodeArtifact, plan: PlanObject) -> ValidationReport:
+        syntax_errors, validator_used = self._syntax_errors_with_optional_matiec(artifact.source)
+        names = {signal.name for signal in [*plan.inputs, *plan.outputs]}
+        plan_domain = getattr(plan, "domain", "") or ""
+        domain_validator = self._detect_domain_validator(artifact.source, names, plan_domain)
+        logger.info(
+            "[ValidationAgent] Domain detected: %s — applying %s rules",
+            domain_validator.domain_name,
+            domain_validator.rule_prefix,
+        )
+        safety_results = [] if syntax_errors else domain_validator.validate(artifact.source, names)
         failed_safety = [result for result in safety_results if result.status == "failed"]
         formal_errors = [result.details or result.description for result in failed_safety]
+        validator_label = "matiec" if validator_used == "matiec" else "static.v1"
 
         if syntax_errors:
             status = "SYNTAX_ERROR"
@@ -73,7 +581,7 @@ class ValidationAgent:
             syntaxPassed=not syntax_errors,
             formalPassed=not syntax_errors and not formal_errors,
             solver="static.v1",
-            validator="static.v1",
+            validator=validator_label,
             checkedAt=self._utc_now(),
             summary=summary,
             syntaxErrors=syntax_errors,
@@ -85,231 +593,214 @@ class ValidationAgent:
             counterexamples=counterexamples,
         )
 
-    def _syntax_errors_with_optional_matiec(self, source: str) -> list[str]:
-        static_errors = self._syntax_errors(source)
-        if not source.strip():
-            return static_errors
-
-        available, reason = self._is_matiec_available()
-        if not available:
-            logger.info("MATIEC syntax hardening skipped: %s", reason)
-            return static_errors
-
-        try:
-            result = self._run_matiec_syntax(source)
-        except Exception as exc:  # pragma: no cover - defensive path
-            logger.warning("MATIEC syntax hardening failed; falling back to static checks: %s", exc)
-            return static_errors
-
-        errors = list(result.get("errors", []))
-        passed = bool(result.get("passed", False))
-        if passed:
-            return static_errors
-        if self._is_matiec_environment_error(errors):
-            logger.warning(
-                "MATIEC unavailable/tool issue during syntax hardening; falling back to static checks: %s",
-                "; ".join(errors) if errors else "unknown MATIEC error",
+    def _validate_formal(self, *, project_id: str, artifact: CodeArtifact, plan: PlanObject) -> ValidationReport:
+        syntax_result = self._run_matiec_syntax(artifact.source)
+        syntax_errors = list(syntax_result.get("errors", []))
+        if not syntax_result.get("passed", False):
+            return ValidationReport(
+                projectId=project_id,
+                artifactId=artifact.artifactId,
+                iteration=artifact.iteration,
+                status="SYNTAX_ERROR",
+                syntaxPassed=False,
+                formalPassed=False,
+                solver="matiec.v1",
+                validator="matiec.v1",
+                checkedAt=self._utc_now(),
+                summary="Structured Text syntax validation failed before formal checks.",
+                syntaxErrors=syntax_errors,
+                formalErrors=[],
+                safetyResults=[],
+                properties=[],
+                errors=syntax_errors,
+                counterexample=None,
+                counterexamples=[],
             )
-            return static_errors
 
-        merged_errors = [*errors, *static_errors]
-        return list(dict.fromkeys(merged_errors))
+        requested_properties = self._requested_properties(plan)
+        transpile_result = StToSmvTranspiler().transpile(artifact.source, requested_properties)
+        if not transpile_result.success:
+            if transpile_result.error and transpile_result.error.startswith("TRANSPILER_UNSUPPORTED"):
+                logger.warning(
+                    "Formal validation fallback to static checks due to unsupported transpiler construct: %s",
+                    transpile_result.unsupported_construct,
+                )
+                fallback_report = self._validate_static(project_id=project_id, artifact=artifact, plan=plan)
+                fallback_summary = (
+                    f"{fallback_report.summary} Formal path fell back to static checks because the transpiler "
+                    f"does not support: {transpile_result.unsupported_construct}."
+                )
+                return fallback_report.model_copy(update={"summary": fallback_summary})
 
-    def _syntax_errors(self, source: str) -> list[str]:
+            transpile_error = transpile_result.error or "ST to SMV transpilation failed."
+            return ValidationReport(
+                projectId=project_id,
+                artifactId=artifact.artifactId,
+                iteration=artifact.iteration,
+                status="FORMAL_VIOLATION",
+                syntaxPassed=True,
+                formalPassed=False,
+                solver="matiec+plcverif.v1",
+                validator="formal.v1",
+                checkedAt=self._utc_now(),
+                summary="Structured Text syntax passed, but formal preprocessing failed.",
+                syntaxErrors=[],
+                formalErrors=[transpile_error],
+                safetyResults=[],
+                properties=[],
+                errors=[transpile_error],
+                counterexample=None,
+                counterexamples=[],
+            )
+
+        formal_result = self._run_coroutine_sync(
+            self.plcverif_validator.validate_formal(transpile_result.smv_model or "", requested_properties)
+        )
+        classification = str(formal_result.get("classification", "FORMAL_VIOLATION")).upper()
+        if classification == "TIMEOUT":
+            status = "TIMEOUT"
+        elif formal_result.get("all_passed", False):
+            status = "VERIFIED"
+        else:
+            status = "FORMAL_VIOLATION"
+
+        property_results = list(formal_result.get("property_results", []))
+        safety_results = self._formal_safety_results(property_results, requested_properties)
+        formal_errors = list(formal_result.get("errors", []))
+        counterexamples = self._formal_counterexamples(formal_result.get("counterexample"))
+        properties = [
+            ValidationProperty(id=result.id, description=result.description, status=result.status)
+            for result in safety_results
+        ]
+
+        summary = (
+            "Formal validation passed for all requested properties."
+            if status == "VERIFIED"
+            else "Formal validation reported property violations."
+        )
+        if status == "TIMEOUT":
+            summary = "Formal validation timed out before completion."
+
+        return ValidationReport(
+            projectId=project_id,
+            artifactId=artifact.artifactId,
+            iteration=artifact.iteration,
+            status=status,
+            syntaxPassed=True,
+            formalPassed=status == "VERIFIED",
+            solver="matiec+plcverif.v1",
+            validator="formal.v1",
+            checkedAt=self._utc_now(),
+            summary=summary,
+            syntaxErrors=[],
+            formalErrors=formal_errors,
+            safetyResults=safety_results,
+            properties=properties,
+            errors=formal_errors,
+            counterexample=counterexamples or None,
+            counterexamples=counterexamples,
+        )
+
+    def _syntax_errors_with_optional_matiec(self, st_code: str) -> tuple[list[str], str]:
+        """
+        Returns (syntax_errors, validator_used).
+        Tries MATIEC first, falls back to regex if unavailable.
+        """
+        result = self.matiec_validator.validate_syntax_sync(st_code)
+
+        if result.get("method") == "matiec":
+            if result.get("passed"):
+                logger.info(
+                    "[ValidationAgent] MATIEC syntax: PASSED (return_code=%s)",
+                    result.get("return_code", 0),
+                )
+                return [], "matiec"
+
+            matiec_errors = list(result.get("errors", []))
+            logger.warning(
+                "[ValidationAgent] MATIEC syntax: FAILED - %s error(s)",
+                len(matiec_errors),
+            )
+            return matiec_errors, "matiec"
+
+        logger.warning(
+            "[ValidationAgent] MATIEC unavailable (%s). Using regex fallback.",
+            result.get("reason", "binary not found"),
+        )
+        return self._regex_syntax_check(st_code), "regex"
+
+    def _regex_syntax_check(self, st_code: str) -> list[str]:
+        """
+        Fast regex-based syntax check used when MATIEC is unavailable.
+        Checks the most common IEC 61131-3 structural requirements.
+        """
         errors: list[str] = []
-        if not source.strip():
+        if not st_code.strip():
             return ["CodeArtifact source is empty."]
 
-        uncommented = self._strip_comments(source)
-        upper = uncommented.upper()
+        upper = st_code.upper()
 
-        has_program = bool(re.search(r"\bPROGRAM\s+[A-Z_][A-Z0-9_]*", upper))
-        has_function_block = bool(re.search(r"\bFUNCTION_BLOCK\s+[A-Z_][A-Z0-9_]*", upper))
-        if not (has_program or has_function_block):
-            errors.append("PROGRAM or FUNCTION_BLOCK declaration is required.")
-        if has_program and not re.search(r"\bEND_PROGRAM\b", upper):
-            errors.append("END_PROGRAM is required for PROGRAM blocks.")
-        if has_function_block and not re.search(r"\bEND_FUNCTION_BLOCK\b", upper):
-            errors.append("END_FUNCTION_BLOCK is required for FUNCTION_BLOCK blocks.")
+        if "PROGRAM" not in upper:
+            errors.append("Missing PROGRAM block declaration")
+        if "END_PROGRAM" not in upper:
+            errors.append("Missing END_PROGRAM")
+        if "VAR" not in upper:
+            errors.append("No VAR block found")
 
-        if not re.search(r"\bVAR_INPUT\b", upper):
-            errors.append("VAR_INPUT block is required.")
-        if not re.search(r"\bVAR_OUTPUT\b", upper):
-            errors.append("VAR_OUTPUT block is required.")
+        var_count = len(re.findall(r"\bVAR\b", st_code, re.IGNORECASE))
+        end_var_count = len(re.findall(r"\bEND_VAR\b", st_code, re.IGNORECASE))
+        if var_count != end_var_count:
+            errors.append(
+                f"Mismatched VAR/END_VAR blocks ({var_count} VAR vs {end_var_count} END_VAR)"
+            )
 
-        var_blocks = re.findall(r"^\s*VAR(?:_INPUT|_OUTPUT)?\b", upper, flags=re.MULTILINE)
-        end_vars = re.findall(r"^\s*END_VAR\b", upper, flags=re.MULTILINE)
-        if len(end_vars) < len(var_blocks):
-            errors.append("Each VAR block must be closed with END_VAR.")
+        if_count = len(re.findall(r"\bIF\b", st_code, re.IGNORECASE))
+        endif_count = len(re.findall(r"\bEND_IF\b", st_code, re.IGNORECASE))
+        if if_count != endif_count:
+            errors.append(f"Mismatched IF/END_IF ({if_count} IF vs {endif_count} END_IF)")
 
-        for start, end, name in [
-            ("IF", "END_IF", "IF"),
-            ("CASE", "END_CASE", "CASE"),
-            ("FOR", "END_FOR", "FOR"),
-            ("WHILE", "END_WHILE", "WHILE"),
-        ]:
-            start_count = len(re.findall(rf"\b{start}\b", upper))
-            end_count = len(re.findall(rf"\b{end}\b", upper))
-            if end_count < start_count:
-                errors.append(f"{name} statements must be closed with {end}.")
+        case_count = len(re.findall(r"\bCASE\b", st_code, re.IGNORECASE))
+        endcase_count = len(re.findall(r"\bEND_CASE\b", st_code, re.IGNORECASE))
+        if case_count != endcase_count:
+            errors.append(
+                f"Mismatched CASE/END_CASE ({case_count} CASE vs {endcase_count} END_CASE)"
+            )
 
-        declared = self._declared_variables(source)
-        for assigned in self._assigned_variables(source):
-            if assigned not in declared:
-                errors.append(f"Assigned variable '{assigned}' is not declared.")
+        bad_assign = re.findall(r"(?<![:<>!])=(?![>=])\s*\w", st_code)
+        if bad_assign:
+            errors.append(f"Found {len(bad_assign)} use(s) of '=' instead of ':='")
 
-        for line_number, line in enumerate(uncommented.splitlines(), start=1):
-            stripped = line.strip()
-            if re.match(r"^[A-Za-z_][A-Za-z0-9_]*\s*=(?!=)", stripped):
-                errors.append(f"Line {line_number}: assignments must use ':='.")
-            if re.search(r"\b(?:true|false)\b", stripped):
-                errors.append(f"Line {line_number}: boolean constants must be TRUE or FALSE.")
-
-        unsupported_patterns = {
-            r"\bdef\s+[A-Za-z_]": "Python function syntax is not supported.",
-            r"\bimport\s+[A-Za-z_]": "Python/JavaScript import syntax is not supported.",
-            r"\bconsole\.log\b": "JavaScript syntax is not supported.",
-            r"\bfunction\s+[A-Za-z_]": "JavaScript function syntax is not supported.",
-            r"#include\s*<": "C/C++ include syntax is not supported.",
-            r"\bstd::": "C++ namespace syntax is not supported.",
-            r"=>": "Arrow-function pseudocode is not supported.",
-        }
-        for pattern, message in unsupported_patterns.items():
-            if re.search(pattern, uncommented):
-                errors.append(message)
-
-        return list(dict.fromkeys(errors))
+        return errors
 
     def _safety_results(self, source: str, plan: PlanObject) -> list[ValidationSafetyResult]:
         names = {signal.name for signal in [*plan.inputs, *plan.outputs]}
+        plan_domain = getattr(plan, "domain", "") or ""
+        return self._check_safety(source, names, plan_domain)
 
-        if {"Start_PB", "Stop_PB", "E_Stop", "Overload", "Motor_Run"}.issubset(names):
-            return self._motor_safety(source)
-        if {"Vehicle_Detect", "Ped_Request", "Red_Light", "Green_Light", "Ped_Walk"}.issubset(names):
-            return self._traffic_safety(source)
-        if {"Level_PV", "Low_SP", "High_SP", "Inlet_Valve"}.issubset(names):
-            return self._tank_safety(source, plan)
-        if {"Guard_Closed", "Machine_Enable", "Trip_Lamp"}.issubset(names):
-            return self._safety_interlock_safety(source)
-        if {"Start_Batch", "Fill_Valve", "Heater", "Drain_Valve"}.issubset(names):
-            return self._batch_safety(source)
+    def _check_safety(
+        self,
+        source: str,
+        signal_names: set[str],
+        plan_domain: str = "",
+    ) -> list[ValidationSafetyResult]:
+        validator = self._detect_domain_validator(source, signal_names, plan_domain)
+        logger.info(
+            "[ValidationAgent] Domain detected: %s — applying %s rules",
+            validator.domain_name,
+            validator.rule_prefix,
+        )
+        return validator.validate(source, signal_names)
 
-        return [
-            self._result(
-                "GEN-1",
-                "Generic fallback must gate process enable with a safe run/fault state",
-                "PROCESS_ENABLE" in source.upper() and "FAULT_STATE" in source.upper(),
-            )
-        ]
-
-    def _motor_safety(self, source: str) -> list[ValidationSafetyResult]:
-        upper = source.upper()
-        motor_lines = [line.upper().strip() for line in source.splitlines() if re.match(r"\s*Motor_Run\s*:=", line)]
-        motor_expr = " ".join(motor_lines)
-        return [
-            self._result(
-                "MC-1",
-                "Motor output must be forced FALSE when emergency stop is active",
-                "E_STOP" in upper and ("SAFETY_OK" in motor_expr or "NOT E_STOP" in motor_expr or "FAULT_STATE" in motor_expr),
-                "Motor_Run is not visibly gated by E_Stop or the safety/fault state.",
-            ),
-            self._result(
-                "MC-2",
-                "Motor output must be forced FALSE when overload is active",
-                "OVERLOAD" in upper and ("SAFETY_OK" in motor_expr or "FAULT_STATE" in motor_expr),
-                "Motor_Run is not visibly gated by overload or the safety/fault state.",
-            ),
-            self._result(
-                "MC-3",
-                "Auto-restart must require explicit operator reset after a safety trip",
-                "RESET_PB" in upper and "FAULT_STATE" in upper,
-                "Fault latching and Reset_PB handling are required to prevent auto-restart.",
-            ),
-        ]
-
-    def _traffic_safety(self, source: str) -> list[ValidationSafetyResult]:
-        upper = source.upper()
-        conflicting_direct = "GREEN_LIGHT := TRUE" in upper and "PED_WALK := TRUE" in upper
-        protected_pedestrian = "PED_WALK := RED_LIGHT AND PED_REQUEST" in upper or "PED_WALK := PHASE_RED" in upper
-        non_conflicting_green = "GREEN_LIGHT := NOT RED_LIGHT AND NOT AMBER_LIGHT" in upper
-        return [
-            self._result(
-                "TL-1",
-                "Vehicle green and pedestrian walk must not be TRUE at the same time",
-                not conflicting_direct and protected_pedestrian and non_conflicting_green,
-                "Traffic logic can permit conflicting green/walk outputs.",
-            ),
-            self._result(
-                "TL-2",
-                "Traffic phases should define a safe transition condition",
-                "EMERGENCY_FLASH" in upper or "PHASE_RED" in upper or "PHASE_AMBER" in upper,
-                "No explicit safe phase/transition guard was found.",
-            ),
-        ]
-
-    def _tank_safety(self, source: str, plan: PlanObject) -> list[ValidationSafetyResult]:
-        upper = source.upper()
-        real_names = {signal.name for signal in plan.inputs if signal.type == "REAL"}
-        return [
-            self._result(
-                "TK-1",
-                "Level and setpoint variables should be REAL typed",
-                {"Level_PV", "Low_SP", "High_SP"}.issubset(real_names),
-                "Tank level/setpoint inputs must use REAL signal types.",
-            ),
-            self._result(
-                "TK-2",
-                "Inlet valve must close or change state at high-level condition",
-                "INLET_VALVE := FALSE" in upper and ("HIGH_SP" in upper or "HIGHHIGH_SP" in upper),
-                "High-level handling does not visibly close Inlet_Valve.",
-            ),
-            self._result(
-                "TK-3",
-                "Low-level condition should be handled before filling",
-                "LOW_SP" in upper and ("FILL_REQUEST" in upper or "LEVEL_PV <=" in upper),
-                "Low-level filling condition was not found.",
-            ),
-        ]
-
-    def _safety_interlock_safety(self, source: str) -> list[ValidationSafetyResult]:
-        upper = source.upper()
-        return [
-            self._result(
-                "SI-1",
-                "Safety interlock must fail safe on unsafe permissive conditions",
-                "PERMISSIVE_OK" in upper and "TRIP_STATE" in upper,
-                "No fail-safe permissive/trip state was found.",
-            ),
-            self._result(
-                "SI-2",
-                "Unsafe condition should force actuator output FALSE",
-                "MACHINE_ENABLE := PERMISSIVE_OK AND NOT TRIP_STATE" in upper,
-                "Machine_Enable is not gated by permissive and trip state.",
-            ),
-        ]
-
-    def _batch_safety(self, source: str) -> list[ValidationSafetyResult]:
-        upper = source.upper()
-        return [
-            self._result(
-                "BT-1",
-                "Sequential batch must use a state/step variable",
-                re.search(r"\bSTEP\s*:\s*INT\b", upper) is not None and "CASE STEP OF" in upper,
-                "No INT Step state machine was found.",
-            ),
-            self._result(
-                "BT-2",
-                "Emergency stop or abort condition should reset the batch safely",
-                "STOP_BATCH" in upper or "ABORT" in upper or "E_STOP" in upper,
-                "No stop/abort condition was found.",
-            ),
-            self._result(
-                "BT-3",
-                "Invalid step fallback should return to a safe idle state",
-                "ELSE" in upper and "STEP := 0" in upper,
-                "No invalid-step fallback to idle was found.",
-            ),
-        ]
+    def _detect_domain_validator(
+        self,
+        source: str,
+        signal_names: set[str],
+        plan_domain: str = "",
+    ) -> DomainValidator:
+        for validator in self.DOMAIN_VALIDATORS:
+            if validator.detect(signal_names, source, plan_domain):
+                return validator
+        return GenericValidator()
 
     @staticmethod
     def _result(
@@ -335,6 +826,42 @@ class ValidationAgent:
             }
             for index, result in enumerate(failed_safety, start=1)
         ]
+
+    @staticmethod
+    def _requested_properties(plan: PlanObject) -> list[str]:
+        properties = [*plan.safetyConstraints, *plan.logicRules]
+        unique = [value.strip() for value in properties if value.strip()]
+        deduped = list(dict.fromkeys(unique))
+        return deduped or ["Safety constraints should remain satisfied."]
+
+    @staticmethod
+    def _formal_safety_results(
+        property_results: list[dict],
+        fallback_properties: list[str],
+    ) -> list[ValidationSafetyResult]:
+        results: list[ValidationSafetyResult] = []
+        rows = property_results or [{"property": p, "passed": False, "message": f"No verifier output for: {p}"} for p in fallback_properties]
+        for index, row in enumerate(rows, start=1):
+            prop = str(row.get("property", f"Property {index}"))
+            passed = bool(row.get("passed", False))
+            results.append(
+                ValidationSafetyResult(
+                    id=f"FM-{index}",
+                    description=prop,
+                    status="passed" if passed else "failed",
+                    details=None if passed else str(row.get("message", prop)),
+                )
+            )
+        return results
+
+    @staticmethod
+    def _formal_counterexamples(counterexample: object) -> list[dict[str, bool | int | float | str]]:
+        if counterexample is None:
+            return []
+        if isinstance(counterexample, list):
+            normalized = [item for item in counterexample if isinstance(item, dict)]
+            return normalized
+        return [{"step": 1, "trace": str(counterexample)}]
 
     @staticmethod
     def _strip_comments(source: str) -> str:
@@ -405,29 +932,3 @@ class ValidationAgent:
             raise error
         return result or {"passed": False, "errors": ["MATIEC syntax validation returned no result."], "raw_output": ""}
 
-    @staticmethod
-    def _is_matiec_environment_error(errors: list[str]) -> bool:
-        normalized = " ".join(errors).lower()
-        keywords = [
-            "not found",
-            "not executable",
-            "permission was denied",
-            "could not be started",
-            "timed out",
-            "windows host",
-        ]
-        return any(keyword in normalized for keyword in keywords)
-
-    @staticmethod
-    def _is_matiec_available() -> tuple[bool, str]:
-        matiec_path = Path(settings.matiec_bin)
-        raw_path = str(matiec_path)
-        if os.name == "nt" and raw_path.startswith("/"):
-            return False, f"MATIEC path '{raw_path}' appears Linux-style on Windows host."
-        if not matiec_path.exists():
-            return False, f"MATIEC path '{raw_path}' does not exist."
-        if not matiec_path.is_file():
-            return False, f"MATIEC path '{raw_path}' is not a file."
-        if not os.access(matiec_path, os.X_OK):
-            return False, f"MATIEC path '{raw_path}' is not executable."
-        return True, "MATIEC binary is available."

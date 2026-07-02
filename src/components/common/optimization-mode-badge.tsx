@@ -8,7 +8,7 @@ export function OptimizationModeBadge() {
 
   return (
     <Badge tone={mockMode ? "info" : "success"} dot>
-      {mockMode ? "Mock Optimizer" : "Real Static Optimizer"}
+      {mockMode ? "Mock Optimizer" : "Real Backend OptimizationReport"}
     </Badge>
   );
 }

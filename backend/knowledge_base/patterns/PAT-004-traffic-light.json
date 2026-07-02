@@ -1,0 +1,16 @@
+{
+  "id": "PAT-004",
+  "name": "Traffic Light Phase Controller",
+  "domain": "Traffic Control",
+  "pattern_type": "Timed State Machine",
+  "description": "Three-phase traffic light with TON timers. Red is default safe state. ELSE resets to Red.",
+  "tags": ["traffic", "light", "red", "green", "amber", "timer", "phase"],
+  "safety_level": "medium",
+  "st_snippet": "CASE Phase OF\n  0: (* Red *)\n    Red_Light := TRUE; Green_Light := FALSE; Amber_Light := FALSE;\n    Red_Timer(IN := TRUE, PT := T#30s);\n    IF Red_Timer.Q THEN Phase := 1; Red_Timer(IN:=FALSE); END_IF;\n  1: (* Green *)\n    Red_Light := FALSE; Green_Light := TRUE;\n    Green_Timer(IN := TRUE, PT := T#25s);\n    IF Green_Timer.Q THEN Phase := 2; Green_Timer(IN:=FALSE); END_IF;\n  2: (* Amber *)\n    Green_Light := FALSE; Amber_Light := TRUE;\n    Amber_Timer(IN := TRUE, PT := T#5s);\n    IF Amber_Timer.Q THEN Phase := 0; Amber_Timer(IN:=FALSE); END_IF;\n  ELSE:\n    Red_Light := TRUE; Green_Light := FALSE;\n    Amber_Light := FALSE; Phase := 0;\nEND_CASE;",
+  "safety_notes": "Always start at Phase=0 (Red). ELSE returns to Red for any undefined phase. Green and Amber must never be TRUE simultaneously.",
+  "common_mistakes": [
+    "No ELSE branch — undefined phase leaves light state unknown",
+    "Not resetting timer IN flag before next cycle"
+  ],
+  "applicable_rules": ["TC-1", "TC-2", "TC-3", "TC-4"]
+}

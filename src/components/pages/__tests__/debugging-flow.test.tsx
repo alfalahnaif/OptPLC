@@ -6,6 +6,8 @@ import type { DebuggingReport } from "@/lib/api-contracts";
 
 describe("Debugging frontend flow", () => {
   afterEach(() => {
+    const routerPush = (globalThis as unknown as { __nextRouterPush?: ReturnType<typeof vi.fn> }).__nextRouterPush;
+    routerPush?.mockReset();
     vi.unstubAllEnvs();
     vi.unstubAllGlobals();
   });
@@ -17,19 +19,23 @@ describe("Debugging frontend flow", () => {
 
     render(<DebuggingPage projectId="PRJ-0421" />);
 
-    expect(await screen.findByText("Real Rule-Based Debugger")).toBeInTheDocument();
+    expect(await screen.findByText("Real Backend DebuggingReport")).toBeInTheDocument();
     expect((await screen.findAllByText("PATCH_ADVICE_GENERATED")).length).toBeGreaterThan(0);
     expect(await screen.findByText("Motor_Run and safety latch logic")).toBeInTheDocument();
-    expect(await screen.findByText("Introduce a Safety_OK expression using E_Stop and Overload.")).toBeInTheDocument();
+    expect(await screen.findByText("Introduce a Safety_OK expression using Emergency_Stop and Overload.")).toBeInTheDocument();
     expect(await screen.findByRole("button", { name: "Run Repair Loop" })).toBeInTheDocument();
   });
 
   it("RepairLoopReport renders final VERIFIED status", async () => {
     vi.stubEnv("NEXT_PUBLIC_USE_MOCK_API", "false");
     vi.stubEnv("NEXT_PUBLIC_API_BASE_URL", "http://api.test");
-    const fetchMock = vi.fn()
-      .mockResolvedValueOnce(jsonResponse(debuggingReport("PRJ-0421", "PATCH_ADVICE_GENERATED")))
-      .mockResolvedValueOnce(jsonResponse(repairLoopReport("PRJ-0421", "VERIFIED")));
+    const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/debug")) return Promise.resolve(jsonResponse(debuggingReport("PRJ-0421", "PATCH_ADVICE_GENERATED")));
+      if (url.endsWith("/validation")) return Promise.resolve(jsonResponse(validationReport("PRJ-0421", "FORMAL_VIOLATION")));
+      if (url.endsWith("/repair-loop")) return Promise.resolve(jsonResponse(repairLoopReport("PRJ-0421", "VERIFIED")));
+      return Promise.resolve(jsonResponse({}, 404));
+    });
     vi.stubGlobal("fetch", fetchMock);
 
     render(<DebuggingPage projectId="PRJ-0421" />);
@@ -44,9 +50,13 @@ describe("Debugging frontend flow", () => {
   it("iteration limit status renders correctly", async () => {
     vi.stubEnv("NEXT_PUBLIC_USE_MOCK_API", "false");
     vi.stubEnv("NEXT_PUBLIC_API_BASE_URL", "http://api.test");
-    const fetchMock = vi.fn()
-      .mockResolvedValueOnce(jsonResponse(debuggingReport("PRJ-0421", "PATCH_ADVICE_GENERATED")))
-      .mockResolvedValueOnce(jsonResponse(repairLoopReport("PRJ-0421", "ITERATION_LIMIT_REACHED")));
+    const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/debug")) return Promise.resolve(jsonResponse(debuggingReport("PRJ-0421", "PATCH_ADVICE_GENERATED")));
+      if (url.endsWith("/validation")) return Promise.resolve(jsonResponse(validationReport("PRJ-0421", "FORMAL_VIOLATION")));
+      if (url.endsWith("/repair-loop")) return Promise.resolve(jsonResponse(repairLoopReport("PRJ-0421", "ITERATION_LIMIT_REACHED")));
+      return Promise.resolve(jsonResponse({}, 404));
+    });
     vi.stubGlobal("fetch", fetchMock);
 
     render(<DebuggingPage projectId="PRJ-0421" />);
@@ -72,7 +82,10 @@ describe("Debugging frontend flow", () => {
     render(<DebuggingPage projectId="PRJ-0421" />);
 
     expect(await screen.findByText("NOT_REQUIRED")).toBeInTheDocument();
-    expect(await screen.findByText("No debugging required because the code is verified.")).toBeInTheDocument();
+    expect(await screen.findByText("No debugging required. The latest validation report is VERIFIED.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Run Repair Loop" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Replay failure/i })).not.toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /Run Optimization/ })).toBeInTheDocument();
   });
 
   it("Debugging page renders CANNOT_DEBUG for timeout", async () => {
@@ -93,15 +106,61 @@ describe("Debugging frontend flow", () => {
     expect(await screen.findByText("Reduce code complexity before retrying validation.")).toBeInTheDocument();
   });
 
-  it("missing ValidationReport backend error is displayed with guidance", async () => {
+  it("missing DebuggingReport shows guidance state", async () => {
     vi.stubEnv("NEXT_PUBLIC_USE_MOCK_API", "false");
     vi.stubEnv("NEXT_PUBLIC_API_BASE_URL", "http://api.test");
-    stubFetch({ detail: "ValidationReport must be generated before debugging." }, 400);
+    const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/debug")) return Promise.resolve(jsonResponse({ detail: "Debugging report for project PRJ-0421 was not found." }, 404));
+      if (url.endsWith("/validation")) return Promise.resolve(jsonResponse({ detail: "Validation report for project PRJ-0421 was not found." }, 404));
+      return Promise.resolve(jsonResponse({}, 404));
+    });
+    vi.stubGlobal("fetch", fetchMock);
 
     render(<DebuggingPage projectId="PRJ-0421" />);
 
-    expect(await screen.findByText("Debugging feedback unavailable")).toBeInTheDocument();
     expect(await screen.findByText("Run validation before requesting debugging advice.")).toBeInTheDocument();
+  });
+
+  it("missing DebuggingReport with VERIFIED validation shows no debugging required path", async () => {
+    vi.stubEnv("NEXT_PUBLIC_USE_MOCK_API", "false");
+    vi.stubEnv("NEXT_PUBLIC_API_BASE_URL", "http://api.test");
+    const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith("/debug")) return Promise.resolve(jsonResponse({ detail: "Debugging report for project PRJ-0421 was not found." }, 404));
+      if (url.endsWith("/validation")) return Promise.resolve(jsonResponse(validationReport("PRJ-0421", "VERIFIED")));
+      return Promise.resolve(jsonResponse({}, 404));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<DebuggingPage projectId="PRJ-0421" />);
+
+    expect(await screen.findByText("No debugging required. The latest validation report is VERIFIED.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Run Repair Loop" })).not.toBeInTheDocument();
+  });
+
+  it("NOT_REQUIRED path runs optimization before navigation", async () => {
+    vi.stubEnv("NEXT_PUBLIC_USE_MOCK_API", "false");
+    vi.stubEnv("NEXT_PUBLIC_API_BASE_URL", "http://api.test");
+    const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/debug")) return Promise.resolve(jsonResponse(debuggingReport("PRJ-0421", "NOT_REQUIRED", { sourceValidationStatus: "VERIFIED" })));
+      if (url.endsWith("/validation")) return Promise.resolve(jsonResponse(validationReport("PRJ-0421", "VERIFIED")));
+      if (url.endsWith("/optimize") && init?.method === "POST") return Promise.resolve(jsonResponse(optimizationReport("PRJ-0421")));
+      return Promise.resolve(jsonResponse({}, 404));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const routerPush = (globalThis as unknown as { __nextRouterPush: ReturnType<typeof vi.fn> }).__nextRouterPush;
+
+    render(<DebuggingPage projectId="PRJ-0421" />);
+    fireEvent.click(await screen.findByRole("button", { name: /Run Optimization/ }));
+
+    expect(await screen.findByText(/Running optimization|No debugging required/)).toBeInTheDocument();
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://api.test/api/projects/PRJ-0421/optimize",
+      expect.objectContaining({ method: "POST" })
+    );
+    expect(routerPush).toHaveBeenCalledWith("/projects/PRJ-0421/optimization");
   });
 
   it("mock mode still renders mock debugging report", async () => {
@@ -147,7 +206,7 @@ function debuggingReport(
     rootCause: "Motor_Run is not visibly forced FALSE by the emergency stop path.",
     rootCauseSummary: "Motor_Run is not visibly forced FALSE by the emergency stop path.",
     affectedCodeRegion: "Motor_Run and safety latch logic",
-    patchAdvice: ["Introduce a Safety_OK expression using E_Stop and Overload."],
+    patchAdvice: ["Introduce a Safety_OK expression using Emergency_Stop and Overload."],
     suggestedRegenerationPrompt: "Regenerate with Safety_OK gating Motor_Run.",
     counterexampleSummary: "1 counterexample step reported.",
     createdAt: "2026-05-19T10:00:00Z",
@@ -210,5 +269,67 @@ function repairLoopReport(projectId: string, finalStatus: "VERIFIED" | "FAILED" 
       finalStatus === "VERIFIED"
         ? "Repair loop verified the code after 2 validation attempts and 1 debugging pass."
         : "Repair loop stopped after reaching the iteration limit of 2 validation attempt(s)."
+  };
+}
+
+function validationReport(projectId: string, status: "VERIFIED" | "FORMAL_VIOLATION") {
+  return {
+    projectId,
+    artifactId: `${projectId}-code-iter-1`,
+    iteration: 1,
+    status,
+    syntaxPassed: true,
+    formalPassed: status === "VERIFIED",
+    solver: "static.v1",
+    validator: "static.v1",
+    checkedAt: "2026-05-19T10:00:00Z",
+    summary: "Validation summary.",
+    syntaxErrors: [],
+    formalErrors: status === "VERIFIED" ? [] : ["Formal violation."],
+    safetyResults: [],
+    properties: [],
+    errors: [],
+    counterexamples: []
+  };
+}
+
+function optimizationReport(projectId: string) {
+  return {
+    projectId,
+    sourceArtifactId: `${projectId}-code-iter-1`,
+    optimizedArtifactId: `${projectId}-code-optimized-2`,
+    status: "OPTIMIZED",
+    optimizer: "static.v1",
+    originalCode: {
+      projectId,
+      artifactId: `${projectId}-code-iter-1`,
+      language: "structured-text",
+      filename: "a.st",
+      source: "PROGRAM A\nEND_PROGRAM",
+      iteration: 1,
+      generatedAt: "2026-05-19T10:00:00Z",
+      metrics: { loc: 2, cyclomaticComplexity: 1, maintainabilityIndex: 90 },
+      metadata: { generator: "template_based.v1", iecStandard: "IEC 61131-3", sourcePlanId: projectId, createdAt: "2026-05-19T10:00:00Z", iteration: 1 }
+    },
+    optimizedCode: {
+      projectId,
+      artifactId: `${projectId}-code-optimized-2`,
+      language: "structured-text",
+      filename: "b.st",
+      source: "PROGRAM B\nEND_PROGRAM",
+      iteration: 2,
+      generatedAt: "2026-05-19T10:00:00Z",
+      metrics: { loc: 2, cyclomaticComplexity: 1, maintainabilityIndex: 90 },
+      metadata: { generator: "static_optimizer.v1", iecStandard: "IEC 61131-3", sourcePlanId: projectId, createdAt: "2026-05-19T10:00:00Z", iteration: 2 }
+    },
+    passes: [],
+    beforeMetrics: { loc: 2, cyclomaticComplexity: 1, maintainabilityIndex: 90, estimatedScanTimeMs: 1 },
+    afterMetrics: { loc: 2, cyclomaticComplexity: 1, maintainabilityIndex: 90, estimatedScanTimeMs: 1 },
+    metricsDelta: { loc: 0, cyclomaticComplexity: 0, maintainabilityIndex: 0, estimatedScanTimeMs: 0, locReductionPercent: 0, cyclomaticReductionPercent: 0, maintainabilityGainPercent: 0, scanTimeReductionPercent: 0 },
+    revalidationStatus: "VERIFIED",
+    rollbackEvents: [],
+    createdAt: "2026-05-19T10:00:00Z",
+    summary: "optimized",
+    revalidated: true
   };
 }

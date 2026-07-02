@@ -1,21 +1,25 @@
 import type { CodeArtifact, PlanObject, RepairLoopReport, WorkflowEvent } from "@/lib/api-contracts";
 import { API_ENDPOINTS, projectEndpoint } from "@/lib/api-contracts";
-import {
-  generatedStructuredText,
-  planObject,
-  sessionLog,
-  workflowEvents
-} from "@/lib/mock-data";
 
 import { cloneMock, mockResolve } from "./mock-transport";
 import { isMockApiEnabled } from "./config";
-import { apiRequest } from "./fetch-transport";
+import { ApiError, apiRequest } from "./fetch-transport";
 import { getCachedRepairLoopReport } from "./validation-client";
 import { getCachedOptimizationReport } from "./optimization-client";
 
+type WorkflowMocks = Pick<
+  typeof import("@/lib/mock-data"),
+  "generatedStructuredText" | "planObject" | "sessionLog" | "workflowEvents"
+>;
+
+async function getWorkflowMocks(): Promise<WorkflowMocks> {
+  const { generatedStructuredText, planObject, sessionLog, workflowEvents } = await import("@/lib/mock-data");
+  return { generatedStructuredText, planObject, sessionLog, workflowEvents };
+}
+
 export type WorkflowMonitorData = {
-  workflowEvents: typeof workflowEvents;
-  sessionLog: typeof sessionLog;
+  workflowEvents: WorkflowMocks["workflowEvents"];
+  sessionLog: WorkflowMocks["sessionLog"];
   repairLoopReport?: RepairLoopReport;
 };
 
@@ -34,6 +38,7 @@ export async function createPlan(projectId: string): Promise<PlanObject> {
     });
   }
 
+  const { planObject } = await getWorkflowMocks();
   const plan = cloneMock(planObject) as PlanObject;
   plan.projectId = projectId;
   return mockResolve(plan);
@@ -41,11 +46,23 @@ export async function createPlan(projectId: string): Promise<PlanObject> {
 
 export const generatePlan = createPlan;
 
-export async function getPlanObject(projectId: string): Promise<PlanObject> {
-  return createPlan(projectId);
+export async function getPlanObject(projectId: string): Promise<PlanObject | null> {
+  if (!isMockApiEnabled()) {
+    try {
+      return await apiRequest<PlanObject>(projectEndpoint(API_ENDPOINTS.getPlan, projectId));
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 404) return null;
+      throw error;
+    }
+  }
+  const { planObject } = await getWorkflowMocks();
+  const plan = cloneMock(planObject) as PlanObject;
+  plan.projectId = projectId;
+  return mockResolve(plan);
 }
 
 export async function getWorkflowEvents(projectId: string): Promise<WorkflowEvent[]> {
+  const { workflowEvents } = await getWorkflowMocks();
   return mockResolve(
     workflowEvents.map((event, index) => ({
       id: `${projectId}-wf-${index + 1}`,
@@ -62,6 +79,7 @@ export async function getWorkflowEvents(projectId: string): Promise<WorkflowEven
 }
 
 export async function getWorkflowMonitorData(projectId: string): Promise<WorkflowMonitorData> {
+  const { sessionLog, workflowEvents } = await getWorkflowMocks();
   const repairLoopReport = getCachedRepairLoopReport(projectId);
   return mockResolve({
     workflowEvents,
@@ -77,6 +95,7 @@ export async function generateCode(projectId: string): Promise<CodeArtifact> {
     });
   }
 
+  const { generatedStructuredText } = await getWorkflowMocks();
   return mockResolve({
     projectId,
     artifactId: `${projectId}-code-iter-2`,
@@ -100,7 +119,27 @@ export async function generateCode(projectId: string): Promise<CodeArtifact> {
   });
 }
 
-export async function getCodePageData(projectId: string): Promise<CodePageData> {
+export async function getCodePageData(projectId: string): Promise<CodePageData | null> {
+  if (!isMockApiEnabled()) {
+    let artifact: CodeArtifact | null = null;
+    try {
+      artifact = await apiRequest<CodeArtifact>(projectEndpoint(API_ENDPOINTS.getCode, projectId));
+    } catch (error) {
+      if (!(error instanceof ApiError && error.status === 404)) {
+        throw error;
+      }
+    }
+    if (!artifact) return null;
+    return mockResolve({
+      artifact,
+      source: artifact.source,
+      ragSources: [],
+      repairLoopReport: undefined,
+      optimizationReport: undefined
+    });
+  }
+
+  const { generatedStructuredText } = await getWorkflowMocks();
   const repairLoopReport = getCachedRepairLoopReport(projectId);
   const optimizationReport = getCachedOptimizationReport(projectId);
   if (optimizationReport) {
@@ -113,20 +152,8 @@ export async function getCodePageData(projectId: string): Promise<CodePageData> 
       optimizationReport
     });
   }
-
   if (repairLoopReport) {
     const artifact = repairLoopReport.finalCodeArtifact;
-    return mockResolve({
-      artifact,
-      source: artifact.source,
-      ragSources: [],
-      repairLoopReport,
-      optimizationReport
-    });
-  }
-
-  if (!isMockApiEnabled()) {
-    const artifact = await generateCode(projectId);
     return mockResolve({
       artifact,
       source: artifact.source,

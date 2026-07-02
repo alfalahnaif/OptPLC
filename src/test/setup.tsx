@@ -9,6 +9,12 @@ Object.defineProperty(globalThis, "__nextRouterPush", {
   value: routerPushMock
 });
 
+Object.defineProperty(globalThis, "__nextPathname", {
+  configurable: true,
+  writable: true,
+  value: "/"
+});
+
 class ResizeObserverMock {
   observe() {}
   unobserve() {}
@@ -36,7 +42,7 @@ Object.defineProperty(window, "matchMedia", {
 });
 
 vi.mock("next/navigation", () => ({
-  usePathname: () => "/",
+  usePathname: () => (globalThis as { __nextPathname?: string }).__nextPathname ?? "/",
   useRouter: () => ({
     push: routerPushMock,
     replace: vi.fn(),

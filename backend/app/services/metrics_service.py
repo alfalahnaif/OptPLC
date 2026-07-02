@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import math
 import re
 
 from app.schemas.contracts import StructuredTextMetrics, StructuredTextMetricsDelta
@@ -136,7 +137,13 @@ class MetricsService:
     def _maintainability_index(*, loc: int, cyclomatic_complexity: int) -> int:
         safe_loc = max(1, loc)
         safe_cyclomatic = max(1, cyclomatic_complexity)
-        score = 100 - (safe_loc * 1.4) - (safe_cyclomatic * 4.5)
+        try:
+            # Keep MI within practical PLC ranges by using a logarithmic size penalty.
+            # This avoids collapsing to zero for moderate-size programs.
+            raw = 171.0 - (21.4 * math.log(safe_loc)) - (0.23 * safe_cyclomatic)
+            score = (raw * 100.0) / 171.0
+        except (ValueError, OverflowError):  # pragma: no cover - defensive fallback
+            score = 0.0
         return max(0, min(100, round(score)))
 
     @staticmethod

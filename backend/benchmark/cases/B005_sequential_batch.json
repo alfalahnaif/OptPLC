@@ -1,0 +1,37 @@
+{
+  "id": "B005",
+  "name": "Sequential Batch (Tank B-21)",
+  "domain": "Sequential Batch",
+  "complexity": "complex",
+  "requirement": "Tank B-21 executes Fill/Mix/Drain sequence. Start_PB begins Fill only if Emergency_Stop healthy, Abort_PB inactive, system idle, no fault. Fill until High_Level, then Mix until Mix_Timer_Done, then Drain until Low_Level. Any E_Stop or Abort_PB immediately stops all outputs and latches fault. Reset_PB clears fault when conditions are safe.",
+  "expected_inputs": [
+    "Start_PB",
+    "Emergency_Stop",
+    "Abort_PB",
+    "Reset_PB",
+    "High_Level",
+    "Low_Level",
+    "Mix_Timer_Done"
+  ],
+  "expected_outputs": [
+    "Fill_Valve",
+    "Mixer_Motor",
+    "Drain_Valve",
+    "Batch_Complete"
+  ],
+  "safety_constraints": [
+    "Emergency_Stop or Abort_PB must de-energize Fill_Valve, Mixer_Motor, and Drain_Valve immediately.",
+    "Fault must latch after trip and require Reset_PB while safety is healthy.",
+    "Invalid or unknown step state must return to idle safe state."
+  ],
+  "expected_properties": [
+    {
+      "id": "B005-P1",
+      "description": "State machine progresses Fill -> Mix -> Drain deterministically."
+    },
+    {
+      "id": "B005-P2",
+      "description": "Abort or emergency stop forces all outputs off and latches fault."
+    }
+  ]
+}

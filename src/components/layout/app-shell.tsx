@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { ACTIVE_PROJECT_ID, projectPath, type ProjectRouteSegment } from "@/lib/api-client";
+import { ACTIVE_PROJECT_ID, getProject, isMockApiEnabled, projectPath, type ProjectRouteSegment, useApiResource } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 import { currentProject, headerActions, sidebarSections } from "@/lib/mock-data";
 
@@ -22,8 +22,25 @@ type NavItem = {
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const routeProjectId = projectIdFromPath(pathname);
+  const activeProjectId = routeProjectId ?? ACTIVE_PROJECT_ID;
+  const projectResource = useApiResource(
+    () => (routeProjectId ? getProject(routeProjectId) : Promise.resolve(null)),
+    [routeProjectId]
+  );
   const [dark, setDark] = useState(false);
   const mobileNavItems = sidebarSections.map((section) => section.items as unknown as NavItem[]).flat();
+  const mockMode = isMockApiEnabled();
+  const activeProjectName = routeProjectId
+    ? (projectResource.data?.name ?? activeProjectId)
+    : mockMode
+      ? currentProject.name
+      : "No project selected";
+  const activeProjectBadgeId = routeProjectId
+    ? activeProjectId
+    : mockMode
+      ? currentProject.id
+      : "--";
 
   useEffect(() => {
     const stored = window.localStorage.getItem("optplc-theme");
@@ -53,7 +70,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       "report"
     ];
     const segment = href.replace("/", "");
-    return pipelineSegments.includes(segment) ? projectPath(ACTIVE_PROJECT_ID, segment as ProjectRouteSegment) : href;
+    return pipelineSegments.includes(segment) ? projectPath(activeProjectId, segment as ProjectRouteSegment) : href;
   }
 
   return (
@@ -132,9 +149,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <div className="flex min-w-0 items-center gap-2">
             <div className="hidden h-9 items-center gap-2 rounded-md border bg-card px-3 text-sm font-medium shadow-sm md:flex">
               <Folder className="size-4 text-muted-foreground" />
-              <span className="max-w-56 truncate">{currentProject.name}</span>
+              <span className="max-w-56 truncate">{activeProjectName}</span>
               <Badge className="font-mono" tone="neutral">
-                {currentProject.id}
+                {activeProjectBadgeId}
               </Badge>
               <ChevronDown className="size-4 text-muted-foreground" />
             </div>
@@ -184,6 +201,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     </div>
     </TooltipProvider>
   );
+}
+
+function projectIdFromPath(pathname: string | null): string | null {
+  if (!pathname) return null;
+  const match = pathname.match(/^\/projects\/([^/]+)/);
+  if (!match?.[1]) return null;
+  try {
+    return decodeURIComponent(match[1]);
+  } catch {
+    return match[1];
+  }
 }
 
 function HeaderIcon({

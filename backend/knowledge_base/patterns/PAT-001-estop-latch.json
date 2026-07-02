@@ -1,0 +1,17 @@
+{
+  "id": "PAT-001",
+  "name": "Emergency Stop Latch",
+  "domain": "Generic",
+  "pattern_type": "Safety Latch",
+  "description": "Latching fault state driven by safety inputs. Requires explicit Reset_PB to clear. Safety force-off placed LAST in scan to override all output assignments.",
+  "tags": ["estop", "fault", "latch", "reset", "safety", "NC contact"],
+  "safety_level": "critical",
+  "st_snippet": "(* === SAFETY LATCH — place at TOP of program === *)\nFault_State := (Fault_State AND NOT Reset_PB)\n                OR (NOT Emergency_Stop)\n                OR Abort_PB;\n\n(* Main logic in middle of program ... *)\n\n(* === SAFETY FORCE-OFF — place at BOTTOM of program === *)\n(* Executes last so it cannot be overridden by earlier assignments *)\nIF Fault_State THEN\n    Fill_Valve   := FALSE;\n    Mixer_Motor  := FALSE;\n    Drain_Valve  := FALSE;\n    Batch_Complete := FALSE;\nEND_IF;",
+  "safety_notes": "Emergency_Stop is normally-closed (NC): signal TRUE = healthy, FALSE = pressed. Force-off block MUST be last in scan. Fault_State uses self-latching: remains TRUE until Reset_PB clears it while E-Stop is healthy.",
+  "common_mistakes": [
+    "Placing E-Stop check before CASE/output assignments — CASE will override the force-off",
+    "Using Emergency_Stop = TRUE as the fault trigger (NC logic is opposite)",
+    "Forgetting to reset step states when fault clears — motor restarts unexpectedly"
+  ],
+  "applicable_rules": ["BT-4", "BT-6", "BT-7", "MC-3", "GEN-3"]
+}

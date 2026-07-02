@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { ArrowRight, Copy, Download, FileJson, GitBranch } from "lucide-react";
 
 import { PageStateGate, type PageState } from "@/components/common/page-state";
@@ -11,18 +13,22 @@ import { PipelineStrip } from "@/components/layout/pipeline-strip";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ACTIVE_PROJECT_ID, generatePlan, projectPath, useApiResource } from "@/lib/api-client";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { ACTIVE_PROJECT_ID, generateCode, getPlanObject, projectPath, useApiResource } from "@/lib/api-client";
 
 export function PlanPage({ projectId = ACTIVE_PROJECT_ID, state }: { projectId?: string; state?: PageState } = {}) {
-  const resource = useApiResource(() => generatePlan(projectId), [projectId]);
+  const router = useRouter();
+  const [isGeneratingCode, setIsGeneratingCode] = useState(false);
+  const [generateError, setGenerateError] = useState<string | null>(null);
+  const resource = useApiResource(() => getPlanObject(projectId), [projectId]);
   const effectiveState = state ?? resource.state;
   const planObject = resource.data;
   const stateView =
     effectiveState !== "ready" || !planObject ? (
       <PageStateGate
-        state={effectiveState === "ready" ? "loading" : effectiveState}
+        state={effectiveState === "ready" && !planObject ? "empty" : effectiveState}
         loading={{ title: "Loading Plan Object", description: "Preparing canonical I/O, logic, and safety constraints." }}
-        empty={{ title: "No Plan Object generated", description: "Generate a plan from requirements to preview this page." }}
+        empty={{ title: "No PlanObject generated yet.", description: "No PlanObject generated yet. Return to Requirements and generate a plan." }}
         error={{ title: "Plan Object unavailable", description: resource.error?.message ?? "The Plan Object could not be loaded." }}
       />
     ) : null;
@@ -39,10 +45,18 @@ export function PlanPage({ projectId = ACTIVE_PROJECT_ID, state }: { projectId?:
             <PlanningModeBadge />
             <StatusBadge status="completed" label="Planning Agent - Completed" />
             <Button variant="outline" asChild><Link href={projectPath(projectId, "requirements")}>Edit Requirements</Link></Button>
-            <Button asChild><Link href={projectPath(projectId, "code")}>Generate Code <ArrowRight /></Link></Button>
+            <Button onClick={() => void handleGenerateCode()} disabled={isGeneratingCode}>
+              {isGeneratingCode ? "Generating code..." : "Generate Code"} <ArrowRight />
+            </Button>
           </>
         }
       />
+      {generateError ? (
+        <Alert variant="destructive" className="mb-4">
+          <AlertTitle>Code generation failed</AlertTitle>
+          <AlertDescription>{generateError}</AlertDescription>
+        </Alert>
+      ) : null}
       {stateView ?? (planObject ? (
         <>
       <Card className="mb-5">
@@ -98,10 +112,10 @@ export function PlanPage({ projectId = ACTIVE_PROJECT_ID, state }: { projectId?:
             <Card>
               <CardHeader><CardTitle>Performance targets</CardTitle></CardHeader>
               <CardContent className="space-y-2 text-sm">
-                <Row label="Max scan time" value="5 ms" />
-                <Row label="Max CC" value="8" />
-                <Row label="Min MI" value="75" />
-                <Row label="Max LOC" value="120" />
+                <div className="rounded-md border bg-muted/20 p-3 text-muted-foreground">
+                  Performance targets are submitted with requirements and persisted in session metadata.
+                  The current `PlanObject` contract does not expose performance targets directly.
+                </div>
               </CardContent>
             </Card>
             <Card>
@@ -133,10 +147,28 @@ export function PlanPage({ projectId = ACTIVE_PROJECT_ID, state }: { projectId?:
           </CardContent>
         </Card>
       </div>
+      <div className="mt-5 flex justify-end">
+        <Button onClick={() => void handleGenerateCode()} disabled={isGeneratingCode}>
+          {isGeneratingCode ? "Generating code..." : "Generate Code"} <ArrowRight />
+        </Button>
+      </div>
         </>
       ) : null)}
     </>
   );
+
+  async function handleGenerateCode() {
+    setGenerateError(null);
+    setIsGeneratingCode(true);
+    try {
+      await generateCode(projectId);
+      router.push(projectPath(projectId, "code"));
+    } catch (error) {
+      setGenerateError(error instanceof Error ? error.message : "Unable to generate code.");
+    } finally {
+      setIsGeneratingCode(false);
+    }
+  }
 }
 
 function SignalCard({ title, items }: { title: string; items: { name: string; type: string; source: string; description: string }[] }) {

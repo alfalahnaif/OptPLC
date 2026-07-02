@@ -1,8 +1,5 @@
-import type { BenchmarkCase, FinalReport } from "@/lib/api-contracts";
+import type { FinalReport } from "@/lib/api-contracts";
 import { API_ENDPOINTS, projectEndpoint } from "@/lib/api-contracts";
-import {
-  benchmarkCases
-} from "@/lib/mock-data";
 
 import { isMockApiEnabled } from "./config";
 import { apiBlobRequest, apiRequest } from "./fetch-transport";
@@ -11,10 +8,6 @@ import { getMetricsReport, optimizeCode } from "./optimization-client";
 import { getProject } from "./project-client";
 import { generateCode, getPlanObject } from "./workflow-client";
 import { validateCode } from "./validation-client";
-
-export type BenchmarkSuiteData = {
-  benchmarkCases: typeof benchmarkCases;
-};
 
 export async function getFinalReport(projectId: string): Promise<FinalReport> {
   if (!isMockApiEnabled()) {
@@ -27,6 +20,40 @@ export async function getFinalReport(projectId: string): Promise<FinalReport> {
   const validation = await validateCode(projectId);
   const optimization = await optimizeCode(projectId);
   const metrics = await getMetricsReport(projectId);
+  const metricsReport = metrics ?? {
+    projectId,
+    source: {
+      selected: "generated_code" as const,
+      generatedCode: codeArtifact.artifactId
+    },
+    beforeMetrics: {
+      loc: codeArtifact.metrics?.loc ?? 0,
+      cyclomaticComplexity: codeArtifact.metrics?.cyclomaticComplexity ?? 0,
+      maintainabilityIndex: codeArtifact.metrics?.maintainabilityIndex ?? 0,
+      estimatedScanTimeMs: 0
+    },
+    afterMetrics: {
+      loc: codeArtifact.metrics?.loc ?? 0,
+      cyclomaticComplexity: codeArtifact.metrics?.cyclomaticComplexity ?? 0,
+      maintainabilityIndex: codeArtifact.metrics?.maintainabilityIndex ?? 0,
+      estimatedScanTimeMs: 0
+    },
+    metricsDelta: {
+      locDelta: 0,
+      cyclomaticComplexityDelta: 0,
+      maintainabilityIndexDelta: 0,
+      estimatedScanTimeDelta: 0,
+      locReductionPercent: 0,
+      complexityReductionPercent: 0,
+      maintainabilityImprovementPercent: 0,
+      scanTimeReductionPercent: 0
+    },
+    history: [],
+    latestValidationStatus: validation.status,
+    latestOptimizationStatus: optimization.status,
+    createdAt: "2026-05-17T09:43:10Z",
+    summary: "Metrics unavailable."
+  };
 
   return mockResolve({
     projectId,
@@ -35,7 +62,7 @@ export async function getFinalReport(projectId: string): Promise<FinalReport> {
     summary: "Verified and optimized IEC 61131-3 Structured Text report.",
     validation,
     optimization,
-    metrics,
+    metrics: metricsReport,
     project,
     requirement: {
       projectId,
@@ -59,7 +86,7 @@ export async function getFinalReport(projectId: string): Promise<FinalReport> {
     debuggingSummary: "Debugging has not been run yet.",
     repairLoopSummary: "Repair loop has not been run yet.",
     optimizationSummary: optimization.summary,
-    metricsSummary: metrics.summary,
+    metricsSummary: metricsReport.summary,
     finalStatusSummary: `Project status is '${project.status}'. Validation status: ${validation.status}. Optimization status: ${optimization.status}.`,
     recommendations: ["Run debugging and repair loop only if future validation fails."],
     limitationsDisclaimer:
@@ -85,26 +112,6 @@ export async function exportReportMarkdown(projectId: string): Promise<Blob> {
 
   const report = await getFinalReport(projectId);
   return new Blob([toReportMarkdown(report)], { type: "text/markdown" });
-}
-
-export async function runBenchmarks(): Promise<BenchmarkCase[]> {
-  return mockResolve(
-    benchmarkCases.map((test) => ({
-      id: test.id,
-      name: test.name,
-      domain: test.domain,
-      complexity: test.complexity.toLowerCase() as "simple" | "medium" | "complex",
-      status: test.status === "passed" || test.status === "warning" ? test.status : "pending",
-      runtimeMs: Number.parseFloat(test.time) * 1000,
-      optimizationGainPercent: Number.parseFloat(test.gain)
-    }))
-  );
-}
-
-export async function getBenchmarkSuiteData(): Promise<BenchmarkSuiteData> {
-  return mockResolve({
-    benchmarkCases
-  });
 }
 
 function toReportMarkdown(report: FinalReport): string {

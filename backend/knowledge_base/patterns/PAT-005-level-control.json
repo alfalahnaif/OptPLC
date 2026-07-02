@@ -1,0 +1,16 @@
+{
+  "id": "PAT-005",
+  "name": "Tank Level Control with Hysteresis",
+  "domain": "Process Control",
+  "pattern_type": "Hysteresis Control",
+  "description": "Fill pump controlled by level switches with hysteresis. High level stops fill, low level starts fill. Overflow alarm on high-high.",
+  "tags": ["level", "tank", "pump", "valve", "high", "low", "hysteresis"],
+  "safety_level": "high",
+  "st_snippet": "(* Hysteresis fill control *)\nIF NOT High_Level AND NOT Fault_State AND Emergency_Stop THEN\n    Fill_Pump := TRUE;\nEND_IF;\nIF High_Level OR Fault_State OR NOT Emergency_Stop THEN\n    Fill_Pump := FALSE;\nEND_IF;\n\n(* Drain when above drain setpoint *)\nIF High_Level AND Drain_Enable AND NOT Fault_State THEN\n    Drain_Valve := TRUE;\nEND_IF;\nIF Low_Level OR Fault_State THEN\n    Drain_Valve := FALSE;\nEND_IF;\n\n(* Alarms *)\nHigh_High_Alarm := High_Level AND Fill_Pump;\nLow_Low_Alarm   := NOT Low_Level AND NOT Fill_Pump;",
+  "safety_notes": "High_Level must immediately stop Fill_Pump regardless of other conditions. Overflow alarm fires if High_Level is reached while pump is still on.",
+  "common_mistakes": [
+    "Not checking Fault_State before enabling pump",
+    "Missing overflow alarm for high-high condition"
+  ],
+  "applicable_rules": ["PC-1", "PC-2", "PC-3"]
+}

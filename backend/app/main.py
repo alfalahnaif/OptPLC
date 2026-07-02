@@ -1,52 +1,71 @@
+import logging
 from contextlib import asynccontextmanager
-
 from fastapi import FastAPI
-from fastapi.encoders import jsonable_encoder
-from fastapi.exceptions import RequestValidationError
+from fastapi import Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.api.health import router as health_router
 from app.api.projects import router as projects_router
-from app.database.database import engine
-from app.database.models import Base
+from app.api.benchmarks import router as benchmarks_router
+from app.database import engine, Base
+
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
-async def lifespan(_app: FastAPI):
-    # Development-only bootstrap: create tables when Alembic migrations are not applied yet.
-    # Production environments should run `alembic upgrade head`.
+async def lifespan(app: FastAPI):
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+    try:
+        from app.services.rag_service import get_rag_service
+
+        rag = get_rag_service()
+        count = rag.seed()
+        if count > 0:
+            logger.info(f"[RAG] ✓ Knowledge base ready: {count} patterns")
+        else:
+            logger.warning("[RAG] ✗ No patterns loaded — check /app/knowledge_base/patterns/")
+    except Exception as e:
+        logger.error(f"[RAG] ✗ Failed to initialize: {type(e).__name__}: {e}")
     yield
 
+
 app = FastAPI(
-    title="PLC Agent Optimizer API",
+    title="OptPLC API",
     version="0.1.0",
-    description="Backend foundation for the PLC Agent Optimizer frontend MVP.",
     lifespan=lifespan,
 )
 
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    import logging
+    logging.getLogger(__name__).exception(
+        f"Unhandled error on {request.method} {request.url}: {exc}"
+    )
+    return JSONResponse(
+        status_code=500,
+        content={
+            "detail": str(exc),
+            "type": type(exc).__name__,
+        },
+        headers={
+            "Access-Control-Allow-Origin": "http://localhost:3000",
+            "Access-Control-Allow-Credentials": "true",
+        },
+    )
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-    ],
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+# ✅ الصحيح: كل router يُسجَّل بـ prefix="/api" فقط
+# لأن كل router عنده prefix خاص: /projects و /benchmarks
 app.include_router(health_router, prefix="/api")
 app.include_router(projects_router, prefix="/api")
-
-
-@app.exception_handler(RequestValidationError)
-async def request_validation_exception_handler(_request, exc: RequestValidationError) -> JSONResponse:
-    return JSONResponse(
-        status_code=400,
-        content={
-            "detail": jsonable_encoder(exc.errors()),
-        },
-    )
+app.include_router(benchmarks_router, prefix="/api")

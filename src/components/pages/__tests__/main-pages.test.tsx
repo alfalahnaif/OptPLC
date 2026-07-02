@@ -1,5 +1,5 @@
 import { render, screen, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import ProjectRoutePage from "@/app/projects/[id]/page";
 import ProjectRequirementsRoutePage from "@/app/projects/[id]/requirements/page";
@@ -20,6 +20,12 @@ import { WorkflowPage } from "@/components/pages/workflow-page";
 import { getPlanObject, getProject, validateCode } from "@/lib/api-client";
 
 describe("main frontend pages", () => {
+  afterEach(() => {
+    (globalThis as unknown as { __nextPathname?: string }).__nextPathname = "/";
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+  });
+
   it("AppShell renders sidebar navigation", () => {
     render(
       <AppShell>
@@ -30,6 +36,38 @@ describe("main frontend pages", () => {
     expect(screen.getAllByText("Dashboard")[0]).toBeInTheDocument();
     expect(screen.getAllByText("Requirements")[0]).toBeInTheDocument();
     expect(screen.getAllByText("Benchmark Suite")[0]).toBeInTheDocument();
+  });
+
+  it("AppShell header shows current backend project metadata on project routes", async () => {
+    vi.stubEnv("NEXT_PUBLIC_USE_MOCK_API", "false");
+    vi.stubEnv("NEXT_PUBLIC_API_BASE_URL", "http://api.test");
+    (globalThis as unknown as { __nextPathname: string }).__nextPathname = "/projects/PRJ-7777/requirements";
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          id: "PRJ-7777",
+          name: "Batch Reactor - B-11",
+          description: "Sequential batch process",
+          domain: "Sequential Batch",
+          standard: "IEC 61131-3",
+          targetLanguage: "Structured Text",
+          status: "draft",
+          createdAt: "2026-05-21T09:00:00Z",
+          updatedAt: "2026-05-21T09:00:00Z"
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      )
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <AppShell>
+        <div>workspace</div>
+      </AppShell>
+    );
+
+    expect(await screen.findByText("Batch Reactor - B-11")).toBeInTheDocument();
+    expect(await screen.findByText("PRJ-7777")).toBeInTheDocument();
   });
 
   it("Dashboard renders KPI cards", async () => {
@@ -96,6 +134,7 @@ describe("main frontend pages", () => {
   it("Optimization page renders optimization passes", async () => {
     render(<OptimizationPage />);
 
+    expect(await screen.findByText("Mock Optimizer")).toBeInTheDocument();
     expect(await screen.findByText("Structural Simplification")).toBeInTheDocument();
     expect(await screen.findByText("Logic Compaction")).toBeInTheDocument();
     expect(await screen.findByText("Maintainability Enhancement")).toBeInTheDocument();
@@ -104,6 +143,7 @@ describe("main frontend pages", () => {
   it("Metrics page renders metric cards and table", async () => {
     render(<MetricsPage />);
 
+    expect(await screen.findByText("Mock Metrics")).toBeInTheDocument();
     expect(await screen.findByText("Lines of code")).toBeInTheDocument();
     expect(await screen.findByText("Metric-by-metric")).toBeInTheDocument();
   });

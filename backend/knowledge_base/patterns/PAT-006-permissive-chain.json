@@ -1,0 +1,16 @@
+{
+  "id": "PAT-006",
+  "name": "Safety Permissive Interlock Chain",
+  "domain": "Safety Interlock",
+  "pattern_type": "Permissive Chain",
+  "description": "All process outputs gated through a single permissive BOOL. All safety conditions ANDed into one variable for easy monitoring.",
+  "tags": ["interlock", "permissive", "safety", "gate", "AND chain"],
+  "safety_level": "critical",
+  "st_snippet": "(* Build permissive chain *)\nAll_OK := Pressure_OK\n          AND Temperature_OK\n          AND Level_OK\n          AND Emergency_Stop        (* NC: TRUE = healthy *)\n          AND NOT Abort_PB\n          AND NOT Fault_State;\n\n(* Gate all outputs through permissive *)\nReactor_Heater := Heater_Command AND All_OK;\nFeed_Pump      := Pump_Command AND All_OK;\nAgitator       := Agitator_Command AND All_OK;\n\n(* Permissive status to HMI *)\nSystem_Ready := All_OK;",
+  "safety_notes": "Single All_OK variable gates everything — easy to add new conditions without changing output logic. Any FALSE in the AND chain de-energizes all outputs.",
+  "common_mistakes": [
+    "Gating outputs individually instead of through single permissive — easy to miss one",
+    "Not including Fault_State in permissive chain"
+  ],
+  "applicable_rules": ["SI-1", "SI-2", "SI-3"]
+}

@@ -1,5 +1,12 @@
 import type {
   BenchmarkCase,
+  BenchmarkCaseCatalogItem,
+  BenchmarkCaseDefinition,
+  BenchmarkCaseResult,
+  BenchmarkComparisonResult,
+  BenchmarkMode,
+  BenchmarkSuiteRunResponse,
+  BenchmarkSummaryResponse,
   CodeArtifact,
   CreateProjectRequest,
   DebuggingReport,
@@ -66,7 +73,22 @@ export const apiClient = {
     void _projectId;
     return notImplemented("getReport");
   },
-  runBenchmarks(): Promise<BenchmarkCase[]> {
+  getBenchmarkCases(): Promise<BenchmarkCaseCatalogItem[]> {
+    return notImplemented("getBenchmarkCases");
+  },
+  runBenchmarks(_caseId: string, _mode: BenchmarkMode): Promise<BenchmarkCaseResult> {
+    void _caseId;
+    void _mode;
     return notImplemented("runBenchmarks");
+  },
+  compareBenchmarks(_caseId: string): Promise<BenchmarkComparisonResult> {
+    void _caseId;
+    return notImplemented("compareBenchmarks");
+  },
+  runBenchmarkSuite(): Promise<BenchmarkSuiteRunResponse> {
+    return notImplemented("runBenchmarkSuite");
+  },
+  getBenchmarkSummary(): Promise<BenchmarkSummaryResponse> {
+    return notImplemented("getBenchmarkSummary");
   }
 };

@@ -1,18 +1,85 @@
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timezone
 from typing import Literal
 
 from app.schemas.contracts import CodeArtifact, DebuggingReport, DebuggingStatus, PlanObject, ValidationReport
 
 DebuggingMode = Literal["rule_based", "llm"]
+logger = logging.getLogger(__name__)
+
+DEBUGGING_SYSTEM_PROMPT = """You are an expert IEC 61131-3 PLC debugging agent.
+A formal or static validator found a safety property violation in generated
+Structured Text code. Your task is to analyze the violation and produce a
+precise, targeted patch directive.
+
+OUTPUT FORMAT: Return ONLY valid JSON - no prose, no markdown fences.
+Schema:
+{
+  "rootCause": str,           (ONE sentence, max 25 words: what logic error caused this)
+  "affectedRegion": str,      (which section: "Safety control logic" | "State transitions" | "Output assignments" | "Fault handling")
+  "patchAdvice": [str],       (EXACTLY 3 actionable directives, each max 20 words)
+  "doNotChange": [str],       (variable/section names that must NOT be touched)
+  "suggestedRegenerationPrompt": str,  (full prompt for CodeGenAgent, max 80 words)
+  "confidence": "high" | "medium" | "low"
+}
+
+ANALYSIS APPROACH:
+1. Read the counterexample: what were the exact variable values when the violation occurred?
+2. Trace backward: which assignments led to that state?
+3. Identify the root cause: missing guard? incorrect latch? wrong operator precedence? scan ordering?
+4. Write patch advice that is SPECIFIC to this violation - never generic.
+5. The suggestedRegenerationPrompt must tell CodeGenAgent exactly what to fix.
+
+COMMON VIOLATION PATTERNS AND THEIR FIXES:
+- "Generic fallback must gate process enable" -> Add Fault_State guard to CASE ELSE branch and all output assignments
+- "outputs not FALSE when Emergency_Stop active" -> Move safety force-off AFTER CASE statement (scan ordering bug)
+- "motor runs after fault without Reset_PB" -> Add NOT Fault_State condition to run latch
+- "mutual exclusion violated" -> Add IF NOT (A) THEN B check before setting B := TRUE
+- "no auto-restart after fault" -> Fault_State must latch and require explicit Reset_PB to clear
+
+RULES:
+- patchAdvice[0]: the primary code change needed
+- patchAdvice[1]: secondary change or constraint to preserve
+- patchAdvice[2]: verification hint (what to check after fix)
+- doNotChange: always include E-Stop/safety input variable names
+- If violation involves scan ordering: explicitly state "move X block AFTER Y block"
+- If violation involves missing guard: explicitly name the variable and condition"""
 
 
 class DebuggingAgent:
     def __init__(self, mode: DebuggingMode = "rule_based") -> None:
         self.mode = mode
 
-    def debug(
+    async def debug(
+        self,
+        *,
+        project_id: str,
+        plan: PlanObject,
+        artifact: CodeArtifact,
+        validation: ValidationReport,
+        iteration: int = 1,
+    ) -> DebuggingReport:
+        if self.mode == "llm":
+            return await self._debug_with_llm(
+                project_id=project_id,
+                plan=plan,
+                artifact=artifact,
+                validation=validation,
+                iteration=iteration,
+            )
+        if self.mode != "rule_based":
+            raise ValueError(f"Unsupported DebuggingAgent mode: {self.mode}")
+
+        return self._generate_rule_based(
+            project_id=project_id,
+            plan=plan,
+            artifact=artifact,
+            validation=validation,
+        )
+
+    def _generate_rule_based(
         self,
         *,
         project_id: str,
@@ -20,11 +87,6 @@ class DebuggingAgent:
         artifact: CodeArtifact,
         validation: ValidationReport,
     ) -> DebuggingReport:
-        if self.mode == "llm":
-            raise NotImplementedError("DebuggingAgent llm mode is reserved for future integration and makes no external calls.")
-        if self.mode != "rule_based":
-            raise ValueError(f"Unsupported DebuggingAgent mode: {self.mode}")
-
         if validation.status == "VERIFIED":
             return self._report(
                 project_id=project_id,
@@ -64,6 +126,154 @@ class DebuggingAgent:
             return self._syntax_report(project_id=project_id, plan=plan, artifact=artifact, validation=validation)
 
         return self._formal_report(project_id=project_id, plan=plan, artifact=artifact, validation=validation)
+
+    async def _debug_with_llm(
+        self,
+        project_id: str,
+        plan: PlanObject,
+        artifact: CodeArtifact,
+        validation: ValidationReport,
+        iteration: int = 1,
+    ) -> DebuggingReport:
+        from app.agents.llm_client import llm_complete
+        import json
+        import re
+
+        status = getattr(validation, "status", "FORMAL_VIOLATION")
+        violation_summary = ""
+        counterexample_text = ""
+
+        if hasattr(validation, "safetyResults") and validation.safetyResults:
+            failed = [result for result in validation.safetyResults if getattr(result, "status", "") == "failed"]
+            if failed:
+                violation_summary = f"Failed safety checks ({len(failed)}/{len(validation.safetyResults)}):\n"
+                for result in failed:
+                    desc = getattr(result, "description", str(result))
+                    details = getattr(result, "details", "")
+                    violation_summary += f"  - {desc}"
+                    if details:
+                        violation_summary += f": {details}"
+                    violation_summary += "\n"
+
+        if hasattr(validation, "counterexample") and validation.counterexample:
+            ce = validation.counterexample
+            if isinstance(ce, dict):
+                counterexample_text = json.dumps(ce, indent=2)[:1500]
+            else:
+                counterexample_text = str(ce)[:1500]
+
+        if hasattr(validation, "syntaxErrors") and validation.syntaxErrors:
+            violation_summary += "Syntax errors:\n"
+            for err in validation.syntaxErrors[:5]:
+                violation_summary += f"  - {err}\n"
+
+        plan_summary = ""
+        if plan:
+            inputs = [getattr(signal, "name", str(signal)) for signal in getattr(plan, "inputs", [])]
+            outputs = [getattr(signal, "name", str(signal)) for signal in getattr(plan, "outputs", [])]
+            safety = getattr(plan, "safetyConstraints", [])
+            plan_summary = (
+                f"Inputs: {', '.join(inputs)}\n"
+                f"Outputs: {', '.join(outputs)}\n"
+                "Safety constraints:\n" + "\n".join(f"  - {item}" for item in safety[:5])
+            )
+
+        st_code = getattr(artifact, "source", "") or ""
+        lines = st_code.splitlines()
+        if len(lines) > 80:
+            st_code = "\n".join(lines[:80]) + "\n(* ... truncated ... *)"
+
+        iteration_context = ""
+        if iteration > 1:
+            iteration_context = (
+                f"\n\nIMPORTANT: This is repair attempt {iteration}. "
+                "Previous patch advice did not resolve the violation. "
+                "Provide DIFFERENT, more specific guidance this time. "
+                "Focus on the exact line or block causing the issue."
+            )
+
+        user_content = f"""PROJECT: {project_id}
+VALIDATION STATUS: {status}
+
+VIOLATION DETAILS:
+{violation_summary or 'FORMAL_VIOLATION - generic fallback safety check failed'}
+
+COUNTEREXAMPLE (variable states at violation):
+{counterexample_text or 'No counterexample available - check static safety rules'}
+
+PLAN REQUIREMENTS:
+{plan_summary}
+
+CURRENT ST CODE:
+{st_code}
+{iteration_context}
+
+Analyze the violation and provide targeted patch advice."""
+
+        try:
+            response = await llm_complete(
+                system=DEBUGGING_SYSTEM_PROMPT,
+                messages=[{"role": "user", "content": user_content}],
+                temperature=0.2,
+                max_tokens=600,
+            )
+
+            cleaned = re.sub(r"```(?:json)?\s*|\s*```", "", response.content).strip()
+            match = re.search(r"\{.*\}", cleaned, re.DOTALL)
+            if not match:
+                raise ValueError("No JSON object in LLM response")
+
+            data = json.loads(match.group())
+
+            root_cause = data.get("rootCause", "Safety property violation detected")
+            patch_advice = data.get("patchAdvice", [])
+            if not patch_advice or len(patch_advice) < 1:
+                raise ValueError("Empty patchAdvice in response")
+
+            while len(patch_advice) < 3:
+                patch_advice.append("Revalidate after applying the above changes.")
+            patch_advice = patch_advice[:3]
+
+            affected_region = data.get("affectedRegion", "Safety control logic")
+            regen_prompt = data.get("suggestedRegenerationPrompt", "")
+            if not regen_prompt:
+                regen_prompt = (
+                    f"Regenerate IEC 61131-3 Structured Text for project {project_id}. "
+                    f"Resolve {status} in {affected_region}. "
+                    "Keep the existing PlanObject I/O names and apply patch advice: "
+                    f"{' '.join(patch_advice)}"
+                )
+
+            logger.info(
+                f"[DebuggingAgent/llm.v1] project={project_id} "
+                f"root_cause='{root_cause[:60]}' "
+                f"tokens={response.input_tokens + response.output_tokens}"
+            )
+
+            return self._report(
+                project_id=project_id,
+                artifact=artifact,
+                validation=validation,
+                status="PATCH_ADVICE_GENERATED",
+                error_type=("syntax_error" if status == "SYNTAX_ERROR" else "formal_violation"),
+                root_cause_summary=root_cause,
+                affected_code_region=affected_region,
+                patch_advice=patch_advice,
+                suggested_regeneration_prompt=regen_prompt,
+                counterexample_summary=self._counterexample_summary(validation),
+                source_label="llm.v1",
+                llm_provider=response.provider,
+                llm_model=response.model,
+                tokens_used=response.input_tokens + response.output_tokens,
+            )
+        except Exception as exc:
+            logger.warning(f"[DebuggingAgent] LLM mode failed: {exc}. Falling back to rule_based.")
+            return self._generate_rule_based(
+                project_id=project_id,
+                plan=plan,
+                artifact=artifact,
+                validation=validation,
+            )
 
     def _syntax_report(
         self,
@@ -264,6 +474,10 @@ class DebuggingAgent:
         patch_advice: list[str],
         suggested_regeneration_prompt: str,
         counterexample_summary: str | None,
+        source_label: str = "rule_based.v1",
+        llm_provider: str | None = None,
+        llm_model: str | None = None,
+        tokens_used: int | None = None,
     ) -> DebuggingReport:
         return DebuggingReport(
             projectId=project_id,
@@ -278,8 +492,11 @@ class DebuggingAgent:
             suggestedRegenerationPrompt=suggested_regeneration_prompt,
             counterexampleSummary=counterexample_summary,
             createdAt=datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
-            debugger="rule_based.v1",
+            debugger=source_label,
             regeneratedArtifactId=None,
+            llmProvider=llm_provider,
+            llmModel=llm_model,
+            tokensUsed=tokens_used,
         )
 
     @staticmethod

@@ -59,6 +59,8 @@ def test_report_includes_requirement_and_plan_with_missing_indicators(client: Te
     report = FinalReport.model_validate(payload)
     assert report.projectId == project_id
     assert report.requirement is not None
+    assert len(report.requirement.safetyConstraints) >= 1
+    assert report.requirement.performanceTargets.maxScanTimeMs > 0
     assert report.planObject is not None
     assert report.codeArtifact is None
     assert report.validationSummary == "Validation has not been run yet."

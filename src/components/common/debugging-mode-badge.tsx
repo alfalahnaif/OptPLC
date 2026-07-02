@@ -8,7 +8,7 @@ export function DebuggingModeBadge() {
 
   return (
     <Badge tone={mockMode ? "info" : "success"} dot>
-      {mockMode ? "Mock Debugger" : "Real Rule-Based Debugger"}
+      {mockMode ? "Mock Debugger" : "Real Backend DebuggingReport"}
     </Badge>
   );
 }

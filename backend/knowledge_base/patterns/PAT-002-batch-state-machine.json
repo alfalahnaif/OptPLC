@@ -1,0 +1,17 @@
+{
+  "id": "PAT-002",
+  "name": "Sequential Batch CASE State Machine",
+  "domain": "Sequential Batch",
+  "pattern_type": "State Machine",
+  "description": "Three-step Fill/Mix/Drain batch sequence. Uses CASE statement with explicit ELSE safe-state. All output assignments inside CASE branches only.",
+  "tags": ["batch", "sequential", "fill", "mix", "drain", "state machine", "CASE"],
+  "safety_level": "high",
+  "st_snippet": "CASE Step_State OF\n  0: (* Idle *)\n    Fill_Valve := FALSE; Mixer_Motor := FALSE; Drain_Valve := FALSE;\n    IF Start_PB AND NOT Fault_State AND Emergency_Stop AND NOT Abort_PB THEN\n        Step_State := 1;\n        Batch_Complete := FALSE;\n    END_IF;\n  1: (* Fill *)\n    Fill_Valve := TRUE;\n    IF High_Level THEN Step_State := 2; END_IF;\n  2: (* Mix *)\n    Mixer_Motor := TRUE;\n    IF Mix_Timer_Done THEN Step_State := 3; END_IF;\n  3: (* Drain *)\n    Drain_Valve := TRUE;\n    IF Low_Level THEN\n        Step_State := 0;\n        Batch_Complete := TRUE;\n    END_IF;\n  ELSE:\n    Fill_Valve := FALSE; Mixer_Motor := FALSE;\n    Drain_Valve := FALSE; Step_State := 0;\nEND_CASE;",
+  "safety_notes": "ELSE branch is mandatory — handles any undefined Step_State value safely. Fill_Valve and Drain_Valve must never be TRUE at the same time. Batch_Complete cleared when new batch starts.",
+  "common_mistakes": [
+    "Missing ELSE branch — undefined state leaves outputs in unknown condition",
+    "Not clearing Batch_Complete when new batch starts",
+    "Allowing Start_PB to restart batch while Fault_State is TRUE"
+  ],
+  "applicable_rules": ["BT-1", "BT-2", "BT-5"]
+}
