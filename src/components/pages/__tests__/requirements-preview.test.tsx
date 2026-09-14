@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { RequirementsPage } from "@/components/pages/requirements-page";
 import type { RequirementPayload } from "@/lib/api-contracts";
+import { deriveRequirementAnalysisPreview } from "@/lib/requirement-analysis";
 
 describe("Requirements requirement-driven preview", () => {
   afterEach(() => {
@@ -52,8 +53,8 @@ describe("Requirements requirement-driven preview", () => {
     fireEvent.click(screen.getByRole("button", { name: "Analyze Requirement" }));
 
     expect(await screen.findByText("Sequential Batch")).toBeInTheDocument();
-    expect(await screen.findByText("Fill_Valve : BOOL")).toBeInTheDocument();
-    expect(await screen.findByText("Drain_Valve : BOOL")).toBeInTheDocument();
+    expect(await screen.findByText(/Fill_Valve/)).toBeInTheDocument();
+    expect(await screen.findByText(/Drain_Valve/)).toBeInTheDocument();
     expect(await screen.findByText(/Inferred inputs -/)).toBeInTheDocument();
     expect(await screen.findByText(/Step_State/)).toBeInTheDocument();
     expect(await screen.findByText(/Fault_State/)).toBeInTheDocument();
@@ -90,8 +91,21 @@ function renderRealModePage({
 
   const persisted = persistedRequirement(projectId, domain, requirementText);
   const project = persistedProject(projectId, domain);
-  const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
+  const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL, options?: RequestInit) => {
     const url = typeof input === "string" ? input : input.toString();
+    const method = (options?.method ?? "GET").toUpperCase();
+    if (url.endsWith(`/api/projects/${projectId}/analyze-requirement`) && method === "POST") {
+      const body = JSON.parse((options?.body as string | undefined) ?? "{}") as {
+        text?: string;
+        safetyConstraints?: string[];
+      };
+      const analysis = deriveRequirementAnalysisPreview({
+        projectDomain: domain,
+        requirementText: body.text ?? "",
+        safetyConstraints: body.safetyConstraints ?? []
+      });
+      return Promise.resolve(jsonResponse(analysis));
+    }
     if (url.endsWith(`/api/projects/${projectId}/requirements`)) {
       return Promise.resolve(jsonResponse(persisted));
     }

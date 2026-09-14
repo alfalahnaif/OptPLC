@@ -144,7 +144,7 @@ describe("main frontend pages", () => {
     render(<MetricsPage />);
 
     expect(await screen.findByText("Mock Metrics")).toBeInTheDocument();
-    expect(await screen.findByText("Lines of code")).toBeInTheDocument();
+    expect(await screen.findByText("LOC")).toBeInTheDocument();
     expect(await screen.findByText("Metric-by-metric")).toBeInTheDocument();
   });
 
@@ -158,8 +158,8 @@ describe("main frontend pages", () => {
   it("Benchmark page renders benchmark table", async () => {
     render(<BenchmarkPage />);
 
-    expect(await screen.findByText("Benchmark cases")).toBeInTheDocument();
-    expect(await screen.findByText("Motor start/stop with E-stop")).toBeInTheDocument();
+    expect(await screen.findByText("Benchmark Suite")).toBeInTheDocument();
+    expect(await screen.findByText(/Motor start\/stop with E-stop/)).toBeInTheDocument();
   });
 
   it("Settings page renders configuration sections", async () => {

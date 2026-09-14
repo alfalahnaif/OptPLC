@@ -1,7 +1,5 @@
 import type {
-  BenchmarkCase,
   BenchmarkCaseCatalogItem,
-  BenchmarkCaseDefinition,
   BenchmarkCaseResult,
   BenchmarkComparisonResult,
   BenchmarkMode,

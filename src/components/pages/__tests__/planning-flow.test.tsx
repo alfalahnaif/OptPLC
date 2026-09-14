@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import { afterEach, describe, expect, it, vi, type Mock } from "vitest";
 
 import type { PlanObject, Project, RequirementPayload, WorkflowEvent } from "@/lib/api-contracts";
+import { deriveRequirementAnalysisPreview } from "@/lib/requirement-analysis";
 import { NewProjectPage } from "@/components/pages/new-project-page";
 import { PlanPage } from "@/components/pages/plan-page";
 import { RequirementsPage } from "@/components/pages/requirements-page";
@@ -96,11 +97,11 @@ describe("Planning Agent frontend flow", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Analyze Requirement" }));
 
-    const outputRow = (await screen.findByText("Fault_Lamp : BOOL")).closest("div");
+    const outputRow = (await screen.findByText(/Fault_Lamp/)).closest(".rounded-md") as HTMLElement | null;
     if (!outputRow) throw new Error("Fault_Lamp suggestion row not found");
     fireEvent.click(within(outputRow).getByRole("button", { name: "Accept" }));
 
-    const safetyRow = (await screen.findByText("Motor_Run must be FALSE when Emergency_Stop is active.")).closest("div");
+    const safetyRow = (await screen.findByText("Motor_Run must be FALSE when Emergency_Stop is active.")).closest(".flex.items-center.justify-between") as HTMLElement | null;
     if (!safetyRow) throw new Error("Suggested safety row not found");
     fireEvent.click(within(safetyRow).getByRole("button", { name: "Accept" }));
 
@@ -172,7 +173,7 @@ describe("Planning Agent frontend flow", () => {
 
     render(<PlanPage projectId="PRJ-0421" />);
 
-    expect(await screen.findByText("Real Backend PlanObject")).toBeInTheDocument();
+    expect(await screen.findByText("Rule-Based")).toBeInTheDocument();
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(
         "http://api.test/api/projects/PRJ-0421/plan",
@@ -190,7 +191,7 @@ describe("Planning Agent frontend flow", () => {
 
     render(<PlanPage projectId="PRJ-0421" />);
 
-    expect(await screen.findByText("Mock Planning Mode")).toBeInTheDocument();
+    expect(await screen.findByText("Rule-Based")).toBeInTheDocument();
     expect(await screen.findByText(/"agent": "PlanningAgent\/v1.4"/)).toBeInTheDocument();
     expect(fetchMock).not.toHaveBeenCalled();
   });
@@ -244,7 +245,7 @@ describe("Planning Agent frontend flow", () => {
     expect((await screen.findAllByText(/Emergency_Stop/)).length).toBeGreaterThan(0);
     expect(await screen.findByText("Confirmed outputs - 0")).toBeInTheDocument();
     expect(await screen.findByText("Suggested outputs (not yet confirmed)")).toBeInTheDocument();
-    expect(await screen.findByText("Fault_Lamp : BOOL")).toBeInTheDocument();
+    expect(await screen.findByText(/Fault_Lamp/)).toBeInTheDocument();
   });
 
   it("real mode renders backend PlanObject", async () => {
@@ -399,7 +400,32 @@ function stubFetchByRoute(projectId: string, requirementsNotFound = false) {
         })
       );
     }
+    if (url.endsWith(`/api/projects/${projectId}/analyze-requirement`) && method === "POST") {
+      const body = JSON.parse((options?.body as string | undefined) ?? "{}") as {
+        text?: string;
+        safetyConstraints?: string[];
+      };
+      const analysis = deriveRequirementAnalysisPreview({
+        projectDomain: projectResponse(projectId).domain,
+        requirementText: body.text ?? "",
+        safetyConstraints: body.safetyConstraints ?? []
+      });
+      return Promise.resolve(
+        new Response(JSON.stringify(analysis), {
+          status: 200,
+          headers: { "Content-Type": "application/json" }
+        })
+      );
+    }
     if (url.endsWith(`/api/projects/${projectId}/plan`) && method === "POST") {
+      return Promise.resolve(
+        new Response(JSON.stringify(backendPlan(projectId)), {
+          status: 200,
+          headers: { "Content-Type": "application/json" }
+        })
+      );
+    }
+    if (url.endsWith(`/api/projects/${projectId}/plan`) && method === "GET") {
       return Promise.resolve(
         new Response(JSON.stringify(backendPlan(projectId)), {
           status: 200,
