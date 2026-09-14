@@ -1,7 +1,7 @@
 # لوحة حالة OptPLC
 
 **آخر تحديث:** 2026-09-14
-**المرحلة الحالية:** 0 (التأسيس)، بحالة `DOING`. أُنجز 9 بنود من 12.
+**المرحلة الحالية:** 0 (التأسيس)، بحالة `DOING`. أُنجز 10 بنود من 12.
 **البوابة التالية:** `G0`، والموعد المستهدف 2026-09-27 (D-022).
 **المناقشة وتسليم الأطروحة:** يونيو 2027 (U-41).
 
@@ -10,13 +10,13 @@
 | الفرع | الحالة |
 | --- | --- |
 | `main` | لم يُمس، على `b345385`. الدمج فيه بموافقتك فقط |
-| `staging` | فرع التكامل، وفيه P0-01 وP0-02 وP0-03 وP0-10 وP0-04 وP0-07 وP0-11 وP0-05 |
-| فروع مدموجة | `p0/P0-01-plan-docs`، و`p0/P0-02-requirement-analysis-module`، و`p0/P0-03-runtime-backup`، و`p0/P0-10-test-timeouts`، و`p0/P0-04-hermetic-backend-tests`، و`p0/P0-07-local-check-script`، و`p0/P0-11-stale-tests`، و`p0/P0-05-docker-reference-env` |
+| `staging` | فرع التكامل، وفيه P0-01 وP0-02 وP0-03 وP0-10 وP0-04 وP0-07 وP0-11 وP0-05 وP0-06 |
+| فروع مدموجة | `p0/P0-01-plan-docs`، و`p0/P0-02-requirement-analysis-module`، و`p0/P0-03-runtime-backup`، و`p0/P0-10-test-timeouts`، و`p0/P0-04-hermetic-backend-tests`، و`p0/P0-07-local-check-script`، و`p0/P0-11-stale-tests`، و`p0/P0-05-docker-reference-env`، و`p0/P0-06-st-compile-script` |
 
 ### أمر الرفع إلى GitHub (تنفّذه أنت، D-023)
 
 ```
-git push -u origin staging p0/P0-01-plan-docs p0/P0-02-requirement-analysis-module p0/P0-03-runtime-backup p0/P0-10-test-timeouts p0/P0-04-hermetic-backend-tests p0/P0-07-local-check-script p0/P0-11-stale-tests p0/P0-05-docker-reference-env
+git push -u origin staging p0/P0-01-plan-docs p0/P0-02-requirement-analysis-module p0/P0-03-runtime-backup p0/P0-10-test-timeouts p0/P0-04-hermetic-backend-tests p0/P0-07-local-check-script p0/P0-11-stale-tests p0/P0-05-docker-reference-env p0/P0-06-st-compile-script
 ```
 
 ## منجز
@@ -33,15 +33,15 @@ git push -u origin staging p0/P0-01-plan-docs p0/P0-02-requirement-analysis-modu
 | 2026-09-14 | `P0-07` | `scripts/check.ps1` يحرس من أي إخفاق جديد |
 | 2026-09-14 | `P0-11` | الاختبارات القديمة محدّثة: 107 نجح و34 فشل معروف. وأُصلح C-12 |
 | 2026-09-14 | `P0-05` | الصورة المرجعية `optplc-backend:p0-05` تعمل وحالتها `healthy`، بمستخدم غير root وMATIEC مثبت الإصدار. 4 من 5 قوالب تُترجم دون تعديل، وكُشف C-13 |
+| 2026-09-14 | `P0-06` | `scripts/st-compile.ps1` يترجم ملفًا واحدًا بـ MATIEC المثبت، ويرفض الملف المعطوب |
 
 ## جارٍ الآن
 
-- `P0-06`: `scripts/st-compile.ps1` جاهز ومُختبر. ينتظر فرعه والـ commit.
-- `P0-08`: `AGENTS.md` و`README.md` محدّثان في شجرة العمل، ويبقى `backend/README.md`. ينتظر فرعه والـ commit.
+`P0-08`: `AGENTS.md` و`README.md` محدّثان في شجرة العمل، ويبقى `backend/README.md`، ثم الـ commit والدمج.
 
 ## التالي
 
-1. إكمال `P0-06` و`P0-08` ودمجهما.
+1. إكمال `P0-08`.
 2. مراجعة بوابة `G0`، ثم عرض ملخص المرحلة 1 عليك (المسودة في `docs/plan/phases/PHASE_1_BRIEF.md`).
 3. `P0-12`: سد ثغرات npm. **ينتظر موافقتك.** هل تريده ضمن G0 أم في بداية المرحلة 1؟
 
