@@ -13,13 +13,15 @@
 
 - **الحصيلة:** 139 اختبارًا. **96 نجح و43 فشل**، في 33 ثانية، دون أي اتصال بالشبكة.
 - **التحقق من العزل:**
-  - بصمة `backend/plcforge.db` متطابقة قبل التشغيل وبعده: `161230E8…29EE`.
+  - بصمة `backend/plcforge.db` متطابقة قبل التشغيل وبعده.
   - ملفات النتائج الـ 14 متطابقة في بصمتها المجمعة.
   - `E:\app\rag_db` لم يُنشأ.
   - المجلد المؤقت للاختبارات حُذف بعد الانتهاء.
-- **هل سبّب العزل أيًّا من حالات الفشل؟** لا، بحسب رسائل الفشل. لا توجد حالة فشل تعتمد على رد LLM حقيقي، والاختبارات التي تستدعي الـ LLM كانت ستفشل بالرد الحقيقي أيضًا. لم أتحقق بتشغيل الإعداد القديم، لأنه يحذف الجداول ويتصل بمزود مدفوع.
+- **هل سبّب العزل أيًّا من حالات الفشل؟** لا، بحسب رسائل الفشل. لا توجد حالة فشل تعتمد على رد LLM حقيقي. لم أتحقق بتشغيل الإعداد القديم لأنه غير آمن.
 
 ## تصنيف حالات الفشل الـ 43
+
+**التصنيف مُراجَع في 2026-09-14** بعد مقارنة القوالب في سجل git. نُقلت 4 اختبارات من ب إلى ج.
 
 ### أ. نتيجة للخطأ C-01: 25 اختبارًا، تُصلح في `P1-01`
 
@@ -37,48 +39,56 @@
 
 **تنبيه:** قد يكشف إصلاح C-01 أخطاء أخرى كانت مختفية خلفه، وستُسجَّل عندها كما هي.
 
-### ب. اختبارات قديمة لم تُحدَّث بعد تغيّر الكود: 16 اختبارًا، تُصلح في `P0-11`
+### ب. اختبارات قديمة فعلًا: 12 اختبارًا، تُصلح في `P0-11`
 
-بعض هذه الحالات يحتاج قرارًا منك قبل التحديث: هل الصحيح هو ما يتوقعه الاختبار، أم ما يفعله الكود الآن؟
+تغيّر الكود عمدًا ولم تُحدَّث هذه الاختبارات.
 
-| الملف | الاختبار | السبب |
-| --- | --- | --- |
-| `test_code_generation_agent` | `test_motor_plan_generates_structured_text_program`، `test_different_domains_produce_different_code` | يتوقعان قالبًا قديمًا يحوي `Run_Cmd` و`Safety_OK` |
-| `test_code_generation_agent` | `test_batch_generation_includes_step_logic` | يتوقع `Step_State = 10`، والقالب الحالي يستخدم 1 إلى 3 |
-| `test_code_generation_agent` | `test_llm_mode_is_placeholder_only` | يتوقع `NotImplementedError`، ووضع LLM صار منفذًا |
-| `test_projects` | `test_get_requirements_returns_404_when_no_requirement_submitted` | الخدمة صارت تعيد متطلبًا افتراضيًا بدل 404. **يحتاج قرارًا** |
-| `test_projects` | `test_different_project_domains_generate_different_code` | يتوقع القالب القديم (`Run_Cmd`) |
-| `test_health` | `test_health_endpoint` | يتوقع `"healthy"`، والكود يعيد `"ok"`. **يحتاج قرارًا** |
-| `test_optimization_agent` | `test_optimization_metrics_improve_or_stay_equal`، `test_rollback_occurs_if_optimization_pass_breaks_validation` | يستدعيان `optimize()` دون `await` بعد أن صارت async |
-| `test_optimization_agent` | `test_llm_mode_raises_not_implemented` | وضع LLM صار منفذًا |
-| `test_planning_agent` | `test_llm_mode_is_placeholder_only` | وضع LLM صار منفذًا |
-| `test_validation_agent` | `test_formal_mode_is_placeholder_only` | الوضع الصوري لم يعد placeholder |
-| `test_validation_agent` | `test_matiec_success_path_keeps_static_validation`، `test_matiec_syntax_failure_returns_syntax_error`، `test_matiec_unavailable_falls_back_to_static_validation`، `test_matiec_timeout_falls_back_to_static_validation` | تستبدل دالة `_is_matiec_available` التي حُذفت من الكود |
+| الملف | الاختبار | السبب | الإصلاح المخطط |
+| --- | --- | --- | --- |
+| `test_planning_agent` | `test_llm_mode_is_placeholder_only` | وضع LLM صار منفذًا | اختباران: رجوع إلى القواعد عند رد غير JSON، ونجاح برد مبرمج |
+| `test_code_generation_agent` | `test_llm_mode_is_placeholder_only` | وضع LLM صار منفذًا | اختباران: رجوع إلى القالب عند رد بلا `PROGRAM`، ونجاح برد مبرمج |
+| `test_optimization_agent` | `test_llm_mode_raises_not_implemented` | وضع LLM صار منفذًا | الرد غير الصالح يترك الكود بلا تغيير (`NO_CHANGES`) |
+| `test_optimization_agent` | `test_optimization_metrics_improve_or_stay_equal`، `test_rollback_occurs_if_optimization_pass_breaks_validation` | `optimize()` صارت async ولا يوجد `await` | إضافة `await`. قد يبقيان فاشلين بسبب C-01 والقوالب، ويُسجَّل ذلك كما هو |
+| `test_validation_agent` | `test_formal_mode_is_placeholder_only` | الوضع الصوري لم يعد placeholder | الوضع الصوري يفشل مغلقًا دون MATIEC |
+| `test_validation_agent` | 4 اختبارات تستبدل `_is_matiec_available` | الدالة حُذفت، وصار المدقق يُحقن عبر الـ constructor | مدقق MATIEC وهمي بأربع حالات: نجاح، وفشل، وغير متوفر (يرجع إلى regex، ويفشل حتى P1-01)، ومهلة (فشل مغلق، ليس VERIFIED) |
+| `test_health` | `test_health_endpoint` | يتوقع `"healthy"` ومفاتيح غير موجودة | مطابقة العقد الحالي (D-025) |
+| `test_projects` | `test_get_requirements_returns_404_when_no_requirement_submitted` | الخدمة تعيد متطلبًا افتراضيًا | **تعديل الكود** ليعيد 404 (D-024)، والاختبار صحيح كما هو |
 
-### ج. خطأ وظيفي حقيقي جديد، C-10: اختباران، يُصلح في `P1-22`
+### ج. اختبارات قوالب تكشف أخطاء حقيقية: 6 اختبارات، تُصلح في `P1-22`
 
-**قالب المحرك يعكس قطبية زر الإيقاف المغلق عادةً (`Stop_PB`)، فالمحرك لا يمكن أن يعمل أبدًا.**
+**ما يقوله سجل git:** ملف `code_generation_agent.py` له ثلاثة commits فقط.
 
-- **في الكود** (`code_generation_agent.py:435-441`): الإعلان يقول `Stop_PB: TRUE = healthy, FALSE = pressed`.
-- **شرط التعشيق** `Run_Latch := TRUE` يتطلب `NOT Stop_PB`، أي أن الزر مضغوط.
-- **شرط الفصل** يعمل على `NOT Stop_PB` نفسها، في المسح نفسه وبعد التعشيق.
-- **النتيجة:**
-  - إذا كان الزر سليمًا، لا يتحقق شرط التعشيق.
-  - إذا كان مضغوطًا، يُعشَّق المحرك ثم يُفصل فورًا في المسح نفسه.
-  - في الحالتين يبقى `Run_Latch` وبالتالي `Motor_Run` على `FALSE` دائمًا.
-- **الاختباران اللذان يكشفانه، وهما صحيحان:** `test_code_generation_agent::test_motor_template_uses_normally_closed_stop_pb_semantics` و`test_projects::test_generate_code_persists_artifact`.
-- **الدلالة العلمية:**
-  - هذا القالب نفسه يحصل على `VERIFIED` من القواعد الساكنة، كما في تجربة التدقيق مع محاكاة MATIEC.
-  - الكود المحفوظ في نتيجة benchmark B001 فيه الخطأ نفسه.
-  - هذا دليل مباشر على أن القواعد الساكنة لا ترى السلوك، وسيكشفه المحاكي (L3) والتحقق الصوري (L4) تلقائيًا.
+- **الأول (`6ea4a27`، مايو):** قالب المحرك يستخدم `Run_Cmd` و`Safety_OK` بمنطق متسق لزر إيقاف مفتوح عادةً. الـ commit التالي `0576978` لم يغيّر هذه الأسطر.
+- **الثالث (`c2f05b2`، يوليو):** أعاد كتابة القالب إلى `Run_Latch`، وأعلن الزر مغلقًا عادةً.
+- **الاختبارات:** تتوقع تصميمًا ثالثًا مغلقًا عادةً مع `Safety_OK`، **لا يوجد في أي commit**.
+
+**C-10، مصحَّح الوصف:** شرط التعشيق `Run_Latch := TRUE` وشرط الفصل كلاهما يحتوي `NOT Stop_PB` (`code_generation_agent.py:435-441`). والنتيجة:
+
+- حين يتحقق شرط التعشيق، يتحقق شرط الفصل أيضًا في المسح نفسه، فيُلغي الفصل التعشيق.
+- **المحرك لا يعمل أبدًا، أيًّا كان اصطلاح توصيل الزر.** كنتُ وصفته سابقًا بـ "عكس القطبية"، والوصف الأدق هو هذا.
+
+**C-11، خطأ جديد:** في قالب الدفعات، يُحسب `Batch_Complete := (Step_State = 3) AND Low_Level AND NOT Fault_State` بعد `CASE`. والـ `CASE` نفسه يعيد `Step_State` إلى 0 عندما يكون `Low_Level` صحيحًا، فتصبح `Batch_Complete` خطأً دائمًا. القالب الأول كان يستخدم خطوة إنهاء مستقلة (`Step = 50`).
+
+| الملف | الاختبار |
+| --- | --- |
+| `test_code_generation_agent` | `test_motor_plan_generates_structured_text_program`، `test_different_domains_produce_different_code`، `test_motor_template_uses_normally_closed_stop_pb_semantics`، `test_batch_generation_includes_step_logic` |
+| `test_projects` | `test_different_project_domains_generate_different_code`، `test_generate_code_persists_artifact` |
+
+**الإصلاح (P1-22):**
+
+- إعادة تصميم قالبي المحرك والدفعات عمدًا: منطق صحيح للزر المغلق عادةً، وإنهاء دفعة قابل للوصول.
+- استبدال اختبارات النصوص الحرفية باختبارات سلوك: أدخل كذا، فيجب أن يحدث كذا عبر عدة مسوحات.
+- حتى وصول المحاكي (P2-04)، يُستخدم منفّذ صغير خاص بهذه القوالب في الاختبارات.
+
+**الدلالة العلمية:** القواعد الساكنة أعطت قالب المحرك `VERIFIED` مع أنه لا يعمل. هذا دليل مباشر على الحاجة إلى المحاكاة (L3) والتحقق الصوري (L4).
 
 ## ملاحظات أخرى من التشغيل
 
-- `pytest-asyncio 1.3.0` مثبت في `.venv` لكنه غير مذكور في `requirements-dev.txt`، ويُضاف في `P0-05`.
+- `pytest-asyncio 1.3.0` مثبت في `.venv` لكنه غير مذكور في `requirements-dev.txt`. أُضيف في `P0-05`.
 - `test_optimization_agent.py` يضع علامة asyncio على اختبارات متزامنة، مما يسبب تحذيرات، ويُنظَّف في `P0-11`.
 
 ## سجل الحصيلة
 
 | التاريخ | البند | نجح | فشل | ملاحظة |
 | --- | --- | --- | --- | --- |
-| 2026-09-14 | P0-04 | 96 | 43 | أول تشغيل آمن ومعزول |
+| 2026-09-14 | P0-04 | 96 | 43 | أول تشغيل آمن ومعزول. التصنيف: 25 من C-01، و12 قديمة، و6 تكشف C-10 وC-11 |

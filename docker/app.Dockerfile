@@ -1,63 +1,61 @@
-# Stage 1: Build MATIEC Compiler
+# OptPLC reference backend image (plan item P0-05).
+
+# Stage 1: build the MATIEC IEC 61131-3 compiler from a pinned upstream commit.
 FROM python:3.11-slim-bookworm AS builder
 
-# Install build dependencies
+ARG MATIEC_REPO=https://github.com/beremiz/matiec.git
+# Upstream HEAD resolved on 2026-09-14 with `git ls-remote <repo> HEAD`.
+ARG MATIEC_COMMIT=79410c7660cf337ec7991a167e53ef141a26caf9
+
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates gcc g++ make git bison flex autoconf automake \
     && rm -rf /var/lib/apt/lists/*
 
-# Clone the official public Beremiz MATIEC repository and build it
-RUN git clone --depth 1 https://github.com/beremiz/matiec.git /matiec \
+RUN git init /matiec \
     && cd /matiec \
+    && git remote add origin "$MATIEC_REPO" \
+    && git fetch --depth 1 origin "$MATIEC_COMMIT" \
+    && git checkout --detach FETCH_HEAD \
+    && test "$(git rev-parse HEAD)" = "$MATIEC_COMMIT" \
     && autoreconf -i \
     && ./configure \
     && make -j"$(nproc)" \
     && install -m 0755 /matiec/iec2c /usr/local/bin/iec2c \
     && mkdir -p /usr/local/share/matiec \
     && cp -r /matiec/lib /usr/local/share/matiec/lib \
-    && chmod -R 755 /usr/local/share/matiec/lib
+    && echo "$MATIEC_COMMIT" > /usr/local/share/matiec/COMMIT
 
-# Stage 2: Final Runtime Environment
+# Stage 2: runtime. No PLCverif binary is installed; formal validation reports it as unavailable.
 FROM python:3.11-slim-bookworm
 
 WORKDIR /app
 
-# Install runtime dependencies (Java for PLCverif)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    default-jre wget \
-    && rm -rf /var/lib/apt/lists/*
-
-# Copy the compiled MATIEC binary from the builder stage
 COPY --from=builder /usr/local/bin/iec2c /usr/local/bin/iec2c
-# Copy MATIEC standard library files from builder stage
-COPY --from=builder /usr/local/share/matiec/lib /usr/local/share/matiec/lib
+COPY --from=builder /usr/local/share/matiec /usr/local/share/matiec
 
-# Create a placeholder for PLCverif executable
-RUN touch /usr/local/bin/plcverif && chmod +x /usr/local/bin/plcverif
-
-# Copy requirements and install Python dependencies
-# ننسخ الملف من داخل مجلد backend
-# Copy requirements and install Python dependencies
 COPY backend/requirements.txt .
-
 RUN python -m pip install --upgrade pip setuptools wheel
 
-# ثبّت PyTorch CPU فقط، بدون CUDA
+# CPU-only PyTorch (no CUDA) before the remaining requirements.
 RUN python -m pip install --default-timeout=1000 --retries 10 \
     --index-url https://download.pytorch.org/whl/cpu \
     torch==2.5.1
-RUN python -c "import torch; print(torch.__version__); print(torch.version.cuda)"
 
-# ثبّت باقي المتطلبات
-RUN python -m pip install --default-timeout=1000 --retries 10 \
-    -r requirements.txt
+RUN python -m pip install --default-timeout=1000 --retries 10 -r requirements.txt
 
-# Copy the rest of the application code
-# ننسخ محتويات مجلد backend إلى داخل المجلد الحالي في الحاوية
 COPY backend/ .
-COPY backend/knowledge_base /app/knowledge_base
+
+# Run as an unprivileged user. iec2c still writes its C output into its working directory
+# (/usr/local/share/matiec) until P1-02 moves compilation to per-request temp dirs, so that
+# directory is owned by the app user for now.
+RUN useradd --create-home --uid 10001 optplc \
+    && mkdir -p /app/rag_db \
+    && chown -R optplc:optplc /app /usr/local/share/matiec
+USER optplc
 
 EXPOSE 8000
 
-# Start the FastAPI application
+HEALTHCHECK --interval=30s --timeout=5s --start-period=90s --retries=3 \
+    CMD python -c "import sys, urllib.request; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=4).status == 200 else 1)"
+
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
