@@ -1,0 +1,6 @@
+# Lock input for the Linux reference image (plan item P0-05).
+# Compile inside python:3.11-slim-bookworm with pip-compile --generate-hashes; the
+# result, requirements-docker.lock, is what docker/app.Dockerfile installs.
+--extra-index-url https://download.pytorch.org/whl/cpu
+-r requirements.txt
+torch==2.5.1+cpu
