@@ -33,15 +33,12 @@ WORKDIR /app
 COPY --from=builder /usr/local/bin/iec2c /usr/local/bin/iec2c
 COPY --from=builder /usr/local/share/matiec /usr/local/share/matiec
 
-COPY backend/requirements.txt .
-RUN python -m pip install --upgrade pip setuptools wheel
-
-# CPU-only PyTorch (no CUDA) before the remaining requirements.
-RUN python -m pip install --default-timeout=1000 --retries 10 \
-    --index-url https://download.pytorch.org/whl/cpu \
-    torch==2.5.1
-
-RUN python -m pip install --default-timeout=1000 --retries 10 -r requirements.txt
+# Hashed lock compiled from backend/requirements-docker.in with `uv pip compile --generate-hashes`.
+# The extra index serves the CPU-only torch wheel pinned in the lock.
+COPY backend/requirements-docker.lock .
+RUN python -m pip install --no-cache-dir --require-hashes --default-timeout=1000 --retries 10 \
+    --extra-index-url https://download.pytorch.org/whl/cpu \
+    -r requirements-docker.lock
 
 COPY backend/ .
 
