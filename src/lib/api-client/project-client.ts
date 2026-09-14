@@ -14,6 +14,7 @@ import {
 import { isMockApiEnabled } from "./config";
 import { ApiError, apiRequest } from "./fetch-transport";
 import { mockResolve } from "./mock-transport";
+import { deriveRequirementAnalysisPreview } from "@/lib/requirement-analysis";
 
 export const ACTIVE_PROJECT_ID = currentProject.id;
 
@@ -268,16 +269,13 @@ export async function analyzeRequirement(
   }
 
   return mockResolve({
-    domain: "Motor Control",
-    confidence: 0.72,
-    inferred_inputs: [],
-    suggested_outputs: [],
-    suggested_internals: [],
-    safety_constraints: [...safetyConstraints],
-    suggested_constraints: [],
+    ...deriveRequirementAnalysisPreview({
+      projectDomain: "",
+      requirementText: text,
+      safetyConstraints
+    }),
     projectId,
-    analyzedAt: new Date().toISOString(),
-    source: "heuristic"
+    analyzedAt: new Date().toISOString()
   });
 }
 

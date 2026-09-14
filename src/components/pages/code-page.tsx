@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ACTIVE_PROJECT_ID, getCodePageData, projectPath, useApiResource, validateCode } from "@/lib/api-client";
+import type { RAGSource } from "@/lib/api-contracts";
 
 export function CodePage({ projectId = ACTIVE_PROJECT_ID, state }: { projectId?: string; state?: PageState } = {}) {
   const router = useRouter();
@@ -153,9 +154,9 @@ export function CodePage({ projectId = ACTIVE_PROJECT_ID, state }: { projectId?:
               <Card>
                 <CardHeader><CardTitle className="flex items-center gap-2"><FileCode2 className="size-4 text-primary" /> RAG sources used</CardTitle></CardHeader>
                 <CardContent className="space-y-3 text-sm">
-                  {data.artifact.metadata?.ragSources?.length > 0 ? (
+                  {(data.artifact.metadata?.ragSources?.length ?? 0) > 0 ? (
                     <div className="space-y-1">
-                      {data.artifact.metadata.ragSources.map((src: any) => (
+                      {data.artifact.metadata?.ragSources?.map((src: RAGSource) => (
                         <div
                           key={src.id}
                           className="flex items-center justify-between text-sm"
@@ -165,7 +166,7 @@ export function CodePage({ projectId = ACTIVE_PROJECT_ID, state }: { projectId?:
                             {src.name}
                           </span>
                           <span className="text-muted-foreground text-xs">
-                            {src.domain} · {Math.round(src.similarity * 100)}%
+                            {src.domain} · {Math.round((src.similarity ?? 0) * 100)}%
                           </span>
                         </div>
                       ))}

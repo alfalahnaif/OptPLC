@@ -83,7 +83,7 @@ export function BenchmarkPage({ state }: { state?: PageState } = {}) {
     return { locReduction, ccReduction };
   }, [suiteSummary]);
 
-  if (effectiveState === "loading" || effectiveState === "idle") {
+  if (effectiveState === "loading") {
     return (
       <div className="flex items-center justify-center h-64">
         <p className="text-muted-foreground">Loading benchmark cases...</p>

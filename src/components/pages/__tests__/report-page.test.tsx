@@ -48,7 +48,7 @@ describe("ReportPage", () => {
 
     expect(await screen.findByText("Project summary")).toBeInTheDocument();
     expect(await screen.findByText("Conveyor Controller")).toBeInTheDocument();
-    expect(await screen.findByText("Validation passed.")).toBeInTheDocument();
+    expect(await screen.findByText("Syntax: PASS")).toBeInTheDocument();
   });
 
   it("renders missing section placeholders", async () => {
@@ -65,7 +65,8 @@ describe("ReportPage", () => {
 
     render(<ReportPage projectId="PRJ-0421" />);
 
-    expect(await screen.findAllByText("Not generated yet")).not.toHaveLength(0);
+    expect(await screen.findByText("Requirement data is unavailable for this project session.")).toBeInTheDocument();
+    expect(await screen.findByText("Metrics report is unavailable.")).toBeInTheDocument();
   });
 
   it("renders backend error state", async () => {
@@ -118,8 +119,9 @@ describe("ReportPage", () => {
     });
 
     render(<ReportPage projectId="PRJ-0421" />);
-    const pdfButton = await screen.findByRole("button", { name: "Export PDF (Coming soon)" });
+    const pdfButton = await screen.findByRole("button", { name: "Export PDF" });
     expect(pdfButton).toBeDisabled();
+    expect(pdfButton).toHaveAttribute("title", "PDF export is coming soon");
   });
 
   it("export failure displays error message", async () => {

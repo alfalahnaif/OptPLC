@@ -8,7 +8,7 @@ export function PlanningModeBadge() {
 
   if (mode === "llm") {
     return (
-      <Badge variant="default" className="inline-flex items-center gap-1 text-xs">
+      <Badge tone="primary" className="inline-flex items-center gap-1 text-xs">
         <Sparkles className="h-3 w-3" />
         LLM Mode
       </Badge>
@@ -16,7 +16,7 @@ export function PlanningModeBadge() {
   }
 
   return (
-    <Badge variant="secondary" className="inline-flex items-center gap-1 text-xs">
+    <Badge tone="neutral" className="inline-flex items-center gap-1 text-xs">
       <Cpu className="h-3 w-3" />
       Rule-Based
     </Badge>
