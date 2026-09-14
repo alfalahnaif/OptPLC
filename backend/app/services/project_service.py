@@ -79,19 +79,7 @@ class ProjectService:
         project = await self.repository.require_project(self.db, project_id)
         session = await self.repository.get_latest_session_for_project(self.db, project_id)
         if session is None or not session.requirement_input:
-            return {
-                "projectId": project_id,
-                "text": "",
-                "safetyConstraints": [],
-                "performanceTargets": {
-                    "maxScanTimeMs": 5,
-                    "maxCyclomaticComplexity": 8,
-                    "minMaintainabilityIndex": 75,
-                    "maxIterations": 5,
-                },
-                "confirmedOutputs": [],
-                "confirmedInputs": [],
-            }
+            return None
 
         requirement_input = RequirementInput.model_validate(session.requirement_input)
         submitted_at = session.created_at.isoformat() if session.created_at else None

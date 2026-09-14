@@ -141,11 +141,46 @@ async def test_blank_requirement_is_rejected() -> None:
         )
 
 
-async def test_llm_mode_is_placeholder_only() -> None:
-    with pytest.raises(NotImplementedError, match="reserved for future integration"):
-        await PlanningAgent(mode="llm").generate_plan(
-            project_id="PRJ-LLM",
-            requirement_text="Motor start stop.",
-            domain="Motor Control",
-        )
+SCRIPTED_LLM_PLAN = """{
+  "inputs": [
+    {"name": "Start_PB", "type": "BOOL", "source": "DI-01", "address": null, "description": "Start pushbutton"},
+    {"name": "E_Stop", "type": "BOOL", "source": "DI-02", "address": null, "description": "Emergency stop, normally closed"}
+  ],
+  "outputs": [
+    {"name": "Motor_Run", "type": "BOOL", "address": "DO-01", "description": "Motor contactor"}
+  ],
+  "internalVars": [{"name": "Fault_State", "type": "BOOL", "description": "Latched fault"}],
+  "controlLogic": ["Start latches Motor_Run", "E_Stop drops Motor_Run", "Fault needs reset"],
+  "safetyConstraints": ["the model may paraphrase this"],
+  "domain": "Motor Control",
+  "complexityTier": "simple"
+}"""
+
+
+async def test_llm_mode_falls_back_to_rule_based_when_reply_is_not_json(fake_llm) -> None:
+    plan = await PlanningAgent(mode="llm").generate_plan(
+        project_id="PRJ-LLM",
+        requirement_text="Motor start stop.",
+        domain="Motor Control",
+    )
+
+    assert plan.agent == "PlanningAgent/rule_based.v1"
+    assert len(fake_llm.calls) == 2  # first reply plus one strict-JSON correction retry
+
+
+async def test_llm_mode_builds_plan_from_reply_and_keeps_user_constraints_verbatim(fake_llm) -> None:
+    fake_llm.script(SCRIPTED_LLM_PLAN)
+
+    plan = await PlanningAgent(mode="llm").generate_plan(
+        project_id="PRJ-LLM",
+        requirement_text="Motor start stop with emergency stop.",
+        safety_constraints=["Motor must stop when E_Stop is released."],
+        domain="Motor Control",
+    )
+
+    assert plan.agent == "PlanningAgent/llm.v1"
+    assert plan.llmProvider == "fake"
+    assert plan.safetyConstraints == ["Motor must stop when E_Stop is released."]
+    assert [signal.name for signal in plan.inputs] == ["Start_PB", "E_Stop"]
+    assert plan.logicRules == ["Start latches Motor_Run", "E_Stop drops Motor_Run", "Fault needs reset"]
 
