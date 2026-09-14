@@ -1,8 +1,10 @@
 # OptPLC Backend
 
-FastAPI backend for OptPLC. It exposes project workflow and benchmark APIs, persists pipeline state with async SQLAlchemy, runs LLM-assisted planning, code generation, debugging, and optimization, performs compiler-backed syntax checks with domain-aware structural safety validation, and produces metrics and final reports.
+FastAPI backend for OptPLC. It exposes project workflow and benchmark APIs, persists pipeline state with async SQLAlchemy, runs LLM-assisted planning, code generation, debugging and optimization, checks ST syntax with MATIEC plus heuristic domain rules, and produces metrics and final reports.
 
 API base URL: `http://localhost:8000/api`
+
+Plan, status and known issues: [`../docs/plan/`](../docs/plan/README.md). This file describes the code as it is.
 
 ## Runtime Startup
 
@@ -14,28 +16,24 @@ python -m pip install -r requirements-dev.txt
 uvicorn app.main:app --reload --port 8000
 ```
 
-```bash
-cd backend
-python -m venv .venv
-source .venv/bin/activate
-python -m pip install -r requirements-dev.txt
-uvicorn app.main:app --reload --port 8000
-```
+On startup `app.main` runs `Base.metadata.create_all()` and seeds the RAG store from `knowledge_base/patterns/`. Check readiness with `GET /api/health`.
 
-On startup, `app.main` creates database tables (local convenience) and seeds the RAG knowledge base from `knowledge_base/patterns/`. Verify readiness via `GET /api/health`.
+The reference runtime for reported results is the Docker image (see [Docker](#docker)); the local virtual environment can drift from it (for example `openai`).
 
 ## Configuration
 
-Primary settings module: `app/config.py`. Environment variables are documented in the root `.env.example`.
+Settings module: `app/config.py`, read from `backend/.env`. Variables are listed in the root `.env.example`.
 
 | Group | Key variables |
 | --- | --- |
-| LLM routing | `LLM_PROVIDER` (`anthropic`, `openai`, `gemini`, `groq`, `ollama`) |
-| Provider keys/models | `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL`, `OPENAI_API_KEY`, `OPENAI_MODEL`, `GEMINI_API_KEY`, `GEMINI_MODEL`, `GROQ_API_KEY`, `GROQ_MODEL`, `OLLAMA_BASE_URL`, `OLLAMA_MODEL` |
+| LLM routing | `LLM_PROVIDER` (`anthropic`, `openai`, `gemini`, `groq`, `ollama`; default `openai`) |
+| Provider keys/models | `ANTHROPIC_*`, `OPENAI_*`, `GEMINI_*`, `GROQ_*`, `OLLAMA_BASE_URL`, `OLLAMA_MODEL` |
 | LLM tuning | `LLM_MAX_TOKENS`, `LLM_TEMPERATURE` |
 | Validation | `MATIEC_BIN`, `PLCVERIF_BIN`, `VERIFICATION_TIMEOUT_S` |
-| Persistence | `DATABASE_URL` (default: `sqlite+aiosqlite:///./plcforge.db`) |
+| Persistence | `DATABASE_URL` (default `sqlite+aiosqlite:///./plcforge.db`) |
 | Pipeline | `MAX_ITER` |
+
+Startup fails if the key for the selected provider is missing (Anthropic, OpenAI, Gemini). Groq and Ollama are not checked at startup.
 
 ## Database and Migrations
 
@@ -44,111 +42,80 @@ Primary settings module: `app/config.py`. Environment variables are documented i
 | ORM models | `app/database/models.py` |
 | Engine / session | `app/database/database.py` |
 | Repository (CRUD) | `app/database/repository.py` |
-| Migration config | `alembic.ini`, `alembic/versions/` |
+| Migrations | `alembic.ini`, `alembic/versions/` |
 
 ```bash
 cd backend
 alembic upgrade head
-alembic revision --autogenerate -m "describe change"
 ```
 
-`app.main` also runs `Base.metadata.create_all()` at startup for local convenience. Alembic remains the schema source of truth for controlled environments.
+The local development database was created by `create_all()`, not by Alembic (it has no `alembic_version` table). Back it up before any migration:
 
-### Schema overview
+```powershell
+backend\.venv\Scripts\python scripts\backup_runtime_data.py
+```
 
-- **`projects`** — project metadata (`id`, `name`, `domain`, `status`, `complexity_tier`, timestamps).
-- **`sessions`** — one session per project; all pipeline state stored as JSON columns (`requirement_input`, `plan_object`, `code_artifact`, `validation_report`, `debugging_report`, `optimization_report`, `metrics_report`, `workflow_events`, etc.).
+Schema: `projects` (metadata) and `sessions` (one per project; all pipeline state as JSON columns).
 
-## Agent and Service Architecture
+## Agents and Runtime Modes
 
-### Runtime modes in `ProjectService`
+Modes are hard-coded in `app/services/project_service.py`.
 
-| Step | Agent | Mode |
-| --- | --- | --- |
-| Plan | `PlanningAgent` | `llm` |
-| Generate | `CodeGenerationAgent` | `llm` |
-| Validate | `ValidationAgent` | `static` |
-| Debug | `DebuggingAgent` | `llm` |
-| Optimize | `OptimizationAgent` | `llm` |
+| Step | Agent | Mode | Fallback / caveat |
+| --- | --- | --- | --- |
+| Plan | `PlanningAgent` | `llm` | Rule-based plan if the reply is not JSON after one retry |
+| Generate | `CodeGenerationAgent` | `llm` | Template if the reply has no `PROGRAM` or misses a plan output; RAG off on `/generate` |
+| Validate | `ValidationAgent` | `static` | See [Validation](#validation) |
+| Debug | `DebuggingAgent` | `llm` | Rule-based advice on any LLM error |
+| Optimize | `OptimizationAgent` | `llm` | Per-pass static revalidation and rollback; no behavioural-equivalence check |
 
-Mode selection is hardcoded in `app/services/project_service.py`. Each agent also supports deterministic fallback paths when LLM calls fail.
+Known template defects: the motor template never starts the motor (C-10), the batch template never sets `Batch_Complete` (C-11), and the `"Safety Interlock"` domain falls back to the generic template with undeclared variables (C-13). They are fixed in P1-22.
 
-### Agent responsibilities
-
-- **`PlanningAgent`** — requirement text → `PlanObject` (inputs, outputs, `internalVars`, logic rules, safety constraints). LLM path retrieves RAG context from domain patterns.
-- **`CodeGenerationAgent`** — `PlanObject` (+ optional patch advice) → `CodeArtifact` (ST source, iteration, metadata). `rag_enabled` defaults to `false`; benchmark `llm_rag` mode sets it to `true`.
-- **`ValidationAgent`** — `CodeArtifact` + `PlanObject` → `ValidationReport`.
-- **`DebuggingAgent`** — failed validation context → `DebuggingReport` (patch advice, regeneration prompt).
-- **`OptimizationAgent`** — verified/repaired artifact → `OptimizationReport` with pass outcomes, metrics deltas, and rollback events.
-
-### LLM client
-
-`app/agents/llm_client.py` provides unified async completion for Anthropic, OpenAI, Gemini (OpenAI-compatible endpoint), Groq (OpenAI-compatible endpoint), and Ollama.
-
-### Orchestration services
-
-| Service | Role |
-| --- | --- |
-| `project_service.py` | Main pipeline orchestrator (973 lines) |
-| `repair_service.py` | Iterative repair loop coordination |
-| `metrics_service.py` | LOC, cyclomatic complexity, maintainability index, estimated scan time |
-| `validation_service.py` | MATIEC subprocess wrapper, PLCverif executor |
-| `transpiler_service.py` | ST → SMV transpilation (scaffold for formal path) |
-| `rag_service.py` | ChromaDB retrieval over knowledge-base patterns |
-| `benchmark_runner.py` | Deterministic / LLM / RAG benchmark execution |
+`app/agents/llm_client.py` provides one async `llm_complete()` for all providers. Agents must not call provider SDKs directly.
 
 ## RAG
 
-Service: `app/services/rag_service.py`
+`app/services/rag_service.py`: ChromaDB with the `all-MiniLM-L6-v2` embedding model (English only), 12 JSON patterns in `knowledge_base/patterns/`.
 
-| Aspect | Detail |
-| --- | --- |
-| Storage | ChromaDB persistent store at `/app/rag_db` (container path; local dev uses `./rag_db`) |
-| Seed source | `knowledge_base/patterns/` (JSON pattern files) |
-| Startup | `app.main` lifespan calls `get_rag_service().seed()` |
-| Active in planning | `PlanningAgent` LLM path retrieves domain patterns as prompt context |
-| Active in benchmarks | `llm_rag` mode sets `CodeGenerationAgent.rag_enabled = true` |
-| Not active by default | Main `/generate` path does not enable `rag_enabled` on `CodeGenerationAgent` |
+- Storage and pattern paths are hard-coded to `/app/rag_db` and `/app/knowledge_base/patterns`. On Windows this resolves to the current drive (for example `E:\app\...`), where no patterns exist, so retrieval returns nothing without an error. Fixed in P1-20.
+- Used in planning (LLM mode) and in benchmark `llm_rag` mode; not used on `/generate`.
+- Retrieval quality and its effect on results have not been measured yet.
 
-## Validation Stages
+## Validation
 
-### Active runtime path (`ValidationAgent(mode="static")`)
+### Active path (`ValidationAgent(mode="static")`)
 
-1. **MATIEC syntax validation** — invoked when `MATIEC_BIN` points to an available `iec2c` binary; falls back to regex-based checks otherwise.
-2. **Static structure checks** — Lark-based ST parser (`st_parser.py`) for supplemental analysis.
-3. **Domain-aware safety rules** — structural checks for motor, traffic, tank, interlock, and batch domains.
+1. **Syntax.** If `MATIEC_BIN` exists, `iec2c` compiles a **normalized copy** of the source: timer calls are removed, `X.Q` is replaced by `FALSE`, and `T#` literals become `0` (this also rewrites comments). If MATIEC is missing, a regex fallback runs; it currently rejects every valid program that has `VAR_INPUT` and `VAR_OUTPUT` (C-01).
+2. **Domain rules.** The first matching domain validator (batch, motor, traffic, process, interlock, generic) applies regex rules. These are text heuristics: an unsafe program can pass them.
 
-### Implemented but not active in default pipeline (`mode="formal"`)
+The status `VERIFIED` means these static checks passed. It is not a proof.
 
-- ST → SMV transpilation via `transpiler_service.py`
-- PLCverif execution via `validation_service.py` (`PLCVerifValidator`)
-- nuXmv model checking (depends on real PLCverif / nuXmv binary provisioning)
+### Not wired in (`mode="formal"`)
 
-`ProjectService` selects `mode="static"` for all `/validate` calls. The formal path exists in source for future integration.
+`transpiler_service.py` (ST→SMV) and `PLCVerifValidator` exist, but the transpiler drops `IF` blocks and produces no real LTL, and PLCverif output parsing fails open. Replaced in phase 3.
 
 ## Artifact Contracts
 
-Contracts are defined in `app/schemas/contracts.py` and mirrored in `src/lib/api-contracts/types.ts`. All fields use camelCase.
+Contracts live in `app/schemas/contracts.py` and are mirrored in `src/lib/api-contracts/types.ts` (camelCase, `ContractModel` with `extra="forbid"`).
 
 | Contract | Key fields |
 | --- | --- |
-| `RequirementInput` | `projectId`, `text`, `safetyConstraints`, `performanceTargets`, optional `confirmedOutputs` / `confirmedInputs` |
+| `RequirementInput` | `projectId`, `text`, `safetyConstraints`, `performanceTargets`, `confirmedOutputs`, `confirmedInputs` |
 | `PlanObject` | `inputs`, `outputs`, `internalVars`, `logicRules`, `safetyConstraints`, `scope` |
-| `CodeArtifact` | `artifactId`, `source` (ST code), `iteration`, `language`, `metadata` |
-| `CodeMetadata` | `ragSources`, `llmProvider`, `llmModel`, `generationMode`, `tokensUsed`, `generationTimeMs` |
-| `ValidationReport` | `status` (`VERIFIED` / `SYNTAX_ERROR` / `FORMAL_VIOLATION` / `TIMEOUT`), `syntaxErrors`, `formalErrors`, `safetyResults` |
-| `DebuggingReport` | `patchAdvice`, `suggestedRegenerationPrompt`, root-cause summary |
-| `OptimizationReport` | `passes`, metrics deltas, rollback events, revalidation status |
-| `MetricsReport` | before/after metrics, historical timeline |
-| `FinalReport` | aggregated project, requirements, plan, code, validation, debug, optimization, and metrics summaries |
+| `CodeArtifact` | `artifactId`, `source`, `iteration`, `metrics`, `metadata` |
+| `ValidationReport` | `status`, `syntaxErrors`, `formalErrors`, `safetyResults`, `counterexamples` |
+| `DebuggingReport` | `patchAdvice`, `suggestedRegenerationPrompt`, `rootCauseSummary` |
+| `OptimizationReport` | `passes`, `beforeMetrics`, `afterMetrics`, `rollbackEvents`, `revalidationStatus` |
+| `MetricsReport` | before/after metrics and history (`estimatedScanTimeMs` is a static proxy, not milliseconds) |
+| `FinalReport` | aggregated summaries of every step |
 
 ## API Routes
 
-Routers are mounted in `app.main` under `/api`.
+Routers are mounted under `/api`. There is no authentication or rate limiting yet (S-01).
 
 ### Health
 
-- `GET /api/health`
+- `GET /api/health` returns `status: "ok"`, MATIEC availability and path, the LLM provider, and a timestamp.
 
 ### Projects
 
@@ -156,23 +123,23 @@ Routers are mounted in `app.main` under `/api`.
 | --- | --- | --- |
 | `POST` | `/api/projects` | Create project |
 | `GET` | `/api/projects` | List projects |
-| `GET` | `/api/projects/{project_id}` | Get project with session state |
+| `GET` | `/api/projects/{project_id}` | Get project |
 | `POST` | `/api/projects/{project_id}/requirements` | Submit requirements |
-| `GET` | `/api/projects/{project_id}/requirements` | Get requirements |
-| `POST` | `/api/projects/{project_id}/analyze-requirement` | Analyze requirement text |
+| `GET` | `/api/projects/{project_id}/requirements` | Get requirements (404 until submitted) |
+| `POST` | `/api/projects/{project_id}/analyze-requirement` | LLM analysis of requirement text |
 | `POST` | `/api/projects/{project_id}/plan` | Generate plan |
 | `GET` | `/api/projects/{project_id}/plan` | Get plan |
 | `POST` | `/api/projects/{project_id}/generate` | Generate code |
 | `GET` | `/api/projects/{project_id}/code` | Get latest code artifact |
 | `POST` | `/api/projects/{project_id}/validate` | Validate code |
 | `GET` | `/api/projects/{project_id}/validation` | Get validation report |
-| `POST` | `/api/projects/{project_id}/debug` | Debug failed validation |
+| `POST` | `/api/projects/{project_id}/debug` | Debug the failed validation |
 | `GET` | `/api/projects/{project_id}/debug` | Get debugging report |
-| `POST` | `/api/projects/{project_id}/repair-loop` | Run repair loop |
-| `POST` | `/api/projects/{project_id}/optimize` | Optimize code |
+| `POST` | `/api/projects/{project_id}/repair-loop` | Run the repair loop (up to 90 s in one request) |
+| `POST` | `/api/projects/{project_id}/optimize` | Optimize verified code |
 | `GET` | `/api/projects/{project_id}/optimization` | Get optimization report |
-| `GET` | `/api/projects/{project_id}/metrics` | Get metrics report |
-| `GET` | `/api/projects/{project_id}/report` | Get final report |
+| `GET` | `/api/projects/{project_id}/metrics` | Compute and get the metrics report |
+| `GET` | `/api/projects/{project_id}/report` | Get the final report |
 | `GET` | `/api/projects/{project_id}/report/export/json` | Export report as JSON |
 | `GET` | `/api/projects/{project_id}/report/export/markdown` | Export report as Markdown |
 
@@ -181,65 +148,63 @@ Routers are mounted in `app.main` under `/api`.
 | Method | Path | Purpose |
 | --- | --- | --- |
 | `GET` | `/api/benchmarks/cases` | List benchmark cases |
-| `POST` | `/api/benchmarks/run` | Run single case |
-| `POST` | `/api/benchmarks/compare` | Compare modes for a case |
-| `POST` | `/api/benchmarks/run-suite` | Run full suite |
-| `GET` | `/api/benchmarks/results` | List persisted results |
+| `POST` | `/api/benchmarks/run` | Run one case in one mode |
+| `POST` | `/api/benchmarks/compare` | Run one case in all modes |
+| `POST` | `/api/benchmarks/run-suite` | Run all cases (synchronously, in one request) |
+| `GET` | `/api/benchmarks/results` | List stored results |
 | `GET` | `/api/benchmarks/summary` | Aggregated summary |
 
 ## Benchmarks
 
-Runner: `app/services/benchmark_runner.py`
+Runner: `app/services/benchmark_runner.py`. Modes: `rule_based`, `llm`, `llm_rag`.
 
-| Mode | Description |
-| --- | --- |
-| `rule_based` | Deterministic agents (planning, codegen, debug, optimize) |
-| `llm` | LLM agents without RAG on code generation |
-| `llm_rag` | LLM agents with RAG enabled on code generation |
+- Five cases, B001–B005, in `benchmark/cases/` (15 more are to be authored).
+- Each case's `expected_properties` are not evaluated yet; "verified" in a result means the static checks passed.
+- Results are written to `benchmark/results/` (git-ignored). No valid LLM results are stored yet.
 
-Cases are loaded from `benchmark/cases/` (B001–B005). Results are persisted as JSON under `benchmark/results/` (local, git-ignored).
+## Tests
 
-```bash
-curl -X POST http://localhost:8000/api/benchmarks/run-suite
-```
-
-## Tests and Quality Checks
-
-```bash
+```powershell
 cd backend
-pytest
-python -m compileall app
+.\.venv\Scripts\python -m pytest -q -p no:cacheprovider
 ```
 
-Test modules live in `app/tests/` and cover agents, API endpoints, database schema, benchmarks, and metrics.
+The suite is hermetic: `app/tests/conftest.py` binds settings to a temporary SQLite database before importing the app (and refuses to run otherwise), installs a fake LLM provider and a fake RAG service, sends benchmark results to a temporary directory, and blocks non-loopback network connections. `app/tests/known_failures.txt` lists the documented failing tests; run `scripts\check.ps1` from the repository root, which fails only on new failures. The current baseline is in [`../docs/plan/TEST_BASELINE.md`](../docs/plan/TEST_BASELINE.md).
 
 ## Docker
 
-Compose file: `docker-compose.yml` (backend service only, container name `plcforge-app`).
+Reference image: `docker/app.Dockerfile`.
 
 ```bash
-docker compose up --build
+docker build -f docker/app.Dockerfile -t optplc-backend:p0-05 .
 ```
 
-Image build: `docker/app.Dockerfile`
+- Builds MATIEC (`iec2c`) from a pinned commit in a builder stage.
+- Installs Python dependencies from the hashed lock `requirements-docker.lock` (compiled from `requirements-docker.in` with `uv pip compile --generate-hashes`; CPU-only PyTorch).
+- Runs as the unprivileged user `optplc` (uid 10001) with a health check on `/api/health`.
+- No PLCverif binary is installed.
 
-- Builds MATIEC (`iec2c`) in a builder stage.
-- Installs Python dependencies and runs `uvicorn`.
-- Mounts `./rag_db` for ChromaDB persistence and `./backend/plcforge.db` for SQLite.
-- PLCverif binary path is a placeholder; formal runtime availability depends on real binary provisioning.
+Compile one ST file with the pinned MATIEC, without normalization:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\st-compile.ps1 -Path path\to\program.st
+```
+
+`docker-compose.yml` still uses the older service name (`plcforge-app`) and mounts; it is updated in a later item.
 
 ## Troubleshooting
 
 | Symptom | Check |
 | --- | --- |
-| LLM provider key errors | Ensure the key for the selected `LLM_PROVIDER` is set in `backend/.env` |
-| `MATIEC unavailable` in `/api/health` | Verify `MATIEC_BIN` path and executable permissions |
-| `No RAG patterns loaded` in startup logs | Ensure `knowledge_base/patterns/` files are present and readable |
-| `Project not found` on workflow routes | Complete prior pipeline steps in order (requirements → plan → generate → validate → …) |
-| Formal validation not running | Default runtime uses `ValidationAgent(mode="static")`; formal flow is implemented but not wired into `ProjectService` |
+| Startup error about an API key | Set the key for the selected `LLM_PROVIDER` in `backend/.env` |
+| `matiec: unavailable` in `/api/health` | `MATIEC_BIN` must point to an executable `iec2c`; use the Docker image |
+| Every program fails with `Mismatched VAR/END_VAR` | You are on the regex fallback (C-01); run in the Docker image with MATIEC |
+| RAG returns nothing locally | Paths are hard-coded to `/app/...` (P1-20) |
+| `Project not found` on workflow routes | Complete earlier steps first (requirements → plan → generate → validate …) |
 
 ## Security Notes
 
 - Never commit `backend/.env` or API keys.
-- Keep local database files (`plcforge.db`), vector-store artifacts (`rag_db/`), and benchmark result JSON out of version control.
-- Rotate any credential immediately if accidentally committed.
+- Keep `plcforge.db`, `rag_db/`, and benchmark result JSON out of version control.
+- The API has no authentication; do not expose it on an open network.
+- Rotate any credential immediately if it is ever committed.
