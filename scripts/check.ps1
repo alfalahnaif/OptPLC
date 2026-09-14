@@ -20,6 +20,8 @@
 param([string[]]$Skip = @())
 
 $ErrorActionPreference = 'Continue'
+# With -File, PowerShell passes "-Skip a,b" as one string, so split on commas here.
+$Skip = @($Skip | ForEach-Object { $_ -split ',' } | ForEach-Object { $_.Trim() } | Where-Object { $_ })
 $repo = Split-Path -Parent $PSScriptRoot
 $backend = Join-Path $repo 'backend'
 $python = Join-Path $backend '.venv\Scripts\python.exe'

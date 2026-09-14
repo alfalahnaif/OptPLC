@@ -6,8 +6,8 @@ def test_health_endpoint(client: TestClient) -> None:
 
     assert response.status_code == 200
     body = response.json()
-    assert body["status"] == "healthy"
-    assert body["service"] == "plc-agent-optimizer-api"
-    assert body["version"] == "0.1.0"
+    assert body["status"] == "ok"
+    assert body["matiec"] in {"available", "unavailable"}
+    assert "matiec_path" in body
+    assert body["llm_provider"]
     assert "timestamp" in body
-

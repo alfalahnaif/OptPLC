@@ -9,8 +9,6 @@ from app.schemas.contracts import CodeArtifact, CodeMetadata, CodeMetrics
 from app.services.metrics_service import MetricsService
 from app.storage.memory import store
 
-pytestmark = pytest.mark.asyncio
-
 
 def test_optimization_fails_with_400_if_no_code_artifact_exists(client: TestClient) -> None:
     project_id = create_project(client)
@@ -103,13 +101,14 @@ async def test_optimization_metrics_improve_or_stay_equal() -> None:
     validation = store.get_validation_report("PRJ-0421")
     assert validation is not None
 
-    report = OptimizationAgent().optimize(
+    report = await OptimizationAgent().optimize(
         project_id="PRJ-0421",
         artifact=artifact,
         plan=plan,
         validation=validation,
     )
 
+    assert report.status != "CANNOT_OPTIMIZE"  # otherwise the metric comparisons below pass vacuously
     assert report.afterMetrics.loc <= report.beforeMetrics.loc
     assert report.afterMetrics.cyclomaticComplexity <= report.beforeMetrics.cyclomaticComplexity
     assert report.afterMetrics.maintainabilityIndex >= report.beforeMetrics.maintainabilityIndex
@@ -122,11 +121,11 @@ async def test_rollback_occurs_if_optimization_pass_breaks_validation(monkeypatc
     assert validation is not None
 
     def broken_logic_compaction(source: str, _plan) -> tuple[str, str]:
-        return source.replace("Motor_Run := Run_Cmd AND Safety_OK AND NOT Fault_State;", "Motor_Run := Run_Cmd;"), "Unsafe compaction."
+        return source.replace("END_PROGRAM", ""), "Compaction that drops END_PROGRAM."
 
     monkeypatch.setattr(OptimizationAgent, "_logic_compaction", staticmethod(broken_logic_compaction))
 
-    report = OptimizationAgent().optimize(
+    report = await OptimizationAgent().optimize(
         project_id="PRJ-0421",
         artifact=artifact,
         plan=plan,
@@ -159,18 +158,21 @@ def test_optimization_report_is_stored_in_memory(client: TestClient) -> None:
     assert asyncio.run(_has_optimization_report()) is True
 
 
-async def test_llm_mode_raises_not_implemented() -> None:
+async def test_llm_mode_keeps_code_unchanged_when_replies_are_unusable(fake_llm) -> None:
     plan, artifact = await save_verified_motor_inputs()
     validation = store.get_validation_report("PRJ-0421")
     assert validation is not None
 
-    with pytest.raises(NotImplementedError, match="llm mode"):
-        OptimizationAgent(mode="llm").optimize(
-            project_id="PRJ-0421",
-            artifact=artifact,
-            plan=plan,
-            validation=validation,
-        )
+    report = await OptimizationAgent(mode="llm").optimize(
+        project_id="PRJ-0421",
+        artifact=artifact,
+        plan=plan,
+        validation=validation,
+    )
+
+    assert report.status == "NO_CHANGES"
+    assert report.optimizedCode.source == artifact.source
+    assert len(fake_llm.calls) == 3  # one reply per optimization pass
 
 
 def test_metrics_service_counts_structured_text_operations() -> None:
