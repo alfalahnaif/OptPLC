@@ -103,15 +103,39 @@ async def test_generic_plan_generates_structured_fallback() -> None:
     assert "END_PROGRAM" in source
 
 
-async def test_llm_mode_is_placeholder_only() -> None:
+async def test_llm_mode_falls_back_to_template_without_program_block(fake_llm) -> None:
     plan = await PlanningAgent().generate_plan(
         project_id="PRJ-LLM",
         requirement_text="Motor start stop.",
         domain="Motor Control",
     )
 
-    with pytest.raises(NotImplementedError, match="reserved for future integration"):
-        await CodeGenerationAgent(mode="llm").generate_code(project_id="PRJ-LLM", plan=plan)
+    artifact = await CodeGenerationAgent(mode="llm").generate_code(project_id="PRJ-LLM", plan=plan)
+
+    assert artifact.metadata.generator == "template_based.v1"
+    assert len(fake_llm.calls) == 2  # first reply plus one "return a PROGRAM block" retry
+
+
+async def test_llm_mode_accepts_scripted_program_with_all_outputs(fake_llm) -> None:
+    plan = await PlanningAgent().generate_plan(
+        project_id="PRJ-LLM",
+        requirement_text="Motor start stop.",
+        domain="Motor Control",
+    )
+    scripted = (
+        "PROGRAM PLC_PRJ_LLM_Controller\n"
+        "VAR_INPUT\n    Start_PB : BOOL;\nEND_VAR\n"
+        "VAR_OUTPUT\n    Motor_Run : BOOL;\nEND_VAR\n"
+        "Motor_Run := Start_PB;\n"
+        "END_PROGRAM"
+    )
+    fake_llm.script(scripted)
+
+    artifact = await CodeGenerationAgent(mode="llm").generate_code(project_id="PRJ-LLM", plan=plan)
+
+    assert artifact.metadata.generator == "CodeGenerationAgent/llm.v1"
+    assert artifact.metadata.llmProvider == "fake"
+    assert artifact.source == scripted
 
 
 async def test_motor_template_uses_normally_closed_stop_pb_semantics() -> None:

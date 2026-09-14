@@ -379,7 +379,7 @@ class CodeGenerationAgent:
                 sourcePlanId=plan.projectId,
                 createdAt=created_at,
                 iteration=iteration,
-                ragSources=rag_sources if rag_sources else None,
+                ragSources=rag_sources,
                 llmProvider=final_llm_response.provider if final_llm_response else None,
                 llmModel=final_llm_response.model if final_llm_response else None,
                 generationMode="llm_rag" if rag_sources else "llm",

@@ -4,6 +4,31 @@
 
 ---
 
+## 2026-09-14 · P0-11 · تحديث الاختبارات القديمة، وإصلاح C-12
+
+- **الفرع:** `p0/P0-11-stale-tests`، من `staging @ 9efe127`.
+- **تعديلات الكود التشغيلي (اثنان فقط):**
+  - `project_service.get_requirements` تعيد `None` عند غياب المتطلب، فيرد الـ route بالرمز 404 (D-024). تحققتُ أن الواجهة تعالج `null` بالقيم الافتراضية (`project-client.ts:179-189`).
+  - **إصلاح C-12** في `code_generation_agent.py`: `ragSources=rag_sources` بدل `rag_sources if rag_sources else None`.
+- **الخطأ C-12:** توليد الكود بوضع LLM **كان ينهار دائمًا** بخطأ `ValidationError: ragSources — Input should be a valid list` كلما أعاد النموذج برنامجًا صالحًا والـ RAG معطّل، وهذا هو المسار الافتراضي لـ `/generate`. لم يُكتشف سابقًا لأن أي اختبار أو تشغيل لم يصل إليه: تشغيلات LLM السابقة فشلت قبله بخطأ حزمة OpenAI. كشفه اختبار جديد في هذا البند.
+- **الاختبارات:**
+  - أُعيدت كتابة 12 اختبارًا قديمًا:
+    - `test_health`: العقد الحالي (D-025).
+    - الـ placeholder في التخطيط وتوليد الكود: كل منهما صار اختبارين يستخدمان `FakeLLMProvider`، واحد لمسار الرجوع وواحد لرد مبرمج ناجح.
+    - الـ placeholder في المحسِّن: الرد غير الصالح يترك الكود بلا تغيير.
+    - الوضع الصوري: يفشل مغلقًا دون MATIEC.
+    - أربعة اختبارات MATIEC: بمدقق وهمي يُحقن عبر الـ constructor.
+  - أُضيف `await` لاختباري المحسِّن. اختبار المقاييس صار يرفض النجاح الفارغ (`CANNOT_OPTIMIZE`)، واختبار التراجع يكسر الكود صياغيًا ليختبر آلية التراجع لا قوة القواعد.
+- **`pytest.ini`:** `asyncio_mode = auto`، وأُزيلت علامة asyncio الشاملة من `test_optimization_agent.py`، فلا تحذيرات asyncio بعد الآن.
+- **`scripts/check.ps1`:** إصلاح `-Skip`. مع `-File` كان PowerShell يمرر `a,b` كنص واحد، والآن يُقسَّم على الفواصل.
+- **`known_failures.txt`:**
+  - حُذفت 9 إدخالات صارت تنجح أو غُيّر اسمها.
+  - نُقلت 3 إدخالات إلى الفئة أ لأنها صارت تفشل بسبب C-01 وحده: `test_matiec_unavailable_falls_back_to_static_validation`، و`test_optimization_metrics_improve_or_stay_equal`، و`test_rollback_occurs_if_optimization_pass_breaks_validation`.
+- **النتيجة كما هي:** `check.ps1 -Skip audit` نجح: typecheck وlint وfrontend PASS، وbackend 141 اختبارًا، **107 نجح و34 فشل كلها معروفة** (28 C-01 و6 قوالب C-10 وC-11)، و0 جديد.
+- **ملاحظة للبند P1-01:** بعد إصلاح C-01 سيظهر على الأرجح إخفاقان آخران كانا مختفيين خلفه:
+  - `test_traffic_conflicting_greens_return_formal_violation` يتوقع المعرّف اليتيم `TL-1` (C-09).
+  - `test_undeclared_assigned_variable_returns_syntax_error` يتوقع كشف المتغيرات غير المعلنة، وهو ما يجب أن يضيفه فحص المحلل في P1-01.
+
 ## 2026-09-14 · P0-07 · سكربت الفحص المحلي
 
 - **الفرع:** `p0/P0-07-local-check-script`، من `staging @ e30848e`.
