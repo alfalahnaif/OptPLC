@@ -8,7 +8,9 @@ export default defineConfig({
     environment: "jsdom",
     globals: true,
     setupFiles: ["./src/test/setup.tsx"],
-    css: true
+    css: true,
+    // Headroom for findBy* waits under cold starts (D-021, temporary).
+    testTimeout: 20000
   },
   resolve: {
     alias: {

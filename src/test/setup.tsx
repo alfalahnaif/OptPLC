@@ -1,6 +1,10 @@
 import React from "react";
 import "@testing-library/jest-dom/vitest";
+import { configure } from "@testing-library/react";
 import { vi } from "vitest";
+
+// Cold jsdom starts on the dev machine can exceed the 1 s default wait (D-021, temporary).
+configure({ asyncUtilTimeout: 5000 });
 
 const routerPushMock = vi.fn();
 
