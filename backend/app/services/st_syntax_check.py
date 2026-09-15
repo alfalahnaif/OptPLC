@@ -9,6 +9,7 @@ Messages are worded so DebuggingAgent._syntax_report maps them to its error type
 from __future__ import annotations
 
 import re
+import threading
 from typing import Final
 
 from lark import Token, Tree
@@ -45,13 +46,16 @@ _BLOCK_PAIRS: Final[tuple[tuple[str, str, str], ...]] = (
 )
 
 _shared_parser: STAstParser | None = None
+# Validation runs in worker threads (asyncio.to_thread, D-030), so the shared parser is guarded.
+_parser_lock = threading.Lock()
 
 
 def _default_parser() -> STAstParser:
     """Builds the Earley parser once per process; compiling the grammar is the slow part."""
     global _shared_parser
-    if _shared_parser is None:
-        _shared_parser = STAstParser()
+    with _parser_lock:
+        if _shared_parser is None:
+            _shared_parser = STAstParser()
     return _shared_parser
 
 
@@ -85,8 +89,10 @@ class ParserCheck:
         if structural:
             return structural
 
+        parser = self._parser or _default_parser()
         try:
-            tree = (self._parser or _default_parser()).parse(source)
+            with _parser_lock:
+                tree = parser.parse(source)
         except UnexpectedInput as exc:
             return [self._parse_error_message(exc)]
         return self._declaration_errors(tree)

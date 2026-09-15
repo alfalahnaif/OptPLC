@@ -80,7 +80,7 @@ class BenchmarkRunner:
                 plan=plan,
                 iteration=1,
             )
-            validation = validation_agent.validate(
+            validation = await validation_agent.validate_in_thread(
                 project_id=run_project_id,
                 artifact=artifact,
                 plan=plan,
@@ -104,7 +104,7 @@ class BenchmarkRunner:
                     suggested_regeneration_prompt=debug.suggestedRegenerationPrompt,
                     iteration=artifact.iteration + 1,
                 )
-                validation = validation_agent.validate(
+                validation = await validation_agent.validate_in_thread(
                     project_id=run_project_id,
                     artifact=artifact,
                     plan=plan,

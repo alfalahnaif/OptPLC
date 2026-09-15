@@ -103,7 +103,7 @@ class OptimizationAgent:
             )
         if self.mode != "static":
             raise ValueError(f"Unsupported OptimizationAgent mode: {self.mode}")
-        return self._optimize_static(
+        return await self._optimize_static(
             project_id=project_id,
             artifact=artifact,
             plan=plan,
@@ -111,7 +111,7 @@ class OptimizationAgent:
             repair_loop_report=repair_loop_report,
         )
 
-    def _optimize_static(
+    async def _optimize_static(
         self,
         *,
         project_id: str,
@@ -165,7 +165,7 @@ class OptimizationAgent:
                 iteration=artifact.iteration,
                 candidate_index=index,
             )
-            candidate_validation = ValidationAgent(mode="static").validate(
+            candidate_validation = await ValidationAgent(mode="static").validate_in_thread(
                 project_id=project_id,
                 artifact=candidate_artifact,
                 plan=plan,
@@ -326,7 +326,7 @@ class OptimizationAgent:
                         "artifactId": f"{project_id}-optimization-candidate-{pass_num}",
                     }
                 )
-                recheck = ValidationAgent(mode="static").validate(
+                recheck = await ValidationAgent(mode="static").validate_in_thread(
                     project_id=project_id,
                     artifact=test_artifact,
                     plan=plan,

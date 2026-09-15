@@ -7,6 +7,8 @@ class Settings(BaseSettings):
     gemini_api_key: str = ""
     openai_api_key: str = ""
     matiec_bin: str = "/usr/local/bin/iec2c"
+    # IEC standard library used by iec2c -I (P1-02); the reference image installs it here.
+    matiec_lib_dir: str = "/usr/local/share/matiec/lib"
     plcverif_bin: str = "/usr/local/bin/plcverif"
     verification_timeout_s: int = 120
     database_url: str = "sqlite+aiosqlite:///./plcforge.db"

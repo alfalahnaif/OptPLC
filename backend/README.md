@@ -85,7 +85,7 @@ Known template defects: the motor template never starts the motor (C-10), the ba
 
 ### Active path (`ValidationAgent(mode="static")`)
 
-1. **Syntax.** If `MATIEC_BIN` exists, `iec2c` compiles a **normalized copy** of the source: timer calls are removed, `X.Q` is replaced by `FALSE`, and `T#` literals become `0` (this also rewrites comments). If MATIEC is missing, the parser check `parser.v1` runs (`app/services/st_syntax_check.py`, P1-01): structural checks, a Lark parse of a documented ST subset, then undeclared variables and unknown calls. Passing it is not evidence level L1.
+1. **Syntax.** If `MATIEC_BIN` exists, `iec2c -f -I <MATIEC_LIB_DIR> -T <temp dir>` compiles the source **exactly as written**, in a private temporary directory per request (P1-02, D-005, D-030). The old normalization step was removed because it hid real errors. Async callers use `ValidationAgent.validate_in_thread`, so a compile never blocks the server. If MATIEC is missing, the parser check `parser.v1` runs (`app/services/st_syntax_check.py`, P1-01): structural checks, a Lark parse of a documented ST subset, then undeclared variables and unknown calls. Passing it is not evidence level L1.
 2. **Domain rules.** The first matching domain validator (batch, motor, traffic, process, interlock, generic) applies regex rules. These are text heuristics: an unsafe program can pass them.
 
 The status `VERIFIED` means these static checks passed. It is not a proof.

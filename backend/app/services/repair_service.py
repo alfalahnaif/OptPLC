@@ -47,7 +47,7 @@ class RepairService:
         code_history_payload = list(session.code_artifact_history or [])
 
         for attempt in range(1, max_iter + 1):
-            validation = ValidationAgent(mode="static").validate(
+            validation = await ValidationAgent(mode="static").validate_in_thread(
                 project_id=project_id,
                 artifact=current_artifact,
                 plan=plan,
