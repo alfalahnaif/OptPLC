@@ -120,6 +120,19 @@ class ParserCheck:
             opened, closed = _count_keyword(opener, text), _count_keyword(closer, text)
             if opened != closed:
                 errors.append(f"Unbalanced {label}: {opened} {opener} vs {closed} {closer}")
+
+        # MATIEC rejects SFC keywords as variable names, e.g. Step (P1-03, D-006).
+        sfc_keywords = {"STEP", "INITIAL_STEP", "END_STEP", "TRANSITION", "END_TRANSITION", "ACTION", "END_ACTION"}
+        for line_number, line in enumerate(text.splitlines(), start=1):
+            declaration = re.match(r"\s*([A-Za-z_]\w*(?:\s*,\s*[A-Za-z_]\w*)*)\s*:(?!=)", line)
+            if declaration is None:
+                continue
+            for name in re.split(r"\s*,\s*", declaration.group(1)):
+                if name.upper() in sfc_keywords:
+                    errors.append(
+                        f"Variable name '{name}' is a reserved IEC 61131-3 keyword (SFC); MATIEC rejects it "
+                        f"(line {line_number})."
+                    )
         return errors
 
     @staticmethod
@@ -158,6 +171,21 @@ class ParserCheck:
                             f"Variable '{token}' is not declared in any VAR block (line {token.line}).",
                         )
                     )
+            elif node.data == "case_label_list":
+                # MATIEC rejects named constants as CASE labels (D-006); only literals are accepted.
+                for child in node.children:
+                    if isinstance(child, Tree) and child.data == "identifier":
+                        token = child.children[0]
+                        if str(token).upper() in declared:
+                            occurrences.append(
+                                (
+                                    token.line,
+                                    token.column,
+                                    f"CASE-LABEL:{str(token).upper()}",
+                                    f"CASE label '{token}' is a named constant; MATIEC accepts only literal labels "
+                                    f"(line {token.line}).",
+                                )
+                            )
             elif node.data == "function_call":
                 token = _first_identifier(node)
                 if token is None:

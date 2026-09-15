@@ -33,7 +33,7 @@ ABSOLUTE CONSTRAINTS — violation triggers immediate rollback:
    - Do NOT create variables that feed back into themselves in same scan
    - Do NOT introduce scan-cycle dependencies not present in original
    - If UNSURE whether a change is scan-safe: LEAVE IT UNCHANGED
-MATIEC v0.1 TYPE RULES:
+IEC 61131-3 TYPE RULES (checked against the pinned MATIEC, D-006):
 - AND/OR operators require BOOL operands only
 - Never use an INT variable directly in AND/OR expressions
 - WRONG: Step_State AND NOT Fault_State

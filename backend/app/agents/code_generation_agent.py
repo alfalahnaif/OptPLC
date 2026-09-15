@@ -24,66 +24,49 @@ VAR        ... END_VAR
 (* logic body *)
 END_PROGRAM
 
-ABSOLUTE RULES — violation causes compilation failure:
-=== MATIEC v0.1 STRICT COMPATIBILITY RULES ===
-These are hard compiler requirements - violations cause build failure.
+ABSOLUTE RULES — the pinned MATIEC compiler (commit 79410c76) rejects violations.
+Each rule was checked by compiling test programs in the reference image (plan item P1-03, D-006).
 All rules apply to generated code AND repair iterations.
 
-RULE 1 - ONE LINE PER ASSIGNMENT (most common error):
-  WRONG:  Fault_State := NOT Emergency_Stop OR
-                         Abort_PB;
-  RIGHT:  Fault_State := NOT Emergency_Stop OR Abort_PB;
-  -> Every := statement must end with ; on the SAME line.
-  -> If expression is long, use intermediate BOOL variables:
-      Temp := NOT Emergency_Stop OR Abort_PB;
-      Fault_State := Temp OR Overload;
-
-RULE 2 - NO FUNCTION BLOCK INSTANCES:
-  MATIEC v0.1 does not reliably support TON/TOF/CTU instances.
-  NEVER generate: Timer_Name(IN := x, PT := T#5s);
-  NEVER generate: Timer_Name.Q
-  NEVER generate: Timer_Name.ET
-  -> Instead, use a simple BOOL flag driven by an input:
-      Mix_Done := Mix_Timer_Done;  (* input from hardware *)
-  -> If timing logic is needed, describe it in comments only.
-
-RULE 3 - NO DOTTED NOTATION VARIABLES:
-  WRONG: Step.Fill := TRUE;
-  WRONG: State.Current := 0;
-  RIGHT: Fill_Step := TRUE;
-  RIGHT: Current_State := 0;
-  -> All variables must be flat names, NO dots.
-
-RULE 4 - NO CONSTANTS IN CASE LABELS:
-  WRONG: CASE Step_State OF IDLE: ... FILL: ...
-  RIGHT: CASE Step_State OF 0: ...   1:    ...
-  -> CASE labels must be integer literals (0, 1, 2, 3).
-  -> Document meaning in comments: 0: (* Idle *) 1: (* Fill *)
-
-RULE 5 - NO STRUCT OR ARRAY ACCESS:
-  WRONG: Outputs[0] := TRUE;
-  WRONG: Status.Running := TRUE;
-  RIGHT: Output_1 := TRUE;
-  RIGHT: Status_Running := TRUE;
-  -> No arrays, no structs, no subscripts.
-
-RULE 6 - DECLARE ALL INTERNAL VARIABLES:
-  Every variable used in the body MUST appear in VAR...END_VAR.
-  WRONG: use Step_State without declaring it
-  RIGHT:
+RULE 1 - DECLARE EVERY VARIABLE:
+  Every variable used in the body MUST appear in a VAR...END_VAR block,
+  including function block instances and internal state:
     VAR
         Step_State : INT := 0;
         Fault_State : BOOL := FALSE;
+        Mix_Timer : TON;
     END_VAR
 
-RULE 7 - VALID DATA TYPES ONLY:
-  Allowed: BOOL, INT, REAL
-  NOT allowed in MATIEC v0.1: TIME, STRING, ARRAY, STRUCT, ENUM
-  -> Do NOT use T#5s or TIME literals anywhere.
-  -> Do NOT declare TIME variables.
+RULE 2 - CASE LABELS ARE INTEGER LITERALS:
+  WRONG: CASE Step_State OF IDLE: ... FILL: ...   (named constants are rejected)
+  RIGHT: CASE Step_State OF 0: ...   1:    ...
+  -> Document meaning in comments: 0: (* Idle *) 1: (* Fill *)
 
-RULE 8 - IF/END_IF FORMAT:
-  Each clause on its own line. ELSIF not ELSE IF:
+RULE 3 - NEVER NAME A VARIABLE Step:
+  STEP is a reserved IEC 61131-3 keyword (SFC). Use Step_State or Phase instead.
+
+RULE 4 - STANDARD FUNCTION BLOCKS ARE ALLOWED; DECLARE AN INSTANCE FIRST:
+  Allowed: TON, TOF, TP, CTU, CTD, CTUD, R_TRIG, F_TRIG, SR, RS.
+    VAR
+        Mix_Timer : TON;
+    END_VAR
+    Mix_Timer(IN := Mixer_Motor, PT := T#10s);
+    Mix_Done := Mix_Timer.Q;
+  -> Call each instance once per scan, then read its outputs (.Q, .ET, .CV, .QU, .QD).
+  -> Never call the type itself, e.g. TON(...); always call a declared instance.
+
+RULE 5 - TYPES:
+  Allowed: BOOL, INT, DINT, UINT, REAL, LREAL, WORD, TIME, STRING, and ARRAY[..] OF these.
+  TIME literals such as T#5s and T#500ms are allowed.
+  -> Do not declare TYPE blocks (STRUCT, ENUM): the PlanObject defines no custom types.
+  -> AND/OR/XOR/NOT need BOOL operands; compare INT values first: (Step_State > 0) AND Run_Cmd.
+
+RULE 6 - PLAN I/O NAMES ARE FLAT:
+  Use the PlanObject signal names exactly as given, with no dots in your own variable names.
+  Dots are only for reading function block outputs, e.g. Mix_Timer.Q.
+
+RULE 7 - IF/END_IF FORMAT:
+  Prefer ELSIF over a nested ELSE IF, and close every IF with END_IF;
     IF condition THEN
         assignment;
     ELSIF other THEN
