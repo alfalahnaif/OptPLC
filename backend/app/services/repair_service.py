@@ -65,8 +65,8 @@ class RepairService:
             validation_reports.append(validation)
             final_validation = validation
 
-            if validation.status == "VERIFIED":
-                final_status = "VERIFIED"
+            if validation.status == "CHECKS_PASSED":
+                final_status = "CHECKS_PASSED"
                 break
 
             debugging = await DebuggingAgent(mode="llm").debug(
@@ -139,10 +139,10 @@ class RepairService:
 
     @staticmethod
     def _summary(final_status: RepairLoopFinalStatus, iterations: int, debugging_count: int) -> str:
-        if final_status == "VERIFIED":
+        if final_status == "CHECKS_PASSED":
             if debugging_count == 0:
-                return "Initial code artifact was already verified; no repair was required."
-            return f"Repair loop verified the code after {iterations} validation attempt(s) and {debugging_count} debugging pass(es)."
+                return "Initial code artifact already passed the validation checks; no repair was required."
+            return f"Repair loop reached passing validation checks after {iterations} validation attempt(s) and {debugging_count} debugging pass(es)."
         if final_status == "ITERATION_LIMIT_REACHED":
             return f"Repair loop stopped after reaching the iteration limit of {iterations} validation attempt(s)."
-        return "Repair loop stopped before verification because no actionable repair could be generated."
+        return "Repair loop stopped before the checks passed because no actionable repair could be generated."

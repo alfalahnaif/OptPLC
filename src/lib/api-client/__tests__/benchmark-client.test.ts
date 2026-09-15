@@ -36,7 +36,7 @@ describe("benchmark API client transport", () => {
       mode: "llm",
       domain: "Motor Control",
       verified: true,
-      validationStatus: "VERIFIED",
+      validationStatus: "CHECKS_PASSED",
       repairIterations: 1,
       generationTimeMs: 8200,
       metrics: {

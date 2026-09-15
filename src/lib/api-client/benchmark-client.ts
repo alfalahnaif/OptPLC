@@ -278,7 +278,7 @@ function mockCaseResult(caseId: string, mode: BenchmarkMode): BenchmarkCaseResul
     mode,
     domain: "Mock Domain",
     verified: modifier.verified,
-    validationStatus: modifier.verified ? "VERIFIED" : "FORMAL_VIOLATION",
+    validationStatus: modifier.verified ? "CHECKS_PASSED" : "FORMAL_VIOLATION",
     repairIterations: modifier.repair,
     generationTimeMs: modifier.time,
     metrics: {

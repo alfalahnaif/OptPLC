@@ -26,14 +26,14 @@ describe("Debugging frontend flow", () => {
     expect(await screen.findByRole("button", { name: "Run Repair Loop" })).toBeInTheDocument();
   });
 
-  it("RepairLoopReport renders final VERIFIED status", async () => {
+  it("RepairLoopReport renders final CHECKS_PASSED status", async () => {
     vi.stubEnv("NEXT_PUBLIC_USE_MOCK_API", "false");
     vi.stubEnv("NEXT_PUBLIC_API_BASE_URL", "http://api.test");
     const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
       const url = String(input);
       if (url.endsWith("/debug")) return Promise.resolve(jsonResponse(debuggingReport("PRJ-0421", "PATCH_ADVICE_GENERATED")));
       if (url.endsWith("/validation")) return Promise.resolve(jsonResponse(validationReport("PRJ-0421", "FORMAL_VIOLATION")));
-      if (url.endsWith("/repair-loop")) return Promise.resolve(jsonResponse(repairLoopReport("PRJ-0421", "VERIFIED")));
+      if (url.endsWith("/repair-loop")) return Promise.resolve(jsonResponse(repairLoopReport("PRJ-0421", "CHECKS_PASSED")));
       return Promise.resolve(jsonResponse({}, 404));
     });
     vi.stubGlobal("fetch", fetchMock);
@@ -43,8 +43,8 @@ describe("Debugging frontend flow", () => {
     fireEvent.click(await screen.findByRole("button", { name: "Run Repair Loop" }));
 
     expect(await screen.findByText("Repair loop")).toBeInTheDocument();
-    expect((await screen.findAllByText("VERIFIED")).length).toBeGreaterThan(0);
-    expect(await screen.findByText("Repair loop verified the code after 2 validation attempts and 1 debugging pass.")).toBeInTheDocument();
+    expect((await screen.findAllByText("CHECKS_PASSED")).length).toBeGreaterThan(0);
+    expect(await screen.findByText("Repair loop reached passing validation checks after 2 validation attempts and 1 debugging pass.")).toBeInTheDocument();
   });
 
   it("iteration limit status renders correctly", async () => {
@@ -66,14 +66,14 @@ describe("Debugging frontend flow", () => {
     expect(await screen.findByText("ITERATION_LIMIT_REACHED")).toBeInTheDocument();
   });
 
-  it("Debugging page renders NOT_REQUIRED for verified code", async () => {
+  it("Debugging page renders NOT_REQUIRED for code that passed the checks", async () => {
     vi.stubEnv("NEXT_PUBLIC_USE_MOCK_API", "false");
     vi.stubEnv("NEXT_PUBLIC_API_BASE_URL", "http://api.test");
     stubFetch(debuggingReport("PRJ-0421", "NOT_REQUIRED", {
-      sourceValidationStatus: "VERIFIED",
+      sourceValidationStatus: "CHECKS_PASSED",
       errorType: "none",
-      rootCauseSummary: "No debugging required because the code is verified.",
-      rootCause: "No debugging required because the code is verified.",
+      rootCauseSummary: "No debugging required because the validation checks passed.",
+      rootCause: "No debugging required because the validation checks passed.",
       affectedCodeRegion: "None",
       patchAdvice: ["No patch advice is required. Continue to optimization when ready."],
       counterexampleSummary: null
@@ -82,7 +82,7 @@ describe("Debugging frontend flow", () => {
     render(<DebuggingPage projectId="PRJ-0421" />);
 
     expect(await screen.findByText("NOT_REQUIRED")).toBeInTheDocument();
-    expect(await screen.findByText("No debugging required. The latest validation report is VERIFIED.")).toBeInTheDocument();
+    expect(await screen.findByText("No debugging required. The latest validation checks passed.")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Run Repair Loop" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Replay failure/i })).not.toBeInTheDocument();
     expect(await screen.findByRole("button", { name: /Run Optimization/ })).toBeInTheDocument();
@@ -122,20 +122,20 @@ describe("Debugging frontend flow", () => {
     expect(await screen.findByText("Run validation before requesting debugging advice.")).toBeInTheDocument();
   });
 
-  it("missing DebuggingReport with VERIFIED validation shows no debugging required path", async () => {
+  it("missing DebuggingReport with CHECKS_PASSED validation shows no debugging required path", async () => {
     vi.stubEnv("NEXT_PUBLIC_USE_MOCK_API", "false");
     vi.stubEnv("NEXT_PUBLIC_API_BASE_URL", "http://api.test");
     const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL) => {
       const url = String(input);
       if (url.endsWith("/debug")) return Promise.resolve(jsonResponse({ detail: "Debugging report for project PRJ-0421 was not found." }, 404));
-      if (url.endsWith("/validation")) return Promise.resolve(jsonResponse(validationReport("PRJ-0421", "VERIFIED")));
+      if (url.endsWith("/validation")) return Promise.resolve(jsonResponse(validationReport("PRJ-0421", "CHECKS_PASSED")));
       return Promise.resolve(jsonResponse({}, 404));
     });
     vi.stubGlobal("fetch", fetchMock);
 
     render(<DebuggingPage projectId="PRJ-0421" />);
 
-    expect(await screen.findByText("No debugging required. The latest validation report is VERIFIED.")).toBeInTheDocument();
+    expect(await screen.findByText("No debugging required. The latest validation checks passed.")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Run Repair Loop" })).not.toBeInTheDocument();
   });
 
@@ -144,8 +144,8 @@ describe("Debugging frontend flow", () => {
     vi.stubEnv("NEXT_PUBLIC_API_BASE_URL", "http://api.test");
     const fetchMock = vi.fn().mockImplementation((input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
-      if (url.endsWith("/debug")) return Promise.resolve(jsonResponse(debuggingReport("PRJ-0421", "NOT_REQUIRED", { sourceValidationStatus: "VERIFIED" })));
-      if (url.endsWith("/validation")) return Promise.resolve(jsonResponse(validationReport("PRJ-0421", "VERIFIED")));
+      if (url.endsWith("/debug")) return Promise.resolve(jsonResponse(debuggingReport("PRJ-0421", "NOT_REQUIRED", { sourceValidationStatus: "CHECKS_PASSED" })));
+      if (url.endsWith("/validation")) return Promise.resolve(jsonResponse(validationReport("PRJ-0421", "CHECKS_PASSED")));
       if (url.endsWith("/optimize") && init?.method === "POST") return Promise.resolve(jsonResponse(optimizationReport("PRJ-0421")));
       return Promise.resolve(jsonResponse({}, 404));
     });
@@ -215,7 +215,7 @@ function debuggingReport(
   };
 }
 
-function repairLoopReport(projectId: string, finalStatus: "VERIFIED" | "FAILED" | "ITERATION_LIMIT_REACHED") {
+function repairLoopReport(projectId: string, finalStatus: "CHECKS_PASSED" | "FAILED" | "ITERATION_LIMIT_REACHED") {
   const finalCodeArtifact = {
     projectId,
     artifactId: `${projectId}-code-iter-2`,
@@ -241,9 +241,9 @@ function repairLoopReport(projectId: string, finalStatus: "VERIFIED" | "FAILED" 
     projectId,
     artifactId: finalCodeArtifact.artifactId,
     iteration: 2,
-    status: finalStatus === "VERIFIED" ? "VERIFIED" as const : "FORMAL_VIOLATION" as const,
+    status: finalStatus === "CHECKS_PASSED" ? "CHECKS_PASSED" as const : "FORMAL_VIOLATION" as const,
     syntaxPassed: true,
-    formalPassed: finalStatus === "VERIFIED",
+    formalPassed: finalStatus === "CHECKS_PASSED",
     solver: "static.v1",
     validator: "static.v1",
     checkedAt: "2026-05-19T10:00:00Z",
@@ -266,26 +266,26 @@ function repairLoopReport(projectId: string, finalStatus: "VERIFIED" | "FAILED" 
     codeVersions: [finalCodeArtifact],
     validationReports: [finalValidationReport],
     summary:
-      finalStatus === "VERIFIED"
-        ? "Repair loop verified the code after 2 validation attempts and 1 debugging pass."
+      finalStatus === "CHECKS_PASSED"
+        ? "Repair loop reached passing validation checks after 2 validation attempts and 1 debugging pass."
         : "Repair loop stopped after reaching the iteration limit of 2 validation attempt(s)."
   };
 }
 
-function validationReport(projectId: string, status: "VERIFIED" | "FORMAL_VIOLATION") {
+function validationReport(projectId: string, status: "CHECKS_PASSED" | "FORMAL_VIOLATION") {
   return {
     projectId,
     artifactId: `${projectId}-code-iter-1`,
     iteration: 1,
     status,
     syntaxPassed: true,
-    formalPassed: status === "VERIFIED",
+    formalPassed: status === "CHECKS_PASSED",
     solver: "static.v1",
     validator: "static.v1",
     checkedAt: "2026-05-19T10:00:00Z",
     summary: "Validation summary.",
     syntaxErrors: [],
-    formalErrors: status === "VERIFIED" ? [] : ["Formal violation."],
+    formalErrors: status === "CHECKS_PASSED" ? [] : ["Formal violation."],
     safetyResults: [],
     properties: [],
     errors: [],
@@ -326,7 +326,7 @@ function optimizationReport(projectId: string) {
     beforeMetrics: { loc: 2, cyclomaticComplexity: 1, maintainabilityIndex: 90, estimatedScanTimeMs: 1 },
     afterMetrics: { loc: 2, cyclomaticComplexity: 1, maintainabilityIndex: 90, estimatedScanTimeMs: 1 },
     metricsDelta: { loc: 0, cyclomaticComplexity: 0, maintainabilityIndex: 0, estimatedScanTimeMs: 0, locReductionPercent: 0, cyclomaticReductionPercent: 0, maintainabilityGainPercent: 0, scanTimeReductionPercent: 0 },
-    revalidationStatus: "VERIFIED",
+    revalidationStatus: "CHECKS_PASSED",
     rollbackEvents: [],
     createdAt: "2026-05-19T10:00:00Z",
     summary: "optimized",

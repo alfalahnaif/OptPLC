@@ -88,7 +88,7 @@ The motor, batch, and interlock templates were redesigned in P1-22 (C-10, C-11, 
 1. **Syntax.** If `MATIEC_BIN` exists, `iec2c -f -I <MATIEC_LIB_DIR> -T <temp dir>` compiles the source **exactly as written**, in a private temporary directory per request (P1-02, D-005, D-030). The old normalization step was removed because it hid real errors. Async callers use `ValidationAgent.validate_in_thread`, so a compile never blocks the server. If MATIEC is missing, the parser check `parser.v1` runs (`app/services/st_syntax_check.py`, P1-01): structural checks, a Lark parse of a documented ST subset, then undeclared variables and unknown calls. Passing it is not evidence level L1.
 2. **Domain rules.** The first matching domain validator (batch, motor, traffic, process, interlock, generic) applies regex rules. These are text heuristics: an unsafe program can pass them.
 
-The status `VERIFIED` means these static checks passed. It is not a proof.
+The status `CHECKS_PASSED` means these static checks passed. It is not a proof. Each report carries `evidenceLevel` (D-033): `COMPILES` (L1) when MATIEC compiled the unmodified source, `STATIC_RULES_PASSED` (L2) when the domain rules also passed, and `GENERATED` (L0) on the `parser.v1` path. Reports stored before D-033 read `VERIFIED` as `CHECKS_PASSED` and have no level, so they read as L0.
 
 ### Not wired in (`mode="formal"`)
 

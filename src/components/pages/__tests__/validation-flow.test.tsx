@@ -12,13 +12,13 @@ describe("Validation frontend flow", () => {
     vi.unstubAllGlobals();
   });
 
-  it("Validation page renders backend VERIFIED result in real mode", async () => {
+  it("Validation page renders backend CHECKS_PASSED result in real mode", async () => {
     vi.stubEnv("NEXT_PUBLIC_USE_MOCK_API", "false");
     vi.stubEnv("NEXT_PUBLIC_API_BASE_URL", "http://api.test");
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === "string" ? input : input.toString();
       if (url.endsWith("/api/projects/PRJ-0421/validation")) {
-        return Promise.resolve(jsonResponse(validationReport("PRJ-0421", "VERIFIED")));
+        return Promise.resolve(jsonResponse(validationReport("PRJ-0421", "CHECKS_PASSED")));
       }
       if (url.endsWith("/api/projects/PRJ-0421/optimize") && init?.method === "POST") {
         return Promise.resolve(jsonResponse(mockOptimizationReport("PRJ-0421")));
@@ -31,9 +31,12 @@ describe("Validation frontend flow", () => {
     render(<ValidationPage projectId="PRJ-0421" />);
 
     expect(await screen.findByText("Real Backend ValidationReport")).toBeInTheDocument();
-    expect((await screen.findAllByText("VERIFIED")).length).toBeGreaterThan(0);
-    expect(await screen.findByText("All properties hold")).toBeInTheDocument();
+    expect((await screen.findAllByText("CHECKS_PASSED")).length).toBeGreaterThan(0);
+    expect(await screen.findByText("Static checks passed")).toBeInTheDocument();
     expect((await screen.findAllByText("static.v1")).length).toBeGreaterThan(0);
+    expect(screen.getByText("Evidence L2 · Static rules passed")).toBeInTheDocument();
+    expect(screen.getByText("Safety functions are out of scope.")).toBeInTheDocument();
+    expect(screen.queryByText(/verified/i)).not.toBeInTheDocument();
     fireEvent.click(await screen.findByRole("button", { name: /Continue to Optimization/ }));
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(
@@ -97,10 +100,10 @@ describe("Validation frontend flow", () => {
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === "string" ? input : input.toString();
       if (url.endsWith("/api/projects/PRJ-0421/validation")) {
-        return Promise.resolve(jsonResponse(validationReport("PRJ-0421", "VERIFIED")));
+        return Promise.resolve(jsonResponse(validationReport("PRJ-0421", "CHECKS_PASSED")));
       }
       if (url.endsWith("/api/projects/PRJ-0421/optimize") && init?.method === "POST") {
-        return Promise.resolve(jsonResponse({ detail: "Code must be verified before optimization. Run validation or repair loop first." }, 400));
+        return Promise.resolve(jsonResponse({ detail: "Code must pass the validation checks before optimization. Run validation or repair loop first." }, 400));
       }
       return Promise.resolve(jsonResponse({ detail: "Unhandled request" }, 500));
     });
@@ -110,7 +113,7 @@ describe("Validation frontend flow", () => {
     render(<ValidationPage projectId="PRJ-0421" />);
     fireEvent.click(await screen.findByRole("button", { name: /Continue to Optimization/ }));
 
-    expect(await screen.findByText(/Code must be verified before optimization/)).toBeInTheDocument();
+    expect(await screen.findByText(/Code must pass the validation checks before optimization/)).toBeInTheDocument();
     expect(routerPush).not.toHaveBeenCalled();
   });
 
@@ -136,11 +139,11 @@ describe("Validation frontend flow", () => {
         if (!validated) {
           return Promise.resolve(jsonResponse({ detail: "Validation report for project PRJ-0421 was not found." }, 404));
         }
-        return Promise.resolve(jsonResponse(validationReport("PRJ-0421", "VERIFIED")));
+        return Promise.resolve(jsonResponse(validationReport("PRJ-0421", "CHECKS_PASSED")));
       }
       if (url.endsWith("/api/projects/PRJ-0421/validate") && init?.method === "POST") {
         validated = true;
-        return Promise.resolve(jsonResponse(validationReport("PRJ-0421", "VERIFIED")));
+        return Promise.resolve(jsonResponse(validationReport("PRJ-0421", "CHECKS_PASSED")));
       }
       return Promise.resolve(jsonResponse({ detail: `Unhandled request: ${init?.method ?? "GET"} ${url}` }, 500));
     });
@@ -157,7 +160,7 @@ describe("Validation frontend flow", () => {
         expect.objectContaining({ method: "POST" })
       );
     });
-    expect(await screen.findByText("All properties hold")).toBeInTheDocument();
+    expect(await screen.findByText("Static checks passed")).toBeInTheDocument();
     expect(await screen.findByText("Real Backend ValidationReport")).toBeInTheDocument();
   });
 
@@ -169,8 +172,8 @@ describe("Validation frontend flow", () => {
     render(<ValidationPage projectId="PRJ-0421" />);
 
     expect(await screen.findByText("Mock Validator")).toBeInTheDocument();
-    expect((await screen.findAllByText("VERIFIED")).length).toBeGreaterThan(0);
-    expect(await screen.findByText("All properties hold")).toBeInTheDocument();
+    expect((await screen.findAllByText("CHECKS_PASSED")).length).toBeGreaterThan(0);
+    expect(await screen.findByText("Static checks passed")).toBeInTheDocument();
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });
@@ -203,7 +206,7 @@ function validationReport(
   overrides: Partial<ValidationReport> = {}
 ): ValidationReport {
   const syntaxPassed = status !== "SYNTAX_ERROR";
-  const formalPassed = status === "VERIFIED";
+  const formalPassed = status === "CHECKS_PASSED";
   const failedDetails =
     status === "FORMAL_VIOLATION"
       ? "Motor_Run is not visibly gated by Emergency_Stop or the safety/fault state."
@@ -226,9 +229,10 @@ function validationReport(
     formalPassed,
     solver: "static.v1",
     validator: "static.v1",
+    evidenceLevel: status === "SYNTAX_ERROR" ? "GENERATED" : status === "CHECKS_PASSED" ? "STATIC_RULES_PASSED" : "COMPILES",
     checkedAt: "2026-05-19T10:00:00Z",
     summary:
-      status === "VERIFIED"
+      status === "CHECKS_PASSED"
         ? "Structured Text syntax and static safety checks passed."
         : status === "SYNTAX_ERROR"
           ? "Structured Text syntax/static checks failed."
@@ -276,7 +280,7 @@ function mockOptimizationReport(projectId: string) {
     beforeMetrics: { loc: 2, cyclomaticComplexity: 1, maintainabilityIndex: 90, estimatedScanTimeMs: 1 },
     afterMetrics: { loc: 2, cyclomaticComplexity: 1, maintainabilityIndex: 90, estimatedScanTimeMs: 1 },
     metricsDelta: { loc: 0, cyclomaticComplexity: 0, maintainabilityIndex: 0, estimatedScanTimeMs: 0, locReductionPercent: 0, cyclomaticReductionPercent: 0, maintainabilityGainPercent: 0, scanTimeReductionPercent: 0 },
-    revalidationStatus: "VERIFIED",
+    revalidationStatus: "CHECKS_PASSED",
     rollbackEvents: [],
     createdAt: "2026-05-19T10:00:00Z",
     summary: "optimized",

@@ -168,7 +168,17 @@ export interface CodeArtifact {
   metadata: CodeMetadata;
 }
 
-export type ValidationStatus = "VERIFIED" | "SYNTAX_ERROR" | "FORMAL_VIOLATION" | "TIMEOUT";
+export type ValidationStatus = "CHECKS_PASSED" | "SYNTAX_ERROR" | "FORMAL_VIOLATION" | "TIMEOUT";
+
+// Evidence ladder L0-L6 (D-003, D-033). Only L4 and above may be called verified.
+export type EvidenceLevel =
+  | "GENERATED"
+  | "COMPILES"
+  | "STATIC_RULES_PASSED"
+  | "SIMULATION_TESTED"
+  | "PROPERTIES_PROVEN"
+  | "HIL_PASSED"
+  | "ENGINEER_APPROVED";
 
 export interface ValidationSafetyResult {
   id: string;
@@ -186,6 +196,7 @@ export interface ValidationReport {
   formalPassed: boolean;
   solver: string;
   validator: string;
+  evidenceLevel: EvidenceLevel;
   checkedAt: string;
   summary: string;
   syntaxErrors: string[];
@@ -430,7 +441,7 @@ export interface FinalReport {
 
 export interface RepairLoopReport {
   projectId: string;
-  finalStatus: "VERIFIED" | "FAILED" | "ITERATION_LIMIT_REACHED";
+  finalStatus: "CHECKS_PASSED" | "FAILED" | "ITERATION_LIMIT_REACHED";
   iterations: number;
   finalCodeArtifact: CodeArtifact;
   finalValidationReport: ValidationReport;

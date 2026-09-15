@@ -1,10 +1,10 @@
 import { Badge } from "@/components/ui/badge";
 
-export type Status = "optimized" | "verified" | "failed" | "completed" | "healthy" | "passed" | "warning";
+export type Status = "optimized" | "checked" | "failed" | "completed" | "healthy" | "passed" | "warning";
 
 const map: Record<Status, { label: string; tone: "success" | "warning" | "danger" | "neutral" | "info" | "primary" }> = {
   optimized: { label: "Optimized", tone: "success" },
-  verified: { label: "Verified", tone: "success" },
+  checked: { label: "Checks passed", tone: "success" },
   failed: { label: "Failed", tone: "danger" },
   completed: { label: "Completed", tone: "success" },
   healthy: { label: "Healthy", tone: "success" },

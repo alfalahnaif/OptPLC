@@ -229,7 +229,7 @@ export function BenchmarkPage({ state }: { state?: PageState } = {}) {
             {suiteSummary ? (
               <div className="mb-5 grid gap-4 md:grid-cols-3">
                 <Summary
-                  label="Verification rate"
+                  label="Checks-passed rate"
                   value={`Rule ${suiteSummary.byMode.rule_based.verificationRate}% / LLM ${suiteSummary.byMode.llm.verificationRate}% / RAG ${suiteSummary.byMode.llm_rag.verificationRate}%`}
                 />
                 <Summary
@@ -269,7 +269,7 @@ export function BenchmarkPage({ state }: { state?: PageState } = {}) {
                     <>
                       <SummaryRow
                         label="Status"
-                        value={singleResult.verified ? "VERIFIED" : singleResult.validationStatus ?? "ERROR"}
+                        value={singleResult.verified ? "CHECKS_PASSED" : singleResult.validationStatus ?? "ERROR"}
                       />
                       <SummaryRow label="Generation time" value={`${singleResult.generationTimeMs} ms`} />
                       <SummaryRow label="Repair iterations" value={String(singleResult.repairIterations)} />
@@ -426,7 +426,7 @@ function ComparisonTable({ comparison }: { comparison: BenchmarkComparisonResult
           <TD>{bestLower(baseline.repairIterations, llm.repairIterations, rag.repairIterations)}</TD>
         </TR>
         <TR>
-          <TD>Verified</TD>
+          <TD>Checks passed</TD>
           <TD>
             <ValidationStatusBadge status={baseline.validationStatus} />
           </TD>
@@ -450,8 +450,14 @@ function ComparisonTable({ comparison }: { comparison: BenchmarkComparisonResult
   );
 }
 
-function ValidationStatusBadge({ status }: { status?: string | null }) {
-  if (status === "VERIFIED") return <Badge tone="success">VERIFIED</Badge>;
+// Results stored before D-033 still say VERIFIED. It only ever meant that the checks passed.
+function displayStatus(status?: string | null) {
+  return status === "VERIFIED" ? "CHECKS_PASSED" : status;
+}
+
+function ValidationStatusBadge({ status: rawStatus }: { status?: string | null }) {
+  const status = displayStatus(rawStatus);
+  if (status === "CHECKS_PASSED") return <Badge tone="success">CHECKS_PASSED</Badge>;
   if (status === "SYNTAX_ERROR") return <Badge tone="danger">SYNTAX_ERROR</Badge>;
   if (status === "FORMAL_VIOLATION") return <Badge tone="warning">FORMAL_VIOLATION</Badge>;
   return <Badge tone="neutral">{status ?? "UNKNOWN"}</Badge>;
@@ -473,7 +479,7 @@ function resolveCaseName(entry: BenchmarkCaseCatalogItem, fallbackId: string): s
 
 function statusText(value: BenchmarkCaseResult | null): string {
   if (!value) return "-";
-  return value.validationStatus ?? (value.verified ? "VERIFIED" : "FAILED");
+  return displayStatus(value.validationStatus) ?? (value.verified ? "CHECKS_PASSED" : "FAILED");
 }
 
 function deltaClass(delta: number, higherIsBetter: boolean): string {

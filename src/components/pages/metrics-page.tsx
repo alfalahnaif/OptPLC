@@ -249,7 +249,7 @@ function tableRows(data: MetricsPageData) {
       after: report.afterMetrics.cyclomaticComplexity.toString(),
       delta: formatSigned(report.metricsDelta.cyclomaticComplexityDelta),
       improved: report.metricsDelta.cyclomaticComplexityDelta <= 0,
-      interpretation: "Lower branch complexity improves predictability and verification confidence."
+      interpretation: "Lower branch complexity improves predictability and makes the code easier to review and test."
     },
     {
       metric: "Maintainability Index",
@@ -287,5 +287,5 @@ function clamp(value: number) {
 }
 
 function validationRateValue(status: string | null | undefined) {
-  return status === "VERIFIED" ? 100 : 0;
+  return status === "CHECKS_PASSED" ? 100 : 0;
 }

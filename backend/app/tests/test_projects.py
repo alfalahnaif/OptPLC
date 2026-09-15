@@ -748,7 +748,7 @@ def test_debug_after_verified_validation_returns_not_required(client: TestClient
     assert response.status_code == 200
     body = response.json()
     assert body["status"] == "NOT_REQUIRED"
-    assert body["sourceValidationStatus"] == "VERIFIED"
+    assert body["sourceValidationStatus"] == "CHECKS_PASSED"
 
 
 def test_debug_after_failed_validation_returns_patch_advice(client: TestClient) -> None:
@@ -791,7 +791,7 @@ def test_repair_loop_persists_report(client: TestClient) -> None:
     assert response.status_code == 200
     report = response.json()
     assert report["projectId"] == project_id
-    assert report["finalValidationReport"]["status"] in {"VERIFIED", "SYNTAX_ERROR", "FORMAL_VIOLATION"}
+    assert report["finalValidationReport"]["status"] in {"CHECKS_PASSED", "SYNTAX_ERROR", "FORMAL_VIOLATION"}
 
 
 def test_optimize_persists_optimization_report(client: TestClient) -> None:

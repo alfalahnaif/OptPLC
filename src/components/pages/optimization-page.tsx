@@ -54,7 +54,7 @@ export function OptimizationPage({ projectId = ACTIVE_PROJECT_ID, state }: { pro
       <PageHeader
         eyebrow="Pipeline - Step 8 of 9"
         title="Optimization results"
-        description="Deterministic static transformations on verified Structured Text. Each accepted pass is revalidated; regressions are rolled back."
+        description="Deterministic static transformations on Structured Text that passed the validation checks. Each accepted pass is revalidated; regressions are rolled back."
         actions={
           <>
             <OptimizationModeBadge />
@@ -132,7 +132,7 @@ function OptimizationReportView({ report }: { report: OptimizationReport }) {
               </div>
               <MetricDelta label="LOC" before={pass.beforeMetrics.loc} after={pass.afterMetrics.loc} />
               <MetricDelta label="CC" before={pass.beforeMetrics.cyclomaticComplexity} after={pass.afterMetrics.cyclomaticComplexity} />
-              <Badge tone={pass.revalidationStatus === "VERIFIED" ? "success" : "danger"} dot>{pass.revalidationStatus}</Badge>
+              <Badge tone={pass.revalidationStatus === "CHECKS_PASSED" ? "success" : "danger"} dot>{pass.revalidationStatus}</Badge>
             </CardContent>
           </Card>
         ))}
@@ -148,7 +148,7 @@ function OptimizationReportView({ report }: { report: OptimizationReport }) {
               <div className="rounded-md border bg-background/70 p-3 text-sm" key={`${event.passName}-${event.reason}`}>
                 <div className="font-medium">{event.passName}</div>
                 <div className="mt-1 text-muted-foreground">{event.reason}</div>
-                <Badge className="mt-2" tone={event.revalidationStatus === "VERIFIED" ? "success" : "danger"}>{event.revalidationStatus}</Badge>
+                <Badge className="mt-2" tone={event.revalidationStatus === "CHECKS_PASSED" ? "success" : "danger"}>{event.revalidationStatus}</Badge>
               </div>
             ))}
           </CardContent>
@@ -163,7 +163,7 @@ function OptimizationReportView({ report }: { report: OptimizationReport }) {
               {metricSummary(report.afterMetrics)} - {report.summary}
             </p>
           </div>
-          <StatusBadge status={report.revalidationStatus === "VERIFIED" ? "verified" : "warning"} label={`Revalidation ${report.revalidationStatus}`} />
+          <StatusBadge status={report.revalidationStatus === "CHECKS_PASSED" ? "checked" : "warning"} label={`Revalidation ${report.revalidationStatus}`} />
         </div>
         <CodePanel title={report.optimizedCode.filename} code={report.optimizedCode.source} height="420px" />
       </div>
@@ -229,8 +229,8 @@ function optimizationErrorDescription(error: Error | null) {
   if (message.includes("ValidationReport must be generated before optimization")) {
     return "Run validation before optimization.";
   }
-  if (message.includes("Code must be verified before optimization")) {
-    return "Code must be verified before optimization. Run validation or repair loop first.";
+  if (message.includes("Code must pass the validation checks before optimization")) {
+    return "Code must pass the validation checks before optimization. Run validation or repair loop first.";
   }
   return message;
 }

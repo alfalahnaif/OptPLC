@@ -300,11 +300,12 @@ function validationReport(projectId: string): ValidationReport {
     projectId,
     artifactId: `${projectId}-code-iter-1`,
     iteration: 1,
-    status: "VERIFIED",
+    status: "CHECKS_PASSED",
     syntaxPassed: true,
     formalPassed: true,
     solver: "static.v1",
     validator: "static.v1",
+    evidenceLevel: "STATIC_RULES_PASSED",
     checkedAt: "2026-05-19T10:00:00Z",
     summary: "Structured Text syntax and static safety checks passed.",
     syntaxErrors: [],
@@ -355,13 +356,13 @@ function repairLoopReport(projectId: string): RepairLoopReport {
 
   return {
     projectId,
-    finalStatus: "VERIFIED",
+    finalStatus: "CHECKS_PASSED",
     iterations: 2,
     finalCodeArtifact: artifact,
     finalValidationReport: validation,
     debuggingReports: [debugging],
     codeVersions: [artifact],
     validationReports: [validation],
-    summary: "Repair loop verified the code after 2 validation attempts and 1 debugging pass."
+    summary: "Repair loop reached passing validation checks after 2 validation attempts and 1 debugging pass."
   };
 }

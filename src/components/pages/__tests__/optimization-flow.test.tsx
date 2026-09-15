@@ -185,7 +185,7 @@ describe("Optimization frontend flow", () => {
         scanTimeReductionPercent: 9.4
       },
       history: [],
-      latestValidationStatus: "VERIFIED",
+      latestValidationStatus: "CHECKS_PASSED",
       latestOptimizationStatus: "OPTIMIZED",
       createdAt: "2026-05-19T10:00:00Z",
       summary: "Metrics report."
@@ -216,7 +216,7 @@ function optimizationReport(
   options: { changed?: boolean; rollback?: boolean; revalidationStatus?: ValidationStatus } = {}
 ): OptimizationReport {
   const changed = options.changed ?? status === "OPTIMIZED";
-  const revalidationStatus = options.revalidationStatus ?? "VERIFIED";
+  const revalidationStatus = options.revalidationStatus ?? "CHECKS_PASSED";
   const beforeMetrics: StructuredTextMetrics = {
     loc: 47,
     cyclomaticComplexity: 9,
@@ -297,9 +297,9 @@ function optimizationReport(
     createdAt: "2026-05-19T10:00:00Z",
     summary:
       status === "NO_CHANGES"
-        ? "Static optimizer found no safe source changes; verified code was preserved."
+        ? "Static optimizer found no safe source changes; the checked code was preserved."
         : "Static optimizer applied 3 pass(es); every accepted pass revalidated successfully.",
-    revalidated: revalidationStatus === "VERIFIED"
+    revalidated: revalidationStatus === "CHECKS_PASSED"
   };
 }
 

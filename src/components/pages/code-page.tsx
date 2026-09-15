@@ -58,7 +58,7 @@ export function CodePage({ projectId = ACTIVE_PROJECT_ID, state }: { projectId?:
       <PageHeader
         eyebrow="Pipeline - Step 5 of 9"
         title="Generated Structured Text"
-        description="IEC 61131-3 source emitted by the Code Generation Agent. Compare iterations and inspect the verified form."
+        description="IEC 61131-3 source emitted by the Code Generation Agent. Compare iterations and inspect the latest form."
         actions={
           <>
             <CodeGenerationModeBadge />

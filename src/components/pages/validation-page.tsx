@@ -5,6 +5,7 @@ import { ArrowRight, CheckCircle2, Clock, ShieldCheck, TriangleAlert, XCircle } 
 import { useRouter } from "next/navigation";
 
 import { PageStateGate, type PageState } from "@/components/common/page-state";
+import { EvidenceBadge, SafetyScopeNotice } from "@/components/common/evidence-badge";
 import { RepairLoopPanel } from "@/components/common/repair-loop-panel";
 import { StatusBadge } from "@/components/common/status-badge";
 import { ValidationModeBadge } from "@/components/common/validation-mode-badge";
@@ -46,7 +47,7 @@ export function ValidationPage({ projectId = ACTIVE_PROJECT_ID, state }: { proje
     setNextStepError(null);
     setIsRunningNextStep(true);
     try {
-      if (report.status === "VERIFIED") {
+      if (report.status === "CHECKS_PASSED") {
         await optimizeCode(projectId);
         router.push(projectPath(projectId, "optimization"));
       } else {
@@ -79,7 +80,7 @@ export function ValidationPage({ projectId = ACTIVE_PROJECT_ID, state }: { proje
       <PageHeader
         eyebrow="Pipeline - Step 6 of 9"
         title="Validation results"
-        description="Static verification by the Validation Agent before debugging or optimization."
+        description="Static checks by the Validation Agent before debugging or optimization. Passing them is not formal verification."
         actions={
           <>
             <ValidationModeBadge />
@@ -130,20 +131,21 @@ function ValidationReportView({ report }: { report: ValidationReport }) {
   const safetyResults = report.safetyResults.length > 0 ? report.safetyResults : report.properties;
   const passedCount = safetyResults.filter((result) => result.status === "passed").length;
   const counterexamples = report.counterexamples.length > 0 ? report.counterexamples : report.counterexample ?? [];
-  const isVerified = report.status === "VERIFIED";
+  const checksPassed = report.status === "CHECKS_PASSED";
 
   return (
     <>
       <Card className="mb-5 overflow-hidden">
         <CardContent className="grid p-0 md:grid-cols-[1fr_2fr]">
-          <div className={isVerified ? "bg-emerald-50 p-6 dark:bg-emerald-950/20" : "bg-amber-50 p-6 dark:bg-amber-950/20"}>
-            <div className={isVerified ? "flex items-center gap-3 text-emerald-700 dark:text-emerald-300" : "flex items-center gap-3 text-amber-700 dark:text-amber-300"}>
-              {isVerified ? <CheckCircle2 className="size-5" /> : <TriangleAlert className="size-5" />}
+          <div className={checksPassed ? "bg-emerald-50 p-6 dark:bg-emerald-950/20" : "bg-amber-50 p-6 dark:bg-amber-950/20"}>
+            <div className={checksPassed ? "flex items-center gap-3 text-emerald-700 dark:text-emerald-300" : "flex items-center gap-3 text-amber-700 dark:text-amber-300"}>
+              {checksPassed ? <CheckCircle2 className="size-5" /> : <TriangleAlert className="size-5" />}
               <span className="text-xs font-semibold uppercase tracking-wider">{report.status.replace("_", " ")}</span>
             </div>
             <div className="mt-2 text-2xl font-semibold">
-              {isVerified ? "All properties hold" : report.status === "SYNTAX_ERROR" ? "Syntax checks failed" : "Safety checks failed"}
+              {checksPassed ? "Static checks passed" : report.status === "SYNTAX_ERROR" ? "Syntax checks failed" : "Safety checks failed"}
             </div>
+            <div className="mt-3"><EvidenceBadge level={report.evidenceLevel} /></div>
             <p className="mt-4 text-sm text-muted-foreground">{report.summary}</p>
           </div>
           <div className="grid gap-0 md:grid-cols-4">
@@ -159,11 +161,13 @@ function ValidationReportView({ report }: { report: ValidationReport }) {
         </CardContent>
       </Card>
 
+      <div className="mb-5"><SafetyScopeNotice /></div>
+
       <div className="grid gap-5 xl:grid-cols-2">
         <div className="space-y-5">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>Syntax verification</CardTitle>
+              <CardTitle>Syntax check</CardTitle>
               <StatusBadge status={report.syntaxPassed ? "passed" : "failed"} />
             </CardHeader>
             <CardContent>
@@ -179,7 +183,7 @@ function ValidationReportView({ report }: { report: ValidationReport }) {
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>Static safety verification</CardTitle>
+              <CardTitle>Static safety rules</CardTitle>
               <StatusBadge status={report.formalPassed ? "passed" : "failed"} />
             </CardHeader>
             <CardContent>
@@ -238,7 +242,7 @@ function ValidationReportView({ report }: { report: ValidationReport }) {
                 <>
                   <ShieldCheck className="mb-4 size-10 text-emerald-700" />
                   <div className="font-semibold">No counterexample</div>
-                  <p className="mt-2 max-w-sm text-sm text-muted-foreground">Every static safety property held. Code is ready for the next pipeline step.</p>
+                  <p className="mt-2 max-w-sm text-sm text-muted-foreground">No static rule reported a failing state. The rules are text checks, not a proof.</p>
                 </>
               )}
             </CardContent>
@@ -269,7 +273,7 @@ function ValidationReportView({ report }: { report: ValidationReport }) {
 }
 
 function ValidationStatusBadge({ status }: { status: ValidationStatus }) {
-  const tone = status === "VERIFIED" ? "success" : status === "TIMEOUT" ? "warning" : "danger";
+  const tone = status === "CHECKS_PASSED" ? "success" : status === "TIMEOUT" ? "warning" : "danger";
   return <Badge tone={tone} dot>{status}</Badge>;
 }
 
@@ -282,10 +286,10 @@ function ValidationNextAction({
   onClick: () => void;
   loading: boolean;
 }) {
-  const verified = status === "VERIFIED";
+  const passed = status === "CHECKS_PASSED";
   return (
     <Button onClick={onClick} disabled={loading}>
-      {verified ? (loading ? "Running optimization..." : "Continue to Optimization") : (loading ? "Preparing debugging advice..." : "Open Debugging Advice")} <ArrowRight />
+      {passed ?(loading ? "Running optimization..." : "Continue to Optimization") : (loading ? "Preparing debugging advice..." : "Open Debugging Advice")} <ArrowRight />
     </Button>
   );
 }

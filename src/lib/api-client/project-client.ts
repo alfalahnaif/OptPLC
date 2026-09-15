@@ -109,7 +109,7 @@ export async function getProjects(): Promise<Project[]> {
       domain: project.domain,
       standard: "IEC 61131-3",
       targetLanguage: "Structured Text",
-      status: project.status === "failed" ? "failed" : project.status === "verified" ? "validated" : "optimized",
+      status: project.status === "failed" ? "failed" : project.status === "checked" ? "validated" : "optimized",
       createdAt: project.updated,
       updatedAt: project.updated
     }))
@@ -131,7 +131,7 @@ export async function getProject(projectId: string): Promise<Project> {
     domain: project.domain,
     standard: "IEC 61131-3",
     targetLanguage: "Structured Text",
-    status: project.status === "failed" ? "failed" : project.status === "verified" ? "validated" : "optimized",
+    status: project.status === "failed" ? "failed" : project.status === "checked" ? "validated" : "optimized",
     createdAt: project.updated,
     updatedAt: project.updated
   });
@@ -319,6 +319,6 @@ function toProjectRow(project: Project) {
     updated: project.updatedAt.slice(0, 10),
     iterations: project.status === "draft" ? 0 : 1,
     delta: project.status === "optimized" ? "-41.7%" : "-",
-    status: project.status === "failed" ? "failed" : project.status === "optimized" ? "optimized" : "verified"
+    status: project.status === "failed" ? "failed" : project.status === "optimized" ? "optimized" : "checked"
   };
 }

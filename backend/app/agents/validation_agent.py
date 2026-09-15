@@ -10,6 +10,7 @@ from typing import Literal
 
 from app.schemas.contracts import (
     CodeArtifact,
+    EvidenceLevel,
     PlanObject,
     ValidationProperty,
     ValidationReport,
@@ -571,6 +572,7 @@ class ValidationAgent:
         failed_safety = [result for result in safety_results if result.status == "failed"]
         formal_errors = [result.details or result.description for result in failed_safety]
         validator_label = "matiec" if validator_used == "matiec" else PARSER_CHECK_LABEL
+        evidence_level = self._static_evidence_level(validator_used, syntax_errors, formal_errors, safety_results)
 
         if syntax_errors:
             status = "SYNTAX_ERROR"
@@ -578,9 +580,18 @@ class ValidationAgent:
         elif formal_errors:
             status = "FORMAL_VIOLATION"
             summary = "Static safety checks found domain-specific violations."
+        elif validator_used == "matiec":
+            status = "CHECKS_PASSED"
+            summary = (
+                "MATIEC compiled the code and the static rule checks passed. "
+                "The rules are text heuristics, not a proof."
+            )
         else:
-            status = "VERIFIED"
-            summary = "Structured Text syntax and static safety checks passed."
+            status = "CHECKS_PASSED"
+            summary = (
+                f"The parser check ({PARSER_CHECK_LABEL}) and the static rule checks passed. "
+                "MATIEC was not available, so the code has not been compiled."
+            )
 
         counterexamples = self._counterexamples(failed_safety)
         properties = [
@@ -601,6 +612,7 @@ class ValidationAgent:
             formalPassed=not syntax_errors and not formal_errors,
             solver="static.v1",
             validator=validator_label,
+            evidenceLevel=evidence_level,
             checkedAt=self._utc_now(),
             summary=summary,
             syntaxErrors=syntax_errors,
@@ -661,6 +673,7 @@ class ValidationAgent:
                 formalPassed=False,
                 solver="matiec+plcverif.v1",
                 validator="formal.v1",
+                evidenceLevel="COMPILES",
                 checkedAt=self._utc_now(),
                 summary="Structured Text syntax passed, but formal preprocessing failed.",
                 syntaxErrors=[],
@@ -679,7 +692,7 @@ class ValidationAgent:
         if classification == "TIMEOUT":
             status = "TIMEOUT"
         elif formal_result.get("all_passed", False):
-            status = "VERIFIED"
+            status = "CHECKS_PASSED"
         else:
             status = "FORMAL_VIOLATION"
 
@@ -693,8 +706,8 @@ class ValidationAgent:
         ]
 
         summary = (
-            "Formal validation passed for all requested properties."
-            if status == "VERIFIED"
+            "PLCverif reported no violations. The ST-to-SMV model is incomplete, so this is not a proof."
+            if status == "CHECKS_PASSED"
             else "Formal validation reported property violations."
         )
         if status == "TIMEOUT":
@@ -706,9 +719,11 @@ class ValidationAgent:
             iteration=artifact.iteration,
             status=status,
             syntaxPassed=True,
-            formalPassed=status == "VERIFIED",
+            formalPassed=status == "CHECKS_PASSED",
             solver="matiec+plcverif.v1",
             validator="formal.v1",
+            # Capped at L1 until the phase 3 translator is complete (D-033).
+            evidenceLevel="COMPILES",
             checkedAt=self._utc_now(),
             summary=summary,
             syntaxErrors=[],
@@ -719,6 +734,20 @@ class ValidationAgent:
             counterexample=counterexamples or None,
             counterexamples=counterexamples,
         )
+
+    @staticmethod
+    def _static_evidence_level(
+        validator_used: str,
+        syntax_errors: list[str],
+        formal_errors: list[str],
+        safety_results: list[ValidationSafetyResult],
+    ) -> EvidenceLevel:
+        """L1 needs an unmodified MATIEC compile, L2 adds passing static rules; parser.v1 stays L0 (D-029, D-033)."""
+        if validator_used != "matiec" or syntax_errors:
+            return "GENERATED"
+        if formal_errors or not safety_results:
+            return "COMPILES"
+        return "STATIC_RULES_PASSED"
 
     def _syntax_errors_with_optional_matiec(self, st_code: str) -> tuple[list[str], str]:
         """

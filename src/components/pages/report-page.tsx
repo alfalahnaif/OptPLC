@@ -5,6 +5,7 @@ import { useState, type ReactNode } from "react";
 import { CheckCircle, Download, FileDown } from "lucide-react";
 
 import { CodePanel } from "@/components/common/code-panel";
+import { SafetyScopeNotice, evidenceLabel } from "@/components/common/evidence-badge";
 import { PageStateGate, type PageState } from "@/components/common/page-state";
 import { ReportModeBadge } from "@/components/common/report-mode-badge";
 import { StatusBadge } from "@/components/common/status-badge";
@@ -39,11 +40,11 @@ export function ReportPage({ projectId = ACTIVE_PROJECT_ID, state }: { projectId
   const validationAttempts = report?.validation?.iteration ?? report?.repairLoop?.iterations ?? report?.codeArtifact?.iteration ?? 1;
   const locReduction = report?.metrics?.metricsDelta.locReductionPercent ?? 0;
   const dynamicSummary = report
-    ? `${report.project.name} controller was specified in natural language, parsed into a Plan Object, and synthesised to IEC 61131-3 Structured Text. After ${validationAttempts} validation attempt(s), the program passed all safety checks and was reduced by ${Math.abs(locReduction).toFixed(1)}% LOC through ${appliedPasses} optimization pass(es).`
+    ? `${report.project.name} controller was specified in natural language, parsed into a Plan Object, and synthesised to IEC 61131-3 Structured Text. After ${validationAttempts} validation attempt(s), the program passed the static checks (evidence ${evidenceLabel(report.validation?.evidenceLevel)}) and was reduced by ${Math.abs(locReduction).toFixed(1)}% LOC through ${appliedPasses} optimization pass(es).`
     : "";
   const sessionTime = report ? formatDuration(durationBetween(report.project.createdAt, report.generatedAt || report.project.updatedAt)) : "N/A";
   const engineerName = report?.optimization?.optimizer ?? report?.codeArtifact?.metadata.generator ?? "OptPLC Engineering Agent";
-  const outcomeLabel = `${statusWord(report?.validation?.status === "VERIFIED")} · ${statusWord(report?.optimization?.status === "OPTIMIZED")}`;
+  const outcomeLabel = `${statusWord(report?.validation?.status === "CHECKS_PASSED")} · ${statusWord(report?.optimization?.status === "OPTIMIZED")}`;
   const iterationLabel = `iter ${report?.codeArtifact?.iteration ?? 1}/${report?.requirement?.performanceTargets.maxIterations ?? 1}`;
   const sessionEvents = report ? buildAgentEvents(report) : [];
   const agentCount = new Set(sessionEvents.map((event) => event.agent)).size;
@@ -176,10 +177,12 @@ export function ReportPage({ projectId = ACTIVE_PROJECT_ID, state }: { projectId
 
               <ReportSection n={5} title="Validation results">
                 <ul className="space-y-2">
+                  <li>Evidence: {evidenceLabel(report.validation?.evidenceLevel)}</li>
                   <li className={report.validation?.syntaxPassed ? "text-green-600" : "text-red-500"}>Syntax: {report.validation?.syntaxPassed ? "PASS" : "FAIL"}</li>
-                  <li className={report.validation?.formalPassed ? "text-green-600" : "text-red-500"}>Formal: {report.validation?.formalPassed ? "PASS" : "FAIL"}</li>
-                  <li className={livenessPassed(report.validation) ? "text-green-600" : "text-red-500"}>Liveness: {livenessPassed(report.validation) ? "PASS" : "FAIL"}</li>
+                  <li className={report.validation?.formalPassed ? "text-green-600" : "text-red-500"}>Static rules: {report.validation?.formalPassed ? "PASS" : "FAIL"}</li>
+                  <li className={allRulesPassed(report.validation) ? "text-green-600" : "text-red-500"}>Rule results: {allRulesPassed(report.validation) ? "PASS" : "FAIL"}</li>
                 </ul>
+                <div className="mt-3"><SafetyScopeNotice /></div>
               </ReportSection>
 
               <ReportSection n={6} title="Optimization results">
@@ -355,7 +358,7 @@ function metricDeltaRows(report: FinalReport) {
   ];
 }
 
-function livenessPassed(validation: FinalReport["validation"]) {
+function allRulesPassed(validation: FinalReport["validation"]) {
   const properties = validation?.properties ?? [];
   if (properties.length === 0) return false;
   return properties.every((property) => property.status === "passed");
@@ -410,7 +413,7 @@ function formatDuration(durationMs: number | null) {
 }
 
 function statusWord(passed: boolean | undefined) {
-  return passed ? "VERIFIED" : "PENDING";
+  return passed ? "CHECKS PASSED" : "PENDING";
 }
 
 function initials(name: string) {
@@ -430,7 +433,7 @@ function round(value: number) {
 
 function toBadgeStatus(status: ProjectStatus) {
   if (status === "optimized") return "optimized";
-  if (status === "validated") return "verified";
+  if (status === "validated") return "checked";
   if (status === "failed") return "failed";
   return "completed";
 }

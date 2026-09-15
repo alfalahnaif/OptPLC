@@ -198,8 +198,8 @@ export function DashboardPage({ state }: { state?: PageState } = {}) {
 
         <Card>
           <CardHeader>
-            <CardTitle>Verification yield by domain</CardTitle>
-            <CardDescription>First-pass verification rate</CardDescription>
+            <CardTitle>Checks-passed yield by domain</CardTitle>
+            <CardDescription>First-pass rate of passing validation checks</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             {data.domainYield.map((domain) => (

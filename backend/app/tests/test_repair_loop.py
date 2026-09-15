@@ -17,11 +17,11 @@ def test_repair_loop_returns_immediately_when_code_is_verified() -> None:
 
             report = await RepairService(db).run_repair_loop("PRJ-0421")
 
-            assert report.finalStatus == "VERIFIED"
+            assert report.finalStatus == "CHECKS_PASSED"
             assert report.iterations == 1
             assert report.debuggingReports == []
             assert report.finalCodeArtifact.artifactId == artifact.artifactId
-            assert report.finalValidationReport.status == "VERIFIED"
+            assert report.finalValidationReport.status == "CHECKS_PASSED"
 
     asyncio.run(_run())
 
@@ -63,7 +63,7 @@ END_PROGRAM"""
 
             report = await RepairService(db).run_repair_loop("PRJ-0421")
 
-            assert report.finalStatus == "VERIFIED"
+            assert report.finalStatus == "CHECKS_PASSED"
             assert report.iterations == 2
             assert report.debuggingReports[0].errorType == "motor_safety_shutdown"
             assert report.finalCodeArtifact.metadata.generator == "template_based.repair.v1"
@@ -104,7 +104,7 @@ END_PROGRAM"""
 
             report = await RepairService(db).run_repair_loop("PRJ-0421")
 
-            assert report.finalStatus == "VERIFIED"
+            assert report.finalStatus == "CHECKS_PASSED"
             assert report.debuggingReports[0].errorType == "traffic_conflicting_green"
             assert "Green_Light := NOT Red_Light AND NOT Amber_Light;" in report.finalCodeArtifact.source
 
@@ -125,7 +125,7 @@ def test_invalid_syntax_triggers_debugging_and_regeneration() -> None:
 
             report = await RepairService(db).run_repair_loop("PRJ-0421")
 
-            assert report.finalStatus == "VERIFIED"
+            assert report.finalStatus == "CHECKS_PASSED"
             assert report.validationReports[0].status == "SYNTAX_ERROR"
             assert report.debuggingReports[0].errorType == "missing_end_pou"
             assert "END_PROGRAM" in report.finalCodeArtifact.source
@@ -176,7 +176,7 @@ def test_repair_loop_report_is_stored_in_repository() -> None:
             assert session is not None
             assert session.repair_loop_report is not None
             assert session.repair_loop_report["projectId"] == report.projectId
-            assert session.repair_loop_report["finalStatus"] == "VERIFIED"
+            assert session.repair_loop_report["finalStatus"] == "CHECKS_PASSED"
 
     asyncio.run(_run())
 

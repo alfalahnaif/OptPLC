@@ -7,7 +7,7 @@ import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import type { RepairLoopReport } from "@/lib/api-contracts";
 
 export function RepairLoopPanel({ report }: { report: RepairLoopReport }) {
-  const statusTone = report.finalStatus === "VERIFIED" ? "success" : report.finalStatus === "ITERATION_LIMIT_REACHED" ? "warning" : "danger";
+  const statusTone = report.finalStatus === "CHECKS_PASSED" ? "success" : report.finalStatus === "ITERATION_LIMIT_REACHED" ? "warning" : "danger";
 
   return (
     <Card>
@@ -21,7 +21,7 @@ export function RepairLoopPanel({ report }: { report: RepairLoopReport }) {
           <Metric icon={<GitBranch className="size-4" />} label="Iterations" value={`${report.iterations}`} />
           <Metric icon={<Wrench className="size-4" />} label="Code versions" value={`${report.codeVersions.length}`} />
           <Metric icon={<ShieldCheck className="size-4" />} label="Validation" value={report.finalValidationReport.status} />
-          <Metric icon={report.finalStatus === "VERIFIED" ? <CheckCircle2 className="size-4" /> : <XCircle className="size-4" />} label="Final code" value={`Iter ${report.finalCodeArtifact.iteration}`} />
+          <Metric icon={report.finalStatus === "CHECKS_PASSED" ? <CheckCircle2 className="size-4" /> : <XCircle className="size-4" />} label="Final code" value={`Iter ${report.finalCodeArtifact.iteration}`} />
         </div>
 
         <div className="overflow-x-auto">
@@ -36,7 +36,7 @@ export function RepairLoopPanel({ report }: { report: RepairLoopReport }) {
                 return (
                   <TR key={`${validation.artifactId}-${index}`}>
                     <TD className="font-mono text-xs">{index + 1}</TD>
-                    <TD><Badge tone={validation.status === "VERIFIED" ? "success" : validation.status === "TIMEOUT" ? "warning" : "danger"}>{validation.status}</Badge></TD>
+                    <TD><Badge tone={validation.status === "CHECKS_PASSED" ? "success" : validation.status === "TIMEOUT" ? "warning" : "danger"}>{validation.status}</Badge></TD>
                     <TD>{debug ? <Badge tone={debug.status === "PATCH_ADVICE_GENERATED" ? "warning" : "neutral"}>{debug.status}</Badge> : <span className="text-muted-foreground">-</span>}</TD>
                     <TD className="font-mono text-xs">{code?.artifactId ?? "-"}</TD>
                   </TR>

@@ -87,17 +87,17 @@ class DebuggingAgent:
         artifact: CodeArtifact,
         validation: ValidationReport,
     ) -> DebuggingReport:
-        if validation.status == "VERIFIED":
+        if validation.status == "CHECKS_PASSED":
             return self._report(
                 project_id=project_id,
                 artifact=artifact,
                 validation=validation,
                 status="NOT_REQUIRED",
                 error_type="none",
-                root_cause_summary="No debugging required because the code is verified.",
+                root_cause_summary="No debugging required because the validation checks passed.",
                 affected_code_region="None",
                 patch_advice=["No patch advice is required. Continue to optimization when ready."],
-                suggested_regeneration_prompt="No regeneration required; keep the verified Structured Text artifact.",
+                suggested_regeneration_prompt="No regeneration required; keep the current Structured Text artifact.",
                 counterexample_summary=None,
             )
 
