@@ -150,3 +150,20 @@ async def test_b004_template_is_rejected_for_undeclared_signals() -> None:
     errors = CHECK.check(await _template_source("B004"))
     assert errors
     assert all("is not declared" in error for error in errors)
+
+
+def test_step_is_a_reserved_name() -> None:
+    """P1-03, D-006: MATIEC rejects a variable named Step (STEP is an SFC keyword)."""
+    errors = CHECK.check(program("VAR\n    Step : INT;\nEND_VAR", "Step := 1;"))
+    assert errors == ["Variable name 'Step' is a reserved IEC 61131-3 keyword (SFC); MATIEC rejects it (line 3)."]
+
+
+def test_named_constant_case_labels_are_rejected() -> None:
+    """P1-03, D-006: MATIEC accepts only literal CASE labels."""
+    errors = CHECK.check(
+        program(
+            "VAR CONSTANT\n    IDLE : INT := 0;\nEND_VAR\nVAR\n    Phase : INT;\n    X : BOOL;\nEND_VAR",
+            "CASE Phase OF\n    IDLE: X := FALSE;\nEND_CASE;",
+        )
+    )
+    assert errors == ["CASE label 'IDLE' is a named constant; MATIEC accepts only literal labels (line 10)."]
