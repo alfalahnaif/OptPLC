@@ -105,7 +105,7 @@ Open `http://localhost:3000`. The frontend expects the backend at `http://localh
 docker build -f docker/app.Dockerfile -t optplc-backend:p0-05 .
 ```
 
-The image builds MATIEC from a pinned commit, installs Python dependencies from the hashed lock `backend/requirements-docker.lock` (CPU-only PyTorch), and runs as a non-root user with a health check. Results reported in the thesis come from this image. `docker-compose.yml` still uses the older service name and mounts; it is updated in a later item.
+The image builds MATIEC from a pinned commit, installs Python dependencies from the hashed lock `backend/requirements-docker.lock` (CPU-only PyTorch), and runs as a non-root user with a health check. Results reported in the thesis come from this image. `docker-compose.yml` builds the same image as `optplc-backend:local` (container `optplc-app`) and mounts `backend/plcforge.db`, `rag_db/`, and `backend/benchmark/results/` from the host. `docker compose up` replaces a container created from the older file (`plcforge-app`); the results that container held were backed up in P0-13.
 
 ## Environment Variables
 

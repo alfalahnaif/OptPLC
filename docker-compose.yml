@@ -1,14 +1,20 @@
 services:
   plc-app:
+    # Reference backend image (P0-05). Tagged separately so the verified optplc-backend:p0-05 tag stays as it is.
     build:
       context: .
       dockerfile: docker/app.Dockerfile
-    container_name: plcforge-app
+    image: optplc-backend:local
+    container_name: optplc-app
     ports:
       - "8000:8000"
     env_file:
       - ./backend/.env
     volumes:
+      # WORKDIR is /app, so the default DATABASE_URL (sqlite:///./plcforge.db) resolves to /app/plcforge.db.
       - ./backend/plcforge.db:/app/plcforge.db
+      # Chroma store; the path is hard-coded in rag_service.py until P1-20.
       - ./rag_db:/app/rag_db
+      # Benchmark results go to the host so they survive container recreation and reach the backups.
+      - ./backend/benchmark/results:/app/benchmark/results
     restart: unless-stopped
