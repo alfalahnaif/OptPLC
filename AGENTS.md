@@ -146,7 +146,7 @@ Events:    PRJ-0001-wf-requirements-1, PRJ-0001-wf-plan-2 ...
 - **Static domain rules** are text patterns; an unsafe motor program can pass them.
 - **Formal path:** the transpiler deletes `IF` blocks and emits no real LTL, and its result parsing fails open (P3).
 - **No authentication or rate limiting** on any endpoint (S-01; minimal protection in P1-14).
-- **npm audit:** 1 critical and 3 high advisories in frontend dependencies (P0-12).
+- **Dependency advisories:** `npm audit` is clean after P0-12 (Next.js 15.5.25 with a `postcss` override, D-027; the Next.js 16 upgrade is P8-14). `pip-audit` on `backend/requirements-docker.lock` reports 12 known vulnerabilities in `chromadb`, `transformers`, and `pydantic-settings`, not yet addressed; `torch 2.5.1+cpu` cannot be audited because that build is not on PyPI.
 
 ---
 
