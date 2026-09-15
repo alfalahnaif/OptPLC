@@ -15,6 +15,7 @@ from app.schemas.contracts import (
     ValidationReport,
     ValidationSafetyResult,
 )
+from app.services.st_rules import start_paths_guarded
 from app.services.st_syntax_check import PARSER_CHECK_LABEL, ParserCheck, strip_comments_and_strings
 from app.services.transpiler_service import StToSmvTranspiler
 from app.services.validation_service import MatiecValidator, PLCVerifValidator
@@ -232,7 +233,8 @@ class MotorControlValidator(DomainValidator):
             re.search(r"START_PB\s+AND\s+NOT\s+(?:STOP|FAULT|E_STOP|OVERLOAD)", upper) is not None
             or re.search(r"NOT\s+(?:STOP|E_STOP).{0,80}START_PB", upper, re.DOTALL) is not None
         )
-        mc2_passed = (not has_start_signal) or has_start_interlock
+        # The text patterns miss a correct stop-dominant latch (C-14), so the parse tree is checked too (D-031).
+        mc2_passed = (not has_start_signal) or has_start_interlock or bool(start_paths_guarded(source))
 
         has_fault = re.search(r"\bFAULT\w*\b", upper) is not None
         mc3_passed = has_fault or not (has_motor_signal and has_start_signal)

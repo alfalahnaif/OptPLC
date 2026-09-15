@@ -69,7 +69,7 @@ Modes are hard-coded in `app/services/project_service.py`.
 | Debug | `DebuggingAgent` | `llm` | Rule-based advice on any LLM error |
 | Optimize | `OptimizationAgent` | `llm` | Per-pass static revalidation and rollback; no behavioural-equivalence check |
 
-Known template defects: the motor template never starts the motor (C-10), the batch template never sets `Batch_Complete` (C-11), and the `"Safety Interlock"` domain falls back to the generic template with undeclared variables (C-13). They are fixed in P1-22.
+The motor, batch, and interlock templates were redesigned in P1-22 (C-10, C-11, C-13, D-031): a normally closed stop with a rising-edge start, a held batch Complete step, and an interlock that needs a reset after power-up and two hands within 0.5 s. Domains route through `app/agents/domains.py`, and a plan that no template fits gets a program that holds every output FALSE. Behavior tests drive the templates over several scans with `app/tests/support/scan_sim.py`. Known defect: the traffic template is not a phase controller (C-15, P1-24).
 
 `app/agents/llm_client.py` provides one async `llm_complete()` for all providers. Agents must not call provider SDKs directly.
 

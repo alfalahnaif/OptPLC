@@ -137,19 +137,10 @@ async def _template_source(case_id: str) -> str:
     return artifact.source
 
 
-@pytest.mark.parametrize("case_id", ["B001", "B002", "B003", "B005"])
+@pytest.mark.parametrize("case_id", ["B001", "B002", "B003", "B004", "B005"])
 async def test_benchmark_templates_pass(case_id: str) -> None:
+    """B004 was rejected for undeclared signals until P1-22 fixed its routing (C-13)."""
     assert CHECK.check(await _template_source(case_id)) == []
-
-
-async def test_b004_template_is_rejected_for_undeclared_signals() -> None:
-    """C-13: the Safety Interlock case falls back to the generic template, whose signals are not declared.
-
-    MATIEC rejects the same template (P0-05). Update this test when P1-22 fixes C-13.
-    """
-    errors = CHECK.check(await _template_source("B004"))
-    assert errors
-    assert all("is not declared" in error for error in errors)
 
 
 def test_step_is_a_reserved_name() -> None:

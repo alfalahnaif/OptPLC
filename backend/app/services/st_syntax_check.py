@@ -59,6 +59,13 @@ def _default_parser() -> STAstParser:
     return _shared_parser
 
 
+def parse_tree(source: str) -> Tree:
+    """Parses source with the shared parser. Raises lark's UnexpectedInput or ValueError on failure."""
+    parser = _default_parser()
+    with _parser_lock:
+        return parser.parse(source)
+
+
 def strip_comments_and_strings(source: str) -> str:
     """Blanks out comments and string literals, keeping line breaks so line numbers stay valid."""
     return _COMMENT_OR_STRING.sub(lambda match: re.sub(r"[^\r\n]", " ", match.group()), source)

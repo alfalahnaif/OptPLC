@@ -2,6 +2,7 @@ import pytest
 
 from app.agents import CodeGenerationAgent, PlanningAgent
 from app.schemas.contracts import PlanObject, PlanScope, PlanSignal
+from app.tests.support.scan_sim import ScanSim
 
 pytestmark = pytest.mark.asyncio
 
@@ -62,8 +63,11 @@ async def test_safety_interlock_generation_fails_safe() -> None:
 
     source = (await CodeGenerationAgent().generate_code(project_id="PRJ-SAFE", plan=plan)).source
 
-    assert "Permissive_OK := Guard_Closed" in source
-    assert "Machine_Enable := Permissive_OK AND NOT Trip_State;" in source
+    # Behavior, not wording (P1-22): disabled at power-up until a reset, even with both hands pressed.
+    sim = ScanSim(source)
+    power_up = {"Guard_Closed": True, "Fault_Input": False, "Reset_PB": False, "TwoHand_Left": True, "TwoHand_Right": True}
+    assert sim.scan(**power_up)["Machine_Enable"] is False
+    assert sim.scan(**power_up)["Trip_Lamp"] is True
 
 
 async def test_batch_generation_includes_step_logic() -> None:
@@ -78,10 +82,7 @@ async def test_batch_generation_includes_step_logic() -> None:
     assert "Step_State : INT;" in source
     assert "Fault_State : BOOL;" in source
     assert "CASE Step_State OF" in source
-    assert "Fill_Valve := (Step_State = 10) AND NOT Fault_State;" in source
-    assert "Mixer_Motor := (Step_State = 20) AND NOT Fault_State;" in source
-    assert "Drain_Valve := (Step_State = 30) AND NOT Fault_State;" in source
-    assert "Batch_Complete := (Step_State = 40) AND NOT Fault_State;" in source
+    # Step behavior (fill, mix, drain, held complete) is covered in test_template_behavior.py (P1-22).
     assert "IF NOT Emergency_Stop OR Abort_PB THEN" in source
     assert "IF Fault_State AND Reset_PB AND Emergency_Stop AND NOT Abort_PB THEN" in source
     assert "Motor_Run" not in source
@@ -166,11 +167,13 @@ async def test_motor_template_uses_normally_closed_stop_pb_semantics() -> None:
 
     source = (await CodeGenerationAgent().generate_code(project_id="PRJ-MOTOR-NC", plan=plan)).source
 
-    assert "Start_PB AND Stop_PB" in source
-    assert "IF NOT Stop_PB OR Fault_State OR NOT Safety_OK THEN" in source
-    assert "Start_PB AND NOT Stop_PB" not in source
-    assert "IF Stop_PB OR Fault_State" not in source
     assert "Stop_PB : BOOL;  (* Normally closed stop pushbutton: TRUE = healthy, FALSE = pressed *)" in source
+    # Behavior, not wording (P1-22): FALSE on Stop_PB (pressed or a broken wire) stops the motor and blocks a start.
+    sim = ScanSim(source)
+    healthy = {"Start_PB": False, "Stop_PB": True, "Emergency_Stop": True, "Overload": False, "Reset_PB": False}
+    assert sim.scan(**{**healthy, "Start_PB": True})["Motor_Run"] is True
+    assert sim.scan(**{**healthy, "Stop_PB": False})["Motor_Run"] is False
+    assert sim.scan(**{**healthy, "Start_PB": True, "Stop_PB": False})["Motor_Run"] is False
 
 
 async def test_different_domains_produce_different_code() -> None:
@@ -191,4 +194,3 @@ async def test_different_domains_produce_different_code() -> None:
     assert "Motor_Run := Run_Cmd AND Safety_OK AND NOT Fault_State;" in motor_source
     assert "CASE Step_State OF" in batch_source
     assert motor_source != batch_source
-

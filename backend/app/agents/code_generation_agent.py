@@ -6,6 +6,7 @@ import time
 from datetime import datetime, timezone
 from typing import Literal
 
+from app.agents.domains import canonical_domain
 from app.agents.llm_client import llm_complete
 from app.schemas.contracts import CodeArtifact, CodeMetadata, CodeMetrics, PlanObject, PlanSignal
 
@@ -375,69 +376,83 @@ class CodeGenerationAgent:
             ),
         )
 
+    # Signals each template reads or writes unconditionally. A template is used only when the plan
+    # declares all of them, so generated code never references an undeclared signal (C-13).
+    _TEMPLATE_SIGNALS: dict[str, frozenset[str]] = {
+        "motor control": frozenset({"Motor_Run"}),
+        "sequential batch": frozenset(
+            {"Start_PB", "Emergency_Stop", "Abort_PB", "Reset_PB", "High_Level", "Low_Level", "Mix_Timer_Done"}
+        ),
+        "traffic control": frozenset(
+            {"Vehicle_Detect", "Ped_Request", "Emergency_Flash", "Red_Light", "Amber_Light", "Green_Light", "Ped_Walk"}
+        ),
+        "process control": frozenset(
+            {"Level_PV", "Low_SP", "High_SP", "HighHigh_SP", "Auto_Mode", "Inlet_Valve", "Outlet_Valve", "High_Alarm"}
+        ),
+        "safety interlocks": frozenset(
+            {"Guard_Closed", "TwoHand_Left", "TwoHand_Right", "Reset_PB", "Fault_Input", "Machine_Enable", "Trip_Lamp", "Alarm_Horn"}
+        ),
+        "generic": frozenset({"Start_Cmd", "Stop_Cmd", "Reset_Cmd", "Process_Enable", "Fault_Indication"}),
+    }
+
     def _source_for(self, plan: PlanObject) -> str:
-        domain = self._normalized_domain(plan)
-        output_names = {signal.name for signal in plan.outputs}
+        domain = canonical_domain(plan.domain)
+        signals = {signal.name for signal in [*plan.inputs, *plan.outputs]}
+        builders = {
+            "motor control": self._motor_source,
+            "sequential batch": self._batch_source,
+            "traffic control": self._traffic_source,
+            "process control": self._tank_source,
+            "safety interlocks": self._safety_interlock_source,
+        }
 
-        if domain == "motor control" and "Motor_Run" in output_names:
-            return self._motor_source(plan)
-        if domain == "sequential batch":
-            return self._batch_source(plan)
-        if domain == "traffic control":
-            return self._traffic_source(plan)
-        if domain in {"process control", "tank"}:
-            return self._tank_source(plan)
-        if domain == "safety interlocks":
-            return self._safety_interlock_source(plan)
-
-        return self._generic_source(plan)
+        builder = builders.get(domain)
+        if builder is not None and self._TEMPLATE_SIGNALS[domain] <= signals:
+            return builder(plan)
+        if self._TEMPLATE_SIGNALS["generic"] <= signals:
+            return self._generic_source(plan)
+        return self._safe_outputs_source(plan)
 
     def _motor_source(self, plan: PlanObject) -> str:
+        """Motor DOL (P1-22, D-031): normally closed stop, start on a rising edge, stop-dominant seal-in,
+        and a latched fault that only Reset_PB clears. The reset runs after the run logic, so a Start
+        press in the reset scan is consumed while the fault is still latched and cannot start the motor."""
         input_names = {signal.name for signal in plan.inputs}
         output_names = {signal.name for signal in plan.outputs}
-        has_start = "Start_PB" in input_names
-        has_stop = "Stop_PB" in input_names
+        e_stop_name = "E_Stop" if "E_Stop" in input_names else ("Emergency_Stop" if "Emergency_Stop" in input_names else None)
+        safety_terms = [term for term in [e_stop_name, "NOT Overload" if "Overload" in input_names else None] if term]
         has_reset = "Reset_PB" in input_names
-        e_stop_name = "E_Stop" if "E_Stop" in input_names else ("Emergency_Stop" if "Emergency_Stop" in input_names else "E_Stop")
-        has_overload = "Overload" in input_names
+        if has_reset:
+            fault_set = ["IF NOT Safety_OK THEN", "    Fault_State := TRUE;", "END_IF;"]
+            fault_reset = ["IF Fault_State AND Reset_PB AND Safety_OK THEN", "    Fault_State := FALSE;", "END_IF;"]
+        else:
+            # Without a reset input the fault follows the safety inputs; the seal-in still needs a new press.
+            fault_set = ["Fault_State := NOT Safety_OK;"]
+            fault_reset = []
         return self._assemble_program(
             plan,
             internal_variables=[
-                ("Run_Latch", "BOOL"),
+                ("Start_Edge", "R_TRIG"),
+                ("Run_Cmd", "BOOL"),
                 ("Fault_State", "BOOL"),
+                ("Safety_OK", "BOOL"),
             ],
             logic=[
-                "(* Motor DOL template with latched fault and scan-order force-off. *)",
-                f"IF NOT {e_stop_name} OR {'Overload' if has_overload else 'FALSE'} THEN Fault_State := TRUE; END_IF;",
-                *([
-                    f"IF Reset_PB AND {e_stop_name} AND {'NOT Overload' if has_overload else 'TRUE'} THEN",
-                    "    Fault_State := FALSE;",
-                    "END_IF;",
-                ] if has_reset else []),
+                "(* Motor DOL: NC stop, rising-edge start, stop-dominant seal-in, latched fault. *)",
+                f"Safety_OK := {' AND '.join(safety_terms) if safety_terms else 'TRUE'};",
+                *fault_set,
                 "",
-                f"IF {'Start_PB AND ' if has_start else ''}{'NOT Stop_PB AND ' if has_stop else ''}{e_stop_name} AND {'NOT Overload AND ' if has_overload else ''}NOT Fault_State THEN",
-                "    Run_Latch := TRUE;",
+                f"Start_Edge(CLK := {'Start_PB' if 'Start_PB' in input_names else 'FALSE'});",
+                f"IF {'NOT Stop_PB OR ' if 'Stop_PB' in input_names else ''}NOT Safety_OK OR Fault_State THEN",
+                "    Run_Cmd := FALSE;",
+                "ELSIF Start_Edge.Q THEN",
+                "    Run_Cmd := TRUE;",
                 "END_IF;",
+                *fault_reset,
                 "",
-                f"IF {'NOT Stop_PB OR ' if has_stop else ''}NOT {e_stop_name} OR {'Overload OR ' if has_overload else ''}Fault_State THEN",
-                "    Run_Latch := FALSE;",
-                "END_IF;",
-                "",
-                "Motor_Run := Run_Latch AND NOT Fault_State;",
-                *(
-                    ["Ready_Lamp := NOT Fault_State AND NOT Motor_Run;"]
-                    if "Ready_Lamp" in output_names
-                    else []
-                ),
-                *(
-                    ["Fault_Lamp := Fault_State;"]
-                    if "Fault_Lamp" in output_names
-                    else []
-                ),
-                "",
-                f"IF NOT {e_stop_name} OR Fault_State THEN",
-                "    Motor_Run := FALSE;",
-                "END_IF;",
+                "Motor_Run := Run_Cmd AND Safety_OK AND NOT Fault_State;",
+                *(["Ready_Lamp := NOT Fault_State AND NOT Motor_Run;"] if "Ready_Lamp" in output_names else []),
+                *(["Fault_Lamp := Fault_State;"] if "Fault_Lamp" in output_names else []),
             ],
         )
 
@@ -493,142 +508,137 @@ class CodeGenerationAgent:
         )
 
     def _safety_interlock_source(self, plan: PlanObject) -> str:
+        """Fail-safe interlock (P1-22, D-031): a latched trip that needs a manual reset, also after
+        power-up, and two-hand control that needs both hands within 0.5 s and a full release before
+        it re-arms. Machine_Enable is hold-to-run: releasing a hand drops it without tripping."""
         return self._assemble_program(
             plan,
             internal_variables=[
-                ("Permissive_OK", "BOOL"),
-                ("Trip_State", "BOOL"),
+                ("Safety_OK", "BOOL"),
+                ("Trip_State", "BOOL := TRUE"),
+                ("Hands_Both", "BOOL"),
+                ("Hands_Any", "BOOL"),
+                ("Hands_Armed", "BOOL"),
+                ("Hands_Active", "BOOL"),
+                ("Sync_Timer", "TON"),
             ],
             logic=[
-                "(* Fail-safe permissive chain. *)",
-                "Permissive_OK := Guard_Closed AND TwoHand_Left AND TwoHand_Right AND NOT Fault_Input;",
-                "",
-                "IF NOT Permissive_OK THEN",
+                "(* Latched trip; Trip_State starts TRUE, so power-up needs a manual reset. *)",
+                "Safety_OK := Guard_Closed AND NOT Fault_Input;",
+                "IF NOT Safety_OK THEN",
                 "    Trip_State := TRUE;",
                 "END_IF;",
-                "",
-                "IF Trip_State AND Reset_PB AND Permissive_OK THEN",
+                "IF Trip_State AND Reset_PB AND Safety_OK THEN",
                 "    Trip_State := FALSE;",
                 "END_IF;",
                 "",
-                "Machine_Enable := Permissive_OK AND NOT Trip_State;",
+                "(* Two-hand control: both hands within 0.5 s; re-arm only after both are released. *)",
+                "Hands_Both := TwoHand_Left AND TwoHand_Right;",
+                "Hands_Any := TwoHand_Left OR TwoHand_Right;",
+                "IF NOT Hands_Any THEN",
+                "    Hands_Armed := TRUE;",
+                "END_IF;",
+                "Sync_Timer(IN := Hands_Any AND NOT Hands_Both AND NOT Hands_Active, PT := T#500ms);",
+                "IF Sync_Timer.Q THEN",
+                "    Hands_Armed := FALSE;",
+                "END_IF;",
+                "IF Hands_Both AND Hands_Armed THEN",
+                "    Hands_Active := TRUE;",
+                "END_IF;",
+                "IF NOT Hands_Both THEN",
+                "    (* One hand released after activation: stay disarmed until both are released. *)",
+                "    IF Hands_Active AND Hands_Any THEN",
+                "        Hands_Armed := FALSE;",
+                "    END_IF;",
+                "    Hands_Active := FALSE;",
+                "END_IF;",
+                "",
+                "Machine_Enable := Safety_OK AND NOT Trip_State AND Hands_Active;",
                 "Trip_Lamp := Trip_State;",
                 "Alarm_Horn := Trip_State;",
             ],
         )
 
     def _batch_source(self, plan: PlanObject) -> str:
-        input_names = {signal.name for signal in plan.inputs}
+        """Sequential batch (P1-22, D-031): fill, mix, drain, then a Complete step that holds
+        Batch_Complete until the next start. Start acts on a rising edge; an abort or emergency stop
+        latches a fault that Reset_PB clears only when both are healthy."""
         output_names = {signal.name for signal in plan.outputs}
-        has_start = "Start_PB" in input_names
-        has_emergency = "Emergency_Stop" in input_names
-        has_abort = "Abort_PB" in input_names
-        has_reset = "Reset_PB" in input_names
-        has_high_level = "High_Level" in input_names
-        has_mix_done = "Mix_Timer_Done" in input_names
-        has_low_level = "Low_Level" in input_names
-
-        shutdown_conditions: list[str] = []
-        if has_emergency:
-            shutdown_conditions.append("NOT Emergency_Stop")
-        if has_abort:
-            shutdown_conditions.append("Abort_PB")
-        shutdown_expr = " OR ".join(shutdown_conditions) if shutdown_conditions else "FALSE"
-
-        reset_terms = ["Fault_State", "Reset_PB"] if has_reset else []
-        if has_emergency:
-            reset_terms.append("Emergency_Stop")
-        if has_abort:
-            reset_terms.append("NOT Abort_PB")
-        reset_expr = " AND ".join(reset_terms)
-
-        step_transitions = [
-            "    0: (* Idle *)",
-            f"        IF {'Start_PB AND ' if has_start else ''}NOT Fault_State THEN",
-            "            Step_State := 1;",
-            "        END_IF;",
-            "    1: (* Fill *)",
-            f"        IF {'High_Level' if has_high_level else 'TRUE'} THEN",
-            "            Step_State := 2;",
-            "        END_IF;",
-            "    2: (* Mix *)",
-            f"        IF {'Mix_Timer_Done' if has_mix_done else 'TRUE'} THEN",
-            "            Step_State := 3;",
-            "        END_IF;",
-            "    3: (* Drain *)",
-            f"        IF {'Low_Level' if has_low_level else 'TRUE'} THEN",
-            "            Step_State := 0;",
-            "        END_IF;",
-            "    ELSE",
-            "        Step_State := 0;",
+        step_outputs = [
+            (name, step)
+            for name, step in (("Fill_Valve", 1), ("Mixer_Motor", 2), ("Drain_Valve", 3), ("Batch_Complete", 4))
+            if name in output_names
         ]
-
-        output_logic: list[str] = []
-        if "Fill_Valve" in output_names:
-            output_logic.append("Fill_Valve := (Step_State = 1) AND NOT Fault_State;")
-        if "Mixer_Motor" in output_names:
-            output_logic.append("Mixer_Motor := (Step_State = 2) AND NOT Fault_State;")
-        if "Drain_Valve" in output_names:
-            output_logic.append("Drain_Valve := (Step_State = 3) AND NOT Fault_State;")
-        if "Batch_Complete" in output_names:
-            output_logic.append(
-                f"Batch_Complete := (Step_State = 3) AND {'Low_Level AND ' if has_low_level else ''}NOT Fault_State;"
-            )
-
         return self._assemble_program(
             plan,
             internal_variables=[
+                ("Start_Edge", "R_TRIG"),
                 ("Step_State", "INT"),
                 ("Fault_State", "BOOL"),
             ],
             logic=[
                 "(* Sequential batch state machine with explicit fault handling. *)",
-                f"IF {shutdown_expr} THEN",
+                "Start_Edge(CLK := Start_PB);",
+                "IF NOT Emergency_Stop OR Abort_PB THEN",
                 "    Step_State := 0;",
                 "    Fault_State := TRUE;",
                 "END_IF;",
                 "",
-                *(
-                    [
-                        "(* Reset_PB clears the latched fault once shutdown signals are healthy. *)",
-                        f"IF {reset_expr} THEN",
-                        "    Fault_State := FALSE;",
-                        "END_IF;",
-                        "",
-                    ]
-                    if reset_expr
-                    else []
-                ),
+                "(* Reset_PB clears the latched fault once shutdown signals are healthy. *)",
+                "IF Fault_State AND Reset_PB AND Emergency_Stop AND NOT Abort_PB THEN",
+                "    Fault_State := FALSE;",
+                "END_IF;",
+                "",
                 "CASE Step_State OF",
-                *step_transitions,
+                "    0: (* Idle *)",
+                "        IF Start_Edge.Q AND NOT Fault_State THEN",
+                "            Step_State := 1;",
+                "        END_IF;",
+                "    1: (* Fill *)",
+                "        IF High_Level THEN",
+                "            Step_State := 2;",
+                "        END_IF;",
+                "    2: (* Mix *)",
+                "        IF Mix_Timer_Done THEN",
+                "            Step_State := 3;",
+                "        END_IF;",
+                "    3: (* Drain *)",
+                "        IF Low_Level THEN",
+                "            Step_State := 4;",
+                "        END_IF;",
+                "    4: (* Complete: held until the next start *)",
+                "        IF Start_Edge.Q AND NOT Fault_State THEN",
+                "            Step_State := 1;",
+                "        END_IF;",
+                "    ELSE",
+                "        Step_State := 0;",
                 "END_CASE;",
                 "",
                 "(* Outputs are driven from PlanObject outputs only. *)",
-                *output_logic,
-                "",
-                "(* Safety force-off after output assignments (scan order guarantee). *)",
-                "IF Fault_State THEN",
+                *[f"{name} := (Step_State = {step}) AND NOT Fault_State;" for name, step in step_outputs],
                 *(
-                    ["    Fill_Valve := FALSE;"]
-                    if "Fill_Valve" in output_names
+                    [
+                        "",
+                        "(* Safety force-off after output assignments (scan order guarantee). *)",
+                        "IF Fault_State THEN",
+                        *[f"    {name} := FALSE;" for name, _ in step_outputs],
+                        "END_IF;",
+                    ]
+                    if step_outputs
                     else []
                 ),
-                *(
-                    ["    Mixer_Motor := FALSE;"]
-                    if "Mixer_Motor" in output_names
-                    else []
-                ),
-                *(
-                    ["    Drain_Valve := FALSE;"]
-                    if "Drain_Valve" in output_names
-                    else []
-                ),
-                *(
-                    ["    Batch_Complete := FALSE;"]
-                    if "Batch_Complete" in output_names
-                    else []
-                ),
-                "END_IF;",
+            ],
+        )
+
+    def _safe_outputs_source(self, plan: PlanObject) -> str:
+        """Used when no template matches the plan's domain and signals: every BOOL output is held FALSE
+        instead of generating code that reads signals the plan does not declare (C-13)."""
+        return self._assemble_program(
+            plan,
+            internal_variables=[],
+            logic=[
+                "(* No template matches this PlanObject; every BOOL output is held FALSE. *)",
+                *[f"{signal.name} := FALSE;" for signal in plan.outputs if signal.type.upper() == "BOOL"],
             ],
         )
 
