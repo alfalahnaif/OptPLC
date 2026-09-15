@@ -41,7 +41,7 @@ Database  SQLite (dev) — tables `projects` and `sessions`; pipeline state stor
 |------|-------|------|-----------------------|
 | Plan | PlanningAgent | `llm` | Falls back to `rule_based` if the reply is not valid JSON twice |
 | Generate | CodeGenerationAgent | `llm` | Falls back to `template_based` if the reply has no `PROGRAM` or misses a plan output; RAG is off on `/generate` |
-| Validate | ValidationAgent | `static` | MATIEC when available (the code is normalized first, see §8), otherwise the parser check `parser.v1` (P1-01, not L1); then regex domain rules (C-14) |
+| Validate | ValidationAgent | `static` | MATIEC on the code exactly as written when available (P1-02), otherwise the parser check `parser.v1` (P1-01, not L1); then regex domain rules (C-14) |
 | Debug | DebuggingAgent | `llm` | Falls back to `rule_based` on any LLM error |
 | Optimize | OptimizationAgent | `llm` | Three passes with static revalidation and rollback; **no behavioural-equivalence check** (C-03) |
 
@@ -140,7 +140,7 @@ Events:    PRJ-0001-wf-requirements-1, PRJ-0001-wf-plan-2 ...
 ## 8. Known Gaps (details in `docs/plan/AUDIT_2026-09.md` and `docs/plan/TEST_BASELINE.md`)
 
 - **Parser check (`parser.v1`, P1-01):** runs only when MATIEC is missing and covers a subset of ST (no `FUNCTION` POUs, `TYPE`/`STRUCT`, or `=>` output parameters). Passing it is not L1.
-- **MATIEC normalization:** timer calls are removed, `X.Q` becomes `FALSE`, and `T#` literals become `0` before compiling, so the checked code is not the delivered code (P1-02, D-005).
+- **Local tests assume no MATIEC:** on the host they expect `parser.v1`; inside the reference image MATIEC runs instead. MATIEC itself now compiles the delivered code exactly as written (P1-02, D-005).
 - **C-02:** the repair loop shows the LLM the template code instead of the failed code (P1-06).
 - **C-10 / C-11:** the motor template can never start the motor, and the batch template never sets `Batch_Complete` (P1-22).
 - **C-14:** the static domain rules are proximity regexes, not data flow. An unsafe motor program without emergency-stop handling passes MC-1..MC-4, while PC-1 and TC-1 reject the correct tank and traffic templates (P1-05).

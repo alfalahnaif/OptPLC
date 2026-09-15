@@ -42,12 +42,11 @@ RUN python -m pip install --no-cache-dir --require-hashes --default-timeout=1000
 
 COPY backend/ .
 
-# Run as an unprivileged user. iec2c still writes its C output into its working directory
-# (/usr/local/share/matiec) until P1-02 moves compilation to per-request temp dirs, so that
-# directory is owned by the app user for now.
+# Run as an unprivileged user. Each compile writes its C output to its own temp dir (P1-02, D-030),
+# so the MATIEC install stays owned by root and read-only for the app user.
 RUN useradd --create-home --uid 10001 optplc \
     && mkdir -p /app/rag_db \
-    && chown -R optplc:optplc /app /usr/local/share/matiec
+    && chown -R optplc:optplc /app
 USER optplc
 
 EXPOSE 8000

@@ -305,7 +305,7 @@ Rules:
             CodeArtifact,
             "CodeArtifact must be generated before validation.",
         )
-        report = ValidationAgent(mode="static").validate(
+        report = await ValidationAgent(mode="static").validate_in_thread(
             project_id=project_id,
             artifact=artifact,
             plan=plan,
@@ -421,7 +421,7 @@ Rules:
                 break
             logger.info("[RepairLoop] iteration %s/%s (elapsed %ss)", attempt, max_iter, f"{elapsed:.0f}")
 
-            validation = ValidationAgent(mode="static").validate(
+            validation = await ValidationAgent(mode="static").validate_in_thread(
                 project_id=project_id,
                 artifact=current_artifact,
                 plan=plan,
@@ -555,7 +555,7 @@ Rules:
         )
         history = self._append_history(session.optimization_report_history, report)
         code_history = self._append_history(session.code_artifact_history, report.optimizedCode)
-        post_optimization_validation = ValidationAgent(mode="static").validate(
+        post_optimization_validation = await ValidationAgent(mode="static").validate_in_thread(
             project_id=project_id,
             artifact=report.optimizedCode,
             plan=plan,

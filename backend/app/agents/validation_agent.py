@@ -545,6 +545,16 @@ class ValidationAgent:
 
         return self._validate_static(project_id=project_id, artifact=artifact, plan=plan)
 
+    async def validate_in_thread(
+        self,
+        *,
+        project_id: str,
+        artifact: CodeArtifact,
+        plan: PlanObject,
+    ) -> ValidationReport:
+        """Runs validate() in a worker thread so a slow MATIEC compile does not block the event loop (D-030)."""
+        return await asyncio.to_thread(self.validate, project_id=project_id, artifact=artifact, plan=plan)
+
     def _validate_static(self, *, project_id: str, artifact: CodeArtifact, plan: PlanObject) -> ValidationReport:
         syntax_errors, validator_used = self._syntax_errors_with_optional_matiec(artifact.source)
         names = {signal.name for signal in [*plan.inputs, *plan.outputs]}
@@ -868,7 +878,12 @@ class ValidationAgent:
         return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
 
     def _run_matiec_syntax(self, source: str) -> dict:
-        return self._run_coroutine_sync(self.matiec_validator.validate_syntax(source))
+        """Formal mode needs a real compile: a missing MATIEC fails closed with its reason."""
+        result = self.matiec_validator.validate_syntax_sync(source)
+        if result.get("method") == "unavailable":
+            reason = result.get("reason", "binary not found")
+            return {"passed": False, "errors": [f"MATIEC unavailable: {reason}"], "raw_output": ""}
+        return result
 
     @staticmethod
     def _run_coroutine_sync(coro):

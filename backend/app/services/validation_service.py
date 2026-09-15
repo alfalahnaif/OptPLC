@@ -3,6 +3,8 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
+import shutil
+import subprocess
 import tempfile
 from abc import ABC, abstractmethod
 from pathlib import Path
@@ -29,353 +31,106 @@ class IValidator(ABC):
 
 
 class MatiecValidator(IValidator):
-    """Async wrapper around the MATIEC `iec2c` Structured Text compiler."""
+    """Runs the MATIEC `iec2c` compiler on Structured Text exactly as written.
+
+    The source is never normalized first (D-005), so a pass is evidence level L1 for the
+    delivered code. Each compile gets its own temporary directory for the input file and the
+    generated C, so concurrent compiles never share files (P1-02, D-030).
+    """
 
     timeout_seconds = 30
-    _diagnostic_pattern = re.compile(r"(error|undefined)", re.IGNORECASE)
+    _diagnostic_pattern = re.compile(r"\b(error|undefined|undeclared|syntax)\b", re.IGNORECASE)
 
     @property
     def name(self) -> str:
         return "matiec"
 
-    def _normalize_for_matiec(self, code: str) -> str:
-        """
-        Normalize LLM-generated ST code for MATIEC v0.1 compatibility.
-        Handles patterns that the LLM generates but MATIEC v0.1 rejects.
-        """
-        import re
-
-        lines = code.split("\n")
-        result = []
-        i = 0
-        while i < len(lines):
-            line = lines[i]
-            stripped = line.rstrip()
-
-            # FIX A: Collapse multi-line assignments (operator at end)
-            if (":=" in stripped
-                    and not stripped.rstrip().endswith(";")
-                    and not stripped.rstrip().endswith("(*")
-                    and re.search(r"\b(OR|AND|NOT|\+|-|\*)\s*$", stripped, re.IGNORECASE)):
-                merged = stripped
-                j = i + 1
-                while j < len(lines) and not merged.rstrip().endswith(";"):
-                    nxt = lines[j].strip()
-                    if nxt and not nxt.startswith("(*"):
-                        merged = merged.rstrip() + " " + nxt
-                    j += 1
-                result.append(merged)
-                i = j
-                continue
-
-            # FIX B: Remove ANY dotted assignment (Var.Member := ...)
-            if re.search(r"\b\w+\.\w+\s*:=", stripped):
-                result.append(f"(* removed dotted assign: {stripped.strip()} *)")
-                i += 1
-                continue
-
-            # FIX C: Remove timer FB calls (TimerName(IN := ...) )
-            if re.search(r"\b\w+\s*\(\s*IN\s*:=", stripped, re.IGNORECASE):
-                result.append("(* timer FB call removed for MATIEC v0.1 *)")
-                i += 1
-                continue
-
-            # FIX D: Remove reading dotted members in expressions
-            # e.g.  X := Timer.Q AND Y;  -> X := Y;
-            if re.search(r"\b\w+\.\w+\b", stripped):
-                cleaned = re.sub(r"\b\w+\.\w+\b", "FALSE", stripped)
-                result.append(cleaned)
-                i += 1
-                continue
-
-            # FIX E: Remove TIME literals  T#5s -> removed
-            if re.search(r"\bT#\w+|\bTIME#\w+", stripped, re.IGNORECASE):
-                cleaned = re.sub(
-                    r"\bT#\w+|\bTIME#\w+",
-                    "0",
-                    stripped,
-                    flags=re.IGNORECASE,
-                )
-                result.append(cleaned)
-                i += 1
-                continue
-
-            result.append(line)
-            i += 1
-
-        normalized = "\n".join(result)
-        if normalized != code:
-            import logging
-
-            logging.getLogger(__name__).info(
-                "[ValidationAgent] MATIEC normalization applied"
-            )
-        return normalized
-
-    def _collapse_multiline_assignments(self, code: str) -> str:
-        """
-        MATIEC v0.1 requires each assignment on one line.
-        This collapses patterns like:
-          X := A OR
-               B OR C;
-        Into:
-          X := A OR B OR C;
-        """
-        lines = code.split("\n")
-        result = []
-        i = 0
-        while i < len(lines):
-            line = lines[i]
-            stripped = line.rstrip()
-
-            # Check if this line looks like a continuation needed:
-            # ends with an operator but no semicolon
-            continuation_operators = (
-                " OR",
-                " AND",
-                " +",
-                " -",
-                " *",
-                " OR\r",
-                " AND\r",
-            )
-            needs_continuation = (
-                not stripped.endswith(";")
-                and not stripped.endswith("(")
-                and ":=" in stripped
-                and any(stripped.upper().endswith(op.upper().rstrip()) for op in continuation_operators)
-            )
-
-            if needs_continuation and i + 1 < len(lines):
-                # Merge with next line(s) until we find the semicolon
-                merged = stripped
-                j = i + 1
-                while j < len(lines) and not merged.rstrip().endswith(";"):
-                    next_line = lines[j].strip()
-                    if next_line:
-                        merged = merged + " " + next_line
-                    j += 1
-                result.append(merged)
-                i = j
-            else:
-                result.append(line)
-                i += 1
-
-        return "\n".join(result)
+    @staticmethod
+    def build_command(source_path: Path, output_dir: Path) -> list[str]:
+        """-f prints full token locations; -I points at the IEC library; -T keeps the C output private."""
+        return [
+            str(settings.matiec_bin),
+            "-f",
+            "-I",
+            str(settings.matiec_lib_dir),
+            "-T",
+            str(output_dir),
+            str(source_path),
+        ]
 
     def validate_syntax_sync(self, st_code: str) -> dict:
         """
-        Synchronous MATIEC syntax check for sync callers.
+        Compiles st_code with iec2c. Blocking: async callers run it through asyncio.to_thread.
 
         Returns:
           {"passed": bool | None, "errors": list[str], "raw_output": str,
-           "method": "matiec" | "unavailable"}
+           "method": "matiec" | "unavailable", "return_code": int (when iec2c ran),
+           "reason": str (when unavailable)}
         """
-        import shutil
-        import subprocess
+        if not isinstance(st_code, str) or not st_code.strip():
+            return {
+                "passed": False,
+                "errors": ["Structured Text source is empty."],
+                "raw_output": "",
+                "method": "matiec",
+            }
 
-        tmp_path: str | None = None
         matiec_bin = str(settings.matiec_bin)
-        matiec_path = Path(matiec_bin)
+        if shutil.which(matiec_bin) is None and not Path(matiec_bin).exists():
+            return self._unavailable(f"MATIEC binary not found at: {matiec_bin}")
+        if not Path(settings.matiec_lib_dir, "ieclib.txt").exists():
+            return self._unavailable(f"MATIEC library not found at: {settings.matiec_lib_dir}")
 
-        if not isinstance(st_code, str) or not st_code.strip():
-            return {
-                "passed": False,
-                "errors": ["Structured Text source is empty."],
-                "raw_output": "",
-                "method": "matiec",
-            }
-
-        if shutil.which(matiec_bin) is None and not matiec_path.exists():
-            return {
-                "passed": None,
-                "errors": [],
-                "raw_output": "",
-                "method": "unavailable",
-                "reason": f"MATIEC binary not found at: {matiec_bin}",
-            }
-
-        # Preprocess: normalize generated code for MATIEC v0.1 compatibility.
-        normalized = self._normalize_for_matiec(st_code)
-        if normalized != st_code:
-            logging.getLogger(__name__).info(
-                "[ValidationAgent] Applied MATIEC v0.1 normalization"
-            )
-
-        try:
-            with tempfile.NamedTemporaryFile(
-                suffix=".st",
-                mode="w",
-                encoding="utf-8",
-                delete=False,
-            ) as temp_file:
-                temp_file.write(normalized)
-                temp_file.flush()
-                tmp_path = temp_file.name
-
-            # MATIEC needs to run from a directory containing lib/
-            matiec_lib_dir = "/usr/local/share/matiec"
-            lib_exists = Path(matiec_lib_dir, "lib", "ieclib.txt").exists()
-
-            if not lib_exists:
-                logger.warning(
-                    "[ValidationAgent] MATIEC lib/ieclib.txt not found at "
-                    f"{matiec_lib_dir}. Check Dockerfile MATIEC lib copy step."
-                )
-                return {
-                    "passed": None,
-                    "errors": [],
-                    "raw_output": "",
-                    "method": "unavailable",
-                    "reason": "MATIEC library files missing from container",
-                }
-
-            result = subprocess.run(
-                [matiec_bin, tmp_path],
-                capture_output=True,
-                text=True,
-                timeout=30,
-                cwd=matiec_lib_dir,
-                encoding="utf-8",
-                errors="replace",
-            )
-            logger.info(
-                f"[ValidationAgent] MATIEC running from cwd={matiec_lib_dir}, "
-                f"return_code={result.returncode}"
-            )
-
-            output = (result.stdout + result.stderr).strip()
-            errors: list[str] = []
-            for line in output.splitlines():
-                normalized = line.strip()
-                if normalized and re.search(r"\b(error|undefined|undeclared|syntax)\b", normalized, re.IGNORECASE):
-                    errors.append(normalized)
-
-            if len(errors) > 0:
-                error_summary = "\n  ".join(errors[:5])
-                logger.warning(
-                    f"[ValidationAgent] MATIEC syntax: FAILED "
-                    f"— {len(errors)} error(s):\n  {error_summary}"
-                )
-                if output:
-                    logger.debug(
-                        f"[ValidationAgent] MATIEC raw output:\n"
-                        f"{output[:500]}"
-                    )
-
-            passed = result.returncode == 0 and len(errors) == 0
-            return {
-                "passed": passed,
-                "errors": errors,
-                "raw_output": output[:3000],
-                "method": "matiec",
-                "return_code": result.returncode,
-            }
-        except subprocess.TimeoutExpired:
-            return {
-                "passed": False,
-                "errors": [f"MATIEC syntax check timed out after {self.timeout_seconds}s"],
-                "raw_output": "",
-                "method": "matiec",
-            }
-        except FileNotFoundError:
-            return {
-                "passed": None,
-                "errors": [],
-                "raw_output": "",
-                "method": "unavailable",
-                "reason": f"MATIEC binary not executable: {matiec_bin}",
-            }
-        finally:
-            if tmp_path:
-                try:
-                    Path(tmp_path).unlink(missing_ok=True)
-                except OSError:
-                    logger.warning("Failed to remove MATIEC temp file: %s", tmp_path)
-
-    async def validate_syntax(self, st_code: str) -> dict:
-        temp_path: Path | None = None
-
-        if not isinstance(st_code, str) or not st_code.strip():
-            return {
-                "passed": False,
-                "errors": ["Structured Text source is empty."],
-                "raw_output": "",
-            }
-
-        try:
-            with tempfile.NamedTemporaryFile(
-                mode="w",
-                suffix=".st",
-                prefix="plcforge_",
-                encoding="utf-8",
-                delete=False,
-            ) as temp_file:
-                temp_file.write(st_code)
-                temp_file.flush()
-                temp_path = Path(temp_file.name)
-
-            process = await asyncio.create_subprocess_exec(
-                str(settings.matiec_bin),
-                "-f",
-                str(temp_path),
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
-            )
-
+        with tempfile.TemporaryDirectory(prefix="optplc_iec2c_") as work:
+            work_dir = Path(work)
+            source_path = work_dir / "input.st"
+            output_dir = work_dir / "out"
+            output_dir.mkdir()
+            source_path.write_text(st_code, encoding="utf-8")
             try:
-                stdout_bytes, stderr_bytes = await asyncio.wait_for(
-                    process.communicate(),
+                result = subprocess.run(
+                    self.build_command(source_path, output_dir),
+                    capture_output=True,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
                     timeout=self.timeout_seconds,
+                    cwd=work_dir,
                 )
-            except asyncio.TimeoutError:
-                process.kill()
-                stdout_bytes, stderr_bytes = await process.communicate()
-                raw_timeout_output = self._join_output(stdout_bytes, stderr_bytes)
+            except subprocess.TimeoutExpired:
                 return {
                     "passed": False,
-                    "errors": [f"MATIEC syntax validation timed out after {self.timeout_seconds} seconds."],
-                    "raw_output": raw_timeout_output,
+                    "errors": [f"MATIEC syntax check timed out after {self.timeout_seconds}s"],
+                    "raw_output": "",
+                    "method": "matiec",
                 }
+            except OSError as exc:
+                return self._unavailable(f"MATIEC could not be started: {exc}")
 
-            raw_output = self._join_output(stdout_bytes, stderr_bytes)
-            diagnostic_errors = self._extract_errors(raw_output)
-            passed = process.returncode == 0 and not diagnostic_errors
+        output = self._join_output(result.stdout, result.stderr)
+        errors = self._extract_errors(output)
+        passed = result.returncode == 0 and not errors
+        if not passed and not errors:
+            errors = [self._return_code_error(result.returncode)]
+        logger.info("[MatiecValidator] iec2c return_code=%s errors=%s", result.returncode, len(errors))
+        return {
+            "passed": passed,
+            "errors": errors,
+            "raw_output": output[:3000],
+            "method": "matiec",
+            "return_code": result.returncode,
+        }
 
-            return {
-                "passed": passed,
-                "errors": diagnostic_errors if diagnostic_errors else ([] if passed else [self._return_code_error(process.returncode)]),
-                "raw_output": raw_output,
-            }
-
-        except FileNotFoundError:
-            return {
-                "passed": False,
-                "errors": [f"MATIEC binary was not found at {settings.matiec_bin}."],
-                "raw_output": "",
-            }
-        except PermissionError:
-            return {
-                "passed": False,
-                "errors": [f"MATIEC binary is not executable or permission was denied: {settings.matiec_bin}."],
-                "raw_output": "",
-            }
-        except OSError as exc:
-            return {
-                "passed": False,
-                "errors": [f"MATIEC process could not be started: {exc}"],
-                "raw_output": "",
-            }
-        finally:
-            if temp_path is not None:
-                try:
-                    temp_path.unlink(missing_ok=True)
-                except OSError:
-                    # Do not mask validation results because cleanup failed.
-                    temp_path = None
+    async def validate_syntax(self, st_code: str) -> dict:
+        """Async entry point: the same compile, in a worker thread so the event loop is not blocked."""
+        return await asyncio.to_thread(self.validate_syntax_sync, st_code)
 
     async def validate_formal(self, smv_model: str, properties: list[str]) -> dict:
         raise NotImplementedError("MATIEC performs syntax compilation only; formal validation is not implemented here.")
+
+    @staticmethod
+    def _unavailable(reason: str) -> dict:
+        return {"passed": None, "errors": [], "raw_output": "", "method": "unavailable", "reason": reason}
 
     @classmethod
     def _extract_errors(cls, raw_output: str) -> list[str]:
@@ -387,10 +142,8 @@ class MatiecValidator(IValidator):
         return errors
 
     @staticmethod
-    def _join_output(stdout_bytes: bytes | None, stderr_bytes: bytes | None) -> str:
-        stdout = (stdout_bytes or b"").decode("utf-8", errors="replace")
-        stderr = (stderr_bytes or b"").decode("utf-8", errors="replace")
-        return "\n".join(part for part in [stdout.strip(), stderr.strip()] if part)
+    def _join_output(stdout: str | None, stderr: str | None) -> str:
+        return "\n".join(part for part in [(stdout or "").strip(), (stderr or "").strip()] if part)
 
     @staticmethod
     def _return_code_error(return_code: int | None) -> str:
@@ -408,10 +161,13 @@ class ValidationService:
 
     async def validate_syntax(self, st_code: str) -> dict[str, Any]:
         result = await self.syntax_validator.validate_syntax(st_code)
+        errors = list(result.get("errors", []))
+        if not errors and result.get("reason"):
+            errors = [str(result["reason"])]
         return {
             "validator": self.syntax_validator.name,
             "passed": bool(result.get("passed", False)),
-            "errors": list(result.get("errors", [])),
+            "errors": errors,
             "raw_output": str(result.get("raw_output", "")),
         }
 
