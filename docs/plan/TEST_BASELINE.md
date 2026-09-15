@@ -5,9 +5,12 @@
 - **الإخفاقات المعروفة المسموح بها** مسجلة آليًا في `backend/app/tests/known_failures.txt`.
 - **`scripts/check.ps1`** يفشل على أي إخفاق غير مدرج هناك.
 
-## الحصيلة الحالية · 2026-09-14 · بعد P0-11
+## الحصيلة الحالية · 2026-09-15 · بعد P1-01
 
-**141 اختبارًا: 107 نجح، و34 فشل كلها معروفة.** الفئة أ فيها 28 (C-01)، والفئة ج فيها 6 (القوالب).
+**167 اختبارًا: 152 نجح، و15 فشل كلها معروفة.** الفئة ج فيها 6 (القوالب)، والفئة د فيها 9 (أخطاء كانت مختفية خلف C-01). الفئة أ أُغلقت.
+
+- من الاختبارات الـ 141 السابقة: 126 نجح، بعد أن كانت 107.
+- أُضيف 26 اختبارًا في P1-01، وكلها تنجح.
 
 الأمر، من داخل `backend/`:
 
@@ -32,24 +35,17 @@ powershell -ExecutionPolicy Bypass -File scripts\check.ps1
 
 ## تصنيف الإخفاقات
 
-### أ. نتيجة للخطأ C-01: 28 اختبارًا، تُصلح في `P1-01`
+### أ. نتيجة للخطأ C-01: 0، أُغلقت في `P1-01`
 
-مدقق regex الاحتياطي يرفض كل برنامج فيه `VAR_INPUT` و`VAR_OUTPUT` بخطأ `Mismatched VAR/END_VAR (1 VAR vs 3 END_VAR)`. النتيجة سلسلة من الأعطال: التحقق يعطي `SYNTAX_ERROR`، فيعطي وكيل التصحيح `invalid_variable_block`، ولا تصل حلقة الإصلاح إلى `VERIFIED`، ويرفض المحسِّن العمل.
+كانت 28. فحص regex الاحتياطي كان يرفض كل برنامج فيه `VAR_INPUT` و`VAR_OUTPUT` بخطأ `Mismatched VAR/END_VAR (1 VAR vs 3 END_VAR)`. استُبدل بفحص المحلل `parser.v1` (D-029)، فكانت النتيجة:
 
-| الملف | الاختبارات |
-| --- | --- |
-| `test_validation_agent` | `test_valid_motor_structured_text_returns_verified`، `test_motor_missing_emergency_stop_handling_returns_formal_violation`، `test_motor_stop_pb_open_circuit_behavior_returns_formal_violation`، `test_undeclared_assigned_variable_returns_syntax_error`، `test_traffic_conflicting_greens_return_formal_violation`، `test_tank_level_with_real_variables_and_safety_logic_returns_verified`، `test_matiec_unavailable_falls_back_to_static_validation` (انتقل من ب في P0-11) |
-| `test_debugging_agent` | `test_verified_validation_returns_not_required`، `test_undeclared_variable_error_returns_targeted_advice`، `test_motor_formal_violation_returns_shutdown_patch_advice`، `test_traffic_formal_violation_returns_conflicting_green_advice`، `test_tank_formal_violation_returns_high_low_safety_advice`، `test_llm_mode_falls_back_to_rule_based` |
-| `test_repair_loop` | `test_repair_loop_returns_immediately_when_code_is_verified`، `test_motor_missing_emergency_stop_is_repaired_and_verified`، `test_traffic_light_conflict_is_repaired`، `test_invalid_syntax_triggers_debugging_and_regeneration`، `test_repair_loop_report_is_stored_in_repository` |
-| `test_optimization_agent` | `test_verified_motor_code_optimizes_and_remains_verified`، `test_optimization_report_is_stored_in_memory`، و`test_optimization_metrics_improve_or_stay_equal` و`test_rollback_occurs_if_optimization_pass_breaks_validation` (انتقلا من ب في P0-11) |
-| `test_metrics_endpoint` | `test_metrics_after_optimization_uses_optimized_code_as_after_metrics` |
-| `test_projects` | `test_debug_after_verified_validation_returns_not_required`، `test_optimize_persists_optimization_report`، `test_get_optimization_returns_same_persisted_report`، و`test_artifact_get_endpoints_return_persisted_values` (مرجّح) |
-| `test_report_endpoint` | `test_report_includes_optimization_and_metrics_after_pipeline` |
+- 19 اختبارًا صارت تنجح.
+- 9 انتقلت إلى الفئة د. صارت تصل إلى قواعد السلامة، وتفشل هناك لأسباب أخرى.
 
-**متوقع بعد إصلاح C-01:** قد تظهر أخطاء كانت مختفية خلفه، ومنها اثنان معروفان:
+التوقعان المسجلان قبل الإصلاح تحققا:
 
-- `test_traffic_conflicting_greens_return_formal_violation` يتوقع المعرّف اليتيم `TL-1` (C-09).
-- `test_undeclared_assigned_variable_returns_syntax_error` يتوقع كشف المتغيرات غير المعلنة، وهو ما يجب أن يضيفه فحص المحلل في P1-01.
+- ظهر اختبار `TL-1` (C-09).
+- اختبار المتغير غير المعلن صار ينجح بفحص الإعلانات.
 
 ### ب. اختبارات قديمة: 0، أُغلقت في `P0-11`
 
@@ -84,19 +80,46 @@ powershell -ExecutionPolicy Bypass -File scripts\check.ps1
 
 **الدلالة العلمية:** القواعد الساكنة أعطت قالب المحرك `VERIFIED` مع أنه لا يعمل، وهذا دليل مباشر على الحاجة إلى L3 وL4.
 
+### د. أخطاء كانت مختفية خلف C-01: 9 اختبارات
+
+ظهرت بعد P1-01. تحققتُ منها بتجربة شغّلت التحقق على برامج الاختبارات نفسها. في كل الحالات `syntaxErrors=[]`، أي أن فحص المحلل الجديد ليس سبب أي منها.
+
+#### د1. قواعد السلامة الساكنة تعطي أحكامًا خاطئة (C-14): 7 اختبارات، تُصلح في `P1-05`
+
+| الاختبار | ما يحدث | القاعدة وآليتها |
+| --- | --- | --- |
+| `test_validation_agent::test_motor_missing_emergency_stop_handling_returns_formal_violation` | برنامج بلا معالجة للإيقاف الطارئ يُعطى `VERIFIED` | MC-1 تقبل أي `:= FALSE` خلال 120 حرفًا بعد `Stop_PB` أو `OVERLOAD`، وهنا `Fault_Lamp := FALSE`. وMC-3 وMC-4 تكفيهما كلمتا `FAULT…` و`OVERLOAD` في أي مكان، حتى في الإعلانات |
+| `test_debugging_agent::test_motor_formal_violation_returns_shutdown_patch_advice` | التحقق يعطي `VERIFIED`، فلا تشخيص (`errorType=none`) | MC-1، البرنامج نفسه |
+| `test_repair_loop::test_motor_missing_emergency_stop_is_repaired_and_verified` | الحلقة تتوقف في التكرار الأول لأن البرنامج "متحقق" | MC-1، البرنامج نفسه |
+| `test_validation_agent::test_motor_stop_pb_open_circuit_behavior_returns_formal_violation` | برنامج بزر إيقاف لا يعمل بأمان عند انقطاع السلك يُعطى `VERIFIED` | MC-4 تكفيها كلمة `OVERLOAD` |
+| `test_validation_agent::test_tank_level_with_real_variables_and_safety_logic_returns_verified` | قالب الخزان **الصحيح** يُعطى `FORMAL_VIOLATION` | PC-1 تشترط الاسم الحرفي `HIGH_LEVEL`، وتنطبق حين يحوي أي اسم إشارة `HIGH`. والقالب يستخدم `High_SP` |
+| `test_repair_loop::test_traffic_light_conflict_is_repaired` | 5 تكرارات ثم `ITERATION_LIMIT_REACHED` | TC-1 تشترط `CASE`، وقالب المرور نفسه لا يحويه، فكل إصلاح يعيد القالب نفسه ويُرفض |
+| `test_validation_agent::test_traffic_conflicting_greens_return_formal_violation` | الاختبار يتوقع `TL-1`، والقواعد تسمى `TC-*` (C-09) | والخطر الفعلي، أي إضاءة الأخضر والمشاة معًا، لا تفحصه أي قاعدة. البرنامج يفشل بسبب TC-1 البنيوية وحدها |
+
+#### د2. نقطة التحسين في الـ API مثبتة على وضع LLM: اختباران، يُحسمان في `P1-09`
+
+`project_service.py:549` ينشئ `OptimizationAgent(mode="llm")`. في الاختبارات يرد `FakeLLMProvider` دون رد مبرمج، فيعطي المحسِّن `llm.v1`، والحالة `NO_CHANGES`، بينما يتوقع الاختباران المحسِّن الساكن `static.v1`.
+
+| الملف | الاختبار |
+| --- | --- |
+| `test_optimization_agent` | `test_verified_motor_code_optimizes_and_remains_verified` |
+| `test_projects` | `test_optimize_persists_optimization_report` |
+
 ## أخطاء كشفتها الاختبارات وأُصلحت
 
 | المعرّف | الخطأ | كيف اكتُشف | الإصلاح |
 | --- | --- | --- | --- |
 | C-12 | توليد الكود بوضع LLM ينهار دائمًا (`ValidationError: ragSources`) كلما نجح النموذج والـ RAG معطّل، وهذا المسار الافتراضي لـ `/generate` | اختبار جديد برد مبرمج في P0-11 | P0-11: `ragSources=rag_sources` |
+| C-01 | فحص regex الاحتياطي يرفض كل برنامج صحيح فيه `VAR_INPUT` و`VAR_OUTPUT` | التدقيق | P1-01: فحص المحلل `parser.v1` (D-029) |
 
 ## أخطاء كشفها التحقق ولم تُصلح بعد
 
 | المعرّف | الخطأ | كيف اكتُشف | الإصلاح |
 | --- | --- | --- | --- |
-| C-13 | مجال `"Safety Interlock"` (مفرد) يُنتج خطة تعشيق صحيحة، لكن توليد الكود لا يقبل إلا `"safety interlocks"` (جمع)، فيستخدم القالب العام بمتغيرات غير معلنة، ولا يُترجم الكود | ترجمة القوالب الخمسة بـ MATIEC الحقيقي في الصورة المرجعية (P0-05) | `P1-22`، ومعه كشف المتغيرات غير المعلنة في `P1-01` |
+| C-13 | مجال `"Safety Interlock"` (مفرد) يُنتج خطة تعشيق صحيحة، لكن توليد الكود لا يقبل إلا `"safety interlocks"` (جمع)، فيستخدم القالب العام بمتغيرات غير معلنة، ولا يُترجم الكود | ترجمة القوالب الخمسة بـ MATIEC الحقيقي في الصورة المرجعية (P0-05) | `P1-22` |
+| C-14 | قواعد السلامة الساكنة (L2) تعطي أحكامًا خاطئة في الاتجاهين: تمرر برامج محرك غير آمنة، وترفض قالبي الخزان والمرور الصحيحين، ولا تفحص خطر المرور الفعلي | تجربة بعد P1-01 على برامج الفئة د1 | `P1-05`، والحل الجذري في L3 وL4 |
 
-**ملاحظة:** لا يوجد اختبار في الحزمة يغطي C-13 حاليًا، ولذلك لا يظهر في حصيلة pytest. سيُضاف له اختبار في P1-22.
+**C-13 في الاختبارات:** يغطيه الآن `test_parser_check::test_b004_template_is_rejected_for_undeclared_signals`، الذي يثبت أن الكشف يعمل على الكود الخاطئ الحالي. يُحدَّث في P1-22.
 
 ## سجل الحصيلة
 
@@ -104,3 +127,4 @@ powershell -ExecutionPolicy Bypass -File scripts\check.ps1
 | --- | --- | --- | --- | --- | --- |
 | 2026-09-14 | P0-04 | 139 | 96 | 43 | أول تشغيل آمن ومعزول: 25 أ، و12 ب، و6 ج |
 | 2026-09-14 | P0-11 | 141 | 107 | 34 | 28 أ، و0 ب، و6 ج. وكُشف C-12 وأُصلح |
+| 2026-09-15 | P1-01 | 167 | 152 | 15 | 0 أ، و6 ج، و9 د. 26 اختبارًا جديدًا. وأُصلح C-01، وكُشف C-14 |

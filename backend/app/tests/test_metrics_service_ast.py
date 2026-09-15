@@ -64,6 +64,23 @@ END_PROGRAM
     assert metrics.cyclomaticComplexity == 3
 
 
+def test_repeat_increases_cyclomatic_complexity() -> None:
+    metrics = MetricsService.calculate(
+        """
+PROGRAM P
+VAR
+    N : INT;
+END_VAR
+REPEAT
+    N := N + 1;
+UNTIL N > 3
+END_REPEAT;
+END_PROGRAM
+"""
+    )
+    assert metrics.cyclomaticComplexity == 2
+
+
 def test_comments_do_not_increase_cyclomatic_complexity() -> None:
     metrics = MetricsService.calculate(
         """

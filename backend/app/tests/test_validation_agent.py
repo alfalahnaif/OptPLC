@@ -19,7 +19,7 @@ async def test_valid_motor_structured_text_returns_verified() -> None:
     assert report.status == "VERIFIED"
     assert report.syntaxPassed is True
     assert report.formalPassed is True
-    assert report.validator == "static.v1"
+    assert report.validator == "parser.v1"
 
 
 async def test_motor_missing_emergency_stop_handling_returns_formal_violation() -> None:
@@ -260,7 +260,7 @@ async def test_matiec_unavailable_falls_back_to_static_validation() -> None:
 
     assert report.status == "VERIFIED"
     assert report.syntaxPassed is True
-    assert report.validator == "static.v1"
+    assert report.validator == "parser.v1"
 
 
 async def test_matiec_timeout_fails_closed() -> None:

@@ -85,7 +85,7 @@ Known template defects: the motor template never starts the motor (C-10), the ba
 
 ### Active path (`ValidationAgent(mode="static")`)
 
-1. **Syntax.** If `MATIEC_BIN` exists, `iec2c` compiles a **normalized copy** of the source: timer calls are removed, `X.Q` is replaced by `FALSE`, and `T#` literals become `0` (this also rewrites comments). If MATIEC is missing, a regex fallback runs; it currently rejects every valid program that has `VAR_INPUT` and `VAR_OUTPUT` (C-01).
+1. **Syntax.** If `MATIEC_BIN` exists, `iec2c` compiles a **normalized copy** of the source: timer calls are removed, `X.Q` is replaced by `FALSE`, and `T#` literals become `0` (this also rewrites comments). If MATIEC is missing, the parser check `parser.v1` runs (`app/services/st_syntax_check.py`, P1-01): structural checks, a Lark parse of a documented ST subset, then undeclared variables and unknown calls. Passing it is not evidence level L1.
 2. **Domain rules.** The first matching domain validator (batch, motor, traffic, process, interlock, generic) applies regex rules. These are text heuristics: an unsafe program can pass them.
 
 The status `VERIFIED` means these static checks passed. It is not a proof.
@@ -198,7 +198,7 @@ powershell -ExecutionPolicy Bypass -File scripts\st-compile.ps1 -Path path\to\pr
 | --- | --- |
 | Startup error about an API key | Set the key for the selected `LLM_PROVIDER` in `backend/.env` |
 | `matiec: unavailable` in `/api/health` | `MATIEC_BIN` must point to an executable `iec2c`; use the Docker image |
-| Every program fails with `Mismatched VAR/END_VAR` | You are on the regex fallback (C-01); run in the Docker image with MATIEC |
+| A valid program fails with `Parser check (parser.v1) failed at line …` | MATIEC is missing and the program uses a construct outside the parser check's ST subset (P1-01); run in the Docker image with MATIEC |
 | RAG returns nothing locally | Paths are hard-coded to `/app/...` (P1-20) |
 | `Project not found` on workflow routes | Complete earlier steps first (requirements → plan → generate → validate …) |
 

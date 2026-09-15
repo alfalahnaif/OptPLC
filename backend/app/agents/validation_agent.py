@@ -15,6 +15,7 @@ from app.schemas.contracts import (
     ValidationReport,
     ValidationSafetyResult,
 )
+from app.services.st_syntax_check import PARSER_CHECK_LABEL, ParserCheck, strip_comments_and_strings
 from app.services.transpiler_service import StToSmvTranspiler
 from app.services.validation_service import MatiecValidator, PLCVerifValidator
 
@@ -441,6 +442,8 @@ class GenericValidator(DomainValidator):
         return True
 
     def validate(self, source: str, signal_names: set[str]) -> list[ValidationSafetyResult]:
+        # Comments and strings must not count as code (P1-01).
+        source = strip_comments_and_strings(source)
         upper = source.upper()
         R = self._rule
         has_program = "PROGRAM" in upper and "END_PROGRAM" in upper
@@ -453,14 +456,17 @@ class GenericValidator(DomainValidator):
             )
         ]
 
-        var_count = len(re.findall(r"\bVAR\b", source, re.IGNORECASE))
+        # Every block header counts, not only a bare VAR (the GEN-2 half of C-01).
+        var_count = len(
+            re.findall(r"\b(?:VAR|VAR_INPUT|VAR_OUTPUT|VAR_IN_OUT|VAR_TEMP|VAR_GLOBAL|VAR_EXTERNAL)\b", source, re.IGNORECASE)
+        )
         endvar_count = len(re.findall(r"\bEND_VAR\b", source, re.IGNORECASE))
         results.append(
             R(
                 "GEN-2",
                 "VAR and END_VAR blocks must be balanced",
                 var_count == endvar_count,
-                f"Mismatched VAR/END_VAR: {var_count} VAR vs {endvar_count} END_VAR",
+                f"Mismatched variable blocks: {var_count} VAR/VAR_INPUT/VAR_OUTPUT header(s) vs {endvar_count} END_VAR",
             )
         )
 
@@ -523,6 +529,7 @@ class ValidationAgent:
         self.mode = mode
         self.matiec_validator = matiec_validator or MatiecValidator()
         self.plcverif_validator = PLCVerifValidator()
+        self.parser_check = ParserCheck()
 
     def validate(
         self,
@@ -551,7 +558,7 @@ class ValidationAgent:
         safety_results = [] if syntax_errors else domain_validator.validate(artifact.source, names)
         failed_safety = [result for result in safety_results if result.status == "failed"]
         formal_errors = [result.details or result.description for result in failed_safety]
-        validator_label = "matiec" if validator_used == "matiec" else "static.v1"
+        validator_label = "matiec" if validator_used == "matiec" else PARSER_CHECK_LABEL
 
         if syntax_errors:
             status = "SYNTAX_ERROR"
@@ -704,7 +711,8 @@ class ValidationAgent:
     def _syntax_errors_with_optional_matiec(self, st_code: str) -> tuple[list[str], str]:
         """
         Returns (syntax_errors, validator_used).
-        Tries MATIEC first, falls back to regex if unavailable.
+        Tries MATIEC first and falls back to the parser check (parser.v1) if MATIEC is unavailable.
+        A parser-check pass is not evidence level L1 (D-029).
         """
         result = self.matiec_validator.validate_syntax_sync(st_code)
 
@@ -724,53 +732,11 @@ class ValidationAgent:
             return matiec_errors, "matiec"
 
         logger.warning(
-            "[ValidationAgent] MATIEC unavailable (%s). Using regex fallback.",
+            "[ValidationAgent] MATIEC unavailable (%s). Using the parser check (%s).",
             result.get("reason", "binary not found"),
+            PARSER_CHECK_LABEL,
         )
-        return self._regex_syntax_check(st_code), "regex"
-
-    def _regex_syntax_check(self, st_code: str) -> list[str]:
-        """
-        Fast regex-based syntax check used when MATIEC is unavailable.
-        Checks the most common IEC 61131-3 structural requirements.
-        """
-        errors: list[str] = []
-        if not st_code.strip():
-            return ["CodeArtifact source is empty."]
-
-        upper = st_code.upper()
-
-        if "PROGRAM" not in upper:
-            errors.append("Missing PROGRAM block declaration")
-        if "END_PROGRAM" not in upper:
-            errors.append("Missing END_PROGRAM")
-        if "VAR" not in upper:
-            errors.append("No VAR block found")
-
-        var_count = len(re.findall(r"\bVAR\b", st_code, re.IGNORECASE))
-        end_var_count = len(re.findall(r"\bEND_VAR\b", st_code, re.IGNORECASE))
-        if var_count != end_var_count:
-            errors.append(
-                f"Mismatched VAR/END_VAR blocks ({var_count} VAR vs {end_var_count} END_VAR)"
-            )
-
-        if_count = len(re.findall(r"\bIF\b", st_code, re.IGNORECASE))
-        endif_count = len(re.findall(r"\bEND_IF\b", st_code, re.IGNORECASE))
-        if if_count != endif_count:
-            errors.append(f"Mismatched IF/END_IF ({if_count} IF vs {endif_count} END_IF)")
-
-        case_count = len(re.findall(r"\bCASE\b", st_code, re.IGNORECASE))
-        endcase_count = len(re.findall(r"\bEND_CASE\b", st_code, re.IGNORECASE))
-        if case_count != endcase_count:
-            errors.append(
-                f"Mismatched CASE/END_CASE ({case_count} CASE vs {endcase_count} END_CASE)"
-            )
-
-        bad_assign = re.findall(r"(?<![:<>!])=(?![>=])\s*\w", st_code)
-        if bad_assign:
-            errors.append(f"Found {len(bad_assign)} use(s) of '=' instead of ':='")
-
-        return errors
+        return self.parser_check.check(st_code), "parser"
 
     def _safety_results(self, source: str, plan: PlanObject) -> list[ValidationSafetyResult]:
         names = {signal.name for signal in [*plan.inputs, *plan.outputs]}
