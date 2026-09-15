@@ -78,7 +78,7 @@ export const pipelineSteps = [
 
 export const dashboardKpis = [
   { label: "Total projects", value: "24", detail: "5 active", delta: "+12.5%", icon: Folder, tone: "primary" },
-  { label: "Verified programs", value: "21 / 24", detail: "first pass plus repaired", delta: "+9.4%", icon: ShieldCheck, tone: "success" },
+  { label: "Programs passing checks", value: "21 / 24", detail: "first pass plus repaired", delta: "+9.4%", icon: ShieldCheck, tone: "success" },
   { label: "Optimized programs", value: "19 / 21", detail: "validated gains", delta: "+14.2%", icon: Sparkles, tone: "primary" },
   { label: "Avg complexity reduction", value: "34.6%", detail: "last 30 days", delta: "+4.1%", icon: Activity, tone: "info" },
   { label: "Avg maintainability gain", value: "+21.2 pts", detail: "IEC ST score", delta: "+2.8%", icon: Gauge, tone: "success" }
@@ -109,7 +109,7 @@ export const serviceStatus = [
 export const projects = [
   { name: "Motor Control - Conveyor M-12", id: "PRJ-0421", domain: "Motor Control", updated: "2026-05-17", iterations: 3, delta: "-41.7%", status: "optimized" },
   { name: "Tank Level Control - T-204", id: "PRJ-0418", domain: "Process Control", updated: "2026-05-15", iterations: 4, delta: "-36.2%", status: "optimized" },
-  { name: "Intersection 17 Traffic Signal", id: "PRJ-0415", domain: "Traffic Control", updated: "2026-05-12", iterations: 2, delta: "-28.9%", status: "verified" },
+  { name: "Intersection 17 Traffic Signal", id: "PRJ-0415", domain: "Traffic Control", updated: "2026-05-12", iterations: 2, delta: "-28.9%", status: "checked" },
   { name: "Safety Interlock - Press P-3", id: "PRJ-0410", domain: "Safety Interlocks", updated: "2026-05-08", iterations: 5, delta: "-47.4%", status: "optimized" },
   { name: "Batch Reactor Sequence R-1", id: "PRJ-0407", domain: "Sequential Batch", updated: "2026-05-03", iterations: 5, delta: "-", status: "failed" }
 ];
@@ -270,8 +270,8 @@ export const workflowEvents = [
   { agent: "Validation Agent", status: "failed", iter: 1, input: "ST source - iter 1", output: "1 syntax pass, 1 formal violation (SC1)", duration: "9.1 s", icon: ShieldCheck },
   { agent: "Debugging Agent", status: "completed", iter: 1, input: "Counterexample trace", output: "Patch advice: introduce Reset_PB + Fault_State latch", duration: "5.4 s", icon: Bug },
   { agent: "Code Generation Agent", status: "completed", iter: 2, input: "Plan Object + patch advice", output: "ST source: 47 LOC, syntax OK", duration: "5.9 s", icon: FileCode2 },
-  { agent: "Validation Agent", status: "completed", iter: 2, input: "ST source - iter 2", output: "All safety properties hold - CSR 100%", duration: "8.7 s", icon: ShieldCheck },
-  { agent: "Optimization Agent", status: "completed", iter: 1, input: "Verified ST - iter 2", output: "3/3 passes applied, revalidation PASS", duration: "11.2 s", icon: Sparkles }
+  { agent: "Validation Agent", status: "completed", iter: 2, input: "ST source - iter 2", output: "All static safety checks passed - CSR 100%", duration: "8.7 s", icon: ShieldCheck },
+  { agent: "Optimization Agent", status: "completed", iter: 1, input: "Checked ST - iter 2", output: "3/3 passes applied, revalidation PASS", duration: "11.2 s", icon: Sparkles }
 ];
 
 export const sessionLog = [
@@ -284,7 +284,7 @@ export const sessionLog = [
   ["09:42:38", "ERROR", "Validation", "Counterexample emitted (8 steps)"],
   ["09:42:44", "INFO", "Debugging", "Patch advice ready - 4 changes"],
   ["09:42:49", "INFO", "CodeGen", "Regenerated ST: 47 LOC - iter 2"],
-  ["09:42:58", "INFO", "Validation", "All 4 properties VERIFIED - iter 2"],
+  ["09:42:58", "INFO", "Validation", "All 4 static checks passed - iter 2"],
   ["09:43:01", "INFO", "Optimization", "Pass 1/3 Structural Simplification applied"],
   ["09:43:04", "INFO", "Optimization", "Pass 2/3 Logic Compaction applied"],
   ["09:43:08", "INFO", "Optimization", "Pass 3/3 Maintainability Enhancement applied"]
@@ -321,7 +321,7 @@ export const metricsCards = [
   { label: "Maintainability index", before: 68, after: 89, suffix: "/100", delta: "+30.9%" },
   { label: "Estimated scan time", before: 4.1, after: 2.4, suffix: "ms", delta: "+41.5%" },
   { label: "Iteration count", before: 2, after: 2, suffix: "", delta: "unchanged" },
-  { label: "Verification rate", before: 75, after: 100, suffix: "%", delta: "+33.3%" }
+  { label: "Checks-passed rate", before: 75, after: 100, suffix: "%", delta: "+33.3%" }
 ];
 
 export const comparisonData = [
@@ -361,4 +361,4 @@ export const headerActions = [
   { label: "System activity", icon: Activity }
 ];
 
-export type Status = "optimized" | "verified" | "failed" | "completed" | "healthy" | "passed" | "warning";
+export type Status = "optimized" | "checked" | "failed" | "completed" | "healthy" | "passed" | "warning";

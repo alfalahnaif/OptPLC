@@ -32,7 +32,7 @@ export function DebuggingPage({ projectId = ACTIVE_PROJECT_ID, state }: { projec
   const effectiveState = state ?? resource.state;
   const report = resource.data;
   const validation = validationResource.data;
-  const noDebuggingRequired = report?.status === "NOT_REQUIRED" || (effectiveState === "empty" && validation?.status === "VERIFIED");
+  const noDebuggingRequired = report?.status === "NOT_REQUIRED" || (effectiveState === "empty" && validation?.status === "CHECKS_PASSED");
   const missingValidation = effectiveState === "empty" && validationResource.state === "empty";
   const needsDebugGeneration = effectiveState === "empty" && (validation?.status === "SYNTAX_ERROR" || validation?.status === "FORMAL_VIOLATION");
   const showRepairActions = report?.status === "PATCH_ADVICE_GENERATED";
@@ -66,7 +66,7 @@ export function DebuggingPage({ projectId = ACTIVE_PROJECT_ID, state }: { projec
                 {repairLoading ? "Repairing..." : "Run Repair Loop"}
               </Button>
             ) : null}
-            {noDebuggingRequired || activeRepairLoopReport?.finalStatus === "VERIFIED" ? (
+            {noDebuggingRequired || activeRepairLoopReport?.finalStatus === "CHECKS_PASSED" ? (
               <Button onClick={() => void handleRunOptimization()} disabled={optimizationLoading}>
                 {optimizationLoading ? "Running optimization..." : "Run Optimization"} <ArrowRight />
               </Button>
@@ -81,7 +81,7 @@ export function DebuggingPage({ projectId = ACTIVE_PROJECT_ID, state }: { projec
       ) : null}
       {noDebuggingRequired ? (
         <Card>
-          <CardContent className="p-6 text-sm font-medium">No debugging required. The latest validation report is VERIFIED.</CardContent>
+          <CardContent className="p-6 text-sm font-medium">No debugging required. The latest validation checks passed.</CardContent>
         </Card>
       ) : null}
       {!noDebuggingRequired ? stateView ?? (report ? (

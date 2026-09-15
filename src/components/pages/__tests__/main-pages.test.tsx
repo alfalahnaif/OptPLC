@@ -74,7 +74,7 @@ describe("main frontend pages", () => {
     render(<DashboardPage />);
 
     expect(await screen.findByText("Total projects")).toBeInTheDocument();
-    expect(await screen.findByText("Verified programs")).toBeInTheDocument();
+    expect(await screen.findByText("Programs passing checks")).toBeInTheDocument();
     expect(await screen.findByText("Avg complexity reduction")).toBeInTheDocument();
   });
 
@@ -120,7 +120,7 @@ describe("main frontend pages", () => {
   it("Validation page renders status badges", async () => {
     render(<ValidationPage />);
 
-    expect(await screen.findByText("All properties hold")).toBeInTheDocument();
+    expect(await screen.findByText("Static checks passed")).toBeInTheDocument();
     expect((await screen.findAllByText("Passed")).length).toBeGreaterThan(0);
   });
 

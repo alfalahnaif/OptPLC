@@ -71,7 +71,7 @@ def test_optimization_fails_with_400_if_code_is_not_verified(client: TestClient)
     response = client.post(f"/api/projects/{project_id}/optimize")
 
     assert response.status_code == 400
-    assert response.json()["detail"] == "Code must be verified before optimization. Run validation or repair loop first."
+    assert response.json()["detail"] == "Code must pass the validation checks before optimization. Run validation or repair loop first."
 
 
 def test_verified_motor_code_optimizes_and_remains_verified(client: TestClient) -> None:
@@ -87,7 +87,7 @@ def test_verified_motor_code_optimizes_and_remains_verified(client: TestClient) 
     report = response.json()
     assert report["status"] == "OPTIMIZED"
     assert report["optimizer"] == "static.v1"
-    assert report["revalidationStatus"] == "VERIFIED"
+    assert report["revalidationStatus"] == "CHECKS_PASSED"
     assert report["optimizedCode"]["metadata"]["generator"] == "static_optimizer.v1"
     assert {item["name"] for item in report["passes"]} == {
         "Structural Simplification",
@@ -134,7 +134,7 @@ async def test_rollback_occurs_if_optimization_pass_breaks_validation(monkeypatc
 
     assert any(event.passName == "Logic Compaction" for event in report.rollbackEvents)
     assert any(item.name == "Logic Compaction" and item.status == "rolled_back" for item in report.passes)
-    assert report.revalidationStatus == "VERIFIED"
+    assert report.revalidationStatus == "CHECKS_PASSED"
 
 
 def test_optimization_report_is_stored_in_memory(client: TestClient) -> None:

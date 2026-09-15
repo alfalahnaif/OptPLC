@@ -59,7 +59,7 @@ describe("Code Generation frontend flow", () => {
         return Promise.resolve(jsonResponse(artifact("PRJ-0421")));
       }
       if (url.endsWith("/api/projects/PRJ-0421/validate") && init?.method === "POST") {
-        return Promise.resolve(jsonResponse(validationReport("PRJ-0421", "VERIFIED")));
+        return Promise.resolve(jsonResponse(validationReport("PRJ-0421", "CHECKS_PASSED")));
       }
       return Promise.resolve(jsonResponse({ detail: `Unhandled request: ${init?.method ?? "GET"} ${url}` }, 500));
     });
@@ -163,16 +163,17 @@ END_PROGRAM`,
   };
 }
 
-function validationReport(projectId: string, status: "VERIFIED" | "SYNTAX_ERROR" | "FORMAL_VIOLATION"): ValidationReport {
+function validationReport(projectId: string, status: "CHECKS_PASSED" | "SYNTAX_ERROR" | "FORMAL_VIOLATION"): ValidationReport {
   return {
     projectId,
     artifactId: `${projectId}-code-iter-1`,
     iteration: 1,
     status,
     syntaxPassed: status !== "SYNTAX_ERROR",
-    formalPassed: status === "VERIFIED",
+    formalPassed: status === "CHECKS_PASSED",
     solver: "static.v1",
     validator: "static.v1",
+    evidenceLevel: "STATIC_RULES_PASSED",
     checkedAt: "2026-05-19T10:00:00Z",
     summary: "Structured Text syntax and static safety checks passed.",
     syntaxErrors: [],

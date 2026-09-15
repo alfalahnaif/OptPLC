@@ -43,11 +43,12 @@ function mockValidationReport(projectId: string): ValidationReport {
     projectId,
     artifactId: `${projectId}-code-iter-2`,
     iteration: validation.iteration,
-    status: "VERIFIED",
+    status: "CHECKS_PASSED",
     syntaxPassed: true,
     formalPassed: true,
     solver: validation.solver,
     validator: "mock-validator.v1",
+    evidenceLevel: "STATIC_RULES_PASSED",
     checkedAt: "2026-05-17T14:09:51Z",
     summary: "Structured Text syntax and static safety checks passed.",
     syntaxErrors: [],
@@ -238,7 +239,7 @@ function mockRepairLoopReport(projectId: string): RepairLoopReport {
 
   return {
     projectId,
-    finalStatus: "VERIFIED",
+    finalStatus: "CHECKS_PASSED",
     iterations: 2,
     finalCodeArtifact: repairedCode,
     finalValidationReport: finalValidation,
@@ -259,6 +260,6 @@ function mockRepairLoopReport(projectId: string): RepairLoopReport {
       },
       finalValidation
     ],
-    summary: "Repair loop verified the code after 2 validation attempts and 1 debugging pass."
+    summary: "Repair loop reached passing validation checks after 2 validation attempts and 1 debugging pass."
   };
 }

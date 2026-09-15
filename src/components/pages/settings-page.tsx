@@ -29,7 +29,7 @@ export function SettingsPage({ state }: { state?: PageState } = {}) {
       <PageHeader
         eyebrow="System"
         title="Settings"
-        description="Frontend-only configuration mock for model routing, verification engines, and optimization limits."
+        description="Frontend-only configuration mock for model routing, validation engines, and optimization limits."
         actions={<Button><Save /> Save settings</Button>}
       />
       {stateView ?? (data ? (

@@ -11,7 +11,7 @@ async def test_verified_validation_returns_not_required() -> None:
     report = await DebuggingAgent().debug(project_id="PRJ-MOTOR", plan=plan, artifact=artifact, validation=validation)
 
     assert report.status == "NOT_REQUIRED"
-    assert report.sourceValidationStatus == "VERIFIED"
+    assert report.sourceValidationStatus == "CHECKS_PASSED"
     assert "No debugging required" in report.rootCauseSummary
 
 

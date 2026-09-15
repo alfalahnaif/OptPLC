@@ -38,7 +38,7 @@ async def test_repair_loop_validation_runs_off_the_event_loop(monkeypatch) -> No
         await save_plan_and_artifact(db, Repository(), "Motor Control")
         report, _ = await asyncio.gather(RepairService(db).run_repair_loop("PRJ-0421"), ticker())
 
-    assert report.finalStatus == "VERIFIED"
+    assert report.finalStatus == "CHECKS_PASSED"
     gaps = [later - earlier for earlier, later in zip(stamps, stamps[1:])]
     # A blocked loop would leave one gap of about SLOW_COMPILE_SECONDS between ticks.
     assert max(gaps) < SLOW_COMPILE_SECONDS / 2

@@ -59,7 +59,7 @@ export async function getFinalReport(projectId: string): Promise<FinalReport> {
     projectId,
     reportId: `${projectId}-final-report`,
     generatedAt: "2026-05-17T09:43:10Z",
-    summary: "Verified and optimized IEC 61131-3 Structured Text report.",
+    summary: "Checked and optimized IEC 61131-3 Structured Text report.",
     validation,
     optimization,
     metrics: metricsReport,
@@ -90,7 +90,7 @@ export async function getFinalReport(projectId: string): Promise<FinalReport> {
     finalStatusSummary: `Project status is '${project.status}'. Validation status: ${validation.status}. Optimization status: ${optimization.status}.`,
     recommendations: ["Run debugging and repair loop only if future validation fails."],
     limitationsDisclaimer:
-      "This report is generated from deterministic pipeline artifacts; PDF certificate export is future work."
+      "This report is generated from deterministic pipeline artifacts. Validation results are static checks, not formal verification. Safety functions are out of scope; PDF certificate export is future work."
   });
 }
 

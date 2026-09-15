@@ -87,7 +87,7 @@ class BenchmarkRunner:
             )
 
             repair_iterations = 0
-            while validation.status != "VERIFIED" and repair_iterations < settings.max_iter:
+            while validation.status != "CHECKS_PASSED" and repair_iterations < settings.max_iter:
                 debug = await debugging_agent.debug(
                     project_id=run_project_id,
                     plan=plan,
@@ -112,7 +112,7 @@ class BenchmarkRunner:
                 repair_iterations += 1
 
             final_artifact = artifact
-            if validation.status == "VERIFIED":
+            if validation.status == "CHECKS_PASSED":
                 optimization = await optim_agent.optimize(
                     project_id=run_project_id,
                     artifact=artifact,
@@ -128,7 +128,7 @@ class BenchmarkRunner:
                 caseId=case.id,
                 mode=mode,
                 domain=case.domain,
-                verified=validation.status == "VERIFIED",
+                verified=validation.status == "CHECKS_PASSED",
                 validationStatus=validation.status,
                 repairIterations=repair_iterations,
                 generationTimeMs=int((time.perf_counter() - started) * 1000),

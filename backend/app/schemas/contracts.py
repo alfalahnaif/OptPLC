@@ -1,15 +1,37 @@
 from __future__ import annotations
 
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator
+from pydantic import AliasChoices, BaseModel, BeforeValidator, ConfigDict, Field, field_validator
+
+
+def _read_legacy_verified(value: object) -> object:
+    """Reports stored before D-033 say VERIFIED. It only ever meant that the checks passed."""
+    return "CHECKS_PASSED" if value == "VERIFIED" else value
+
 
 ProjectStatus = Literal["draft", "planned", "generated", "validated", "optimized", "failed"]
 AgentStatus = Literal["pending", "running", "completed", "failed"]
 SignalType = Literal["BOOL", "INT", "REAL", "TIME", "STRING"]
-ValidationStatus = Literal["VERIFIED", "SYNTAX_ERROR", "FORMAL_VIOLATION", "TIMEOUT"]
+ValidationStatus = Annotated[
+    Literal["CHECKS_PASSED", "SYNTAX_ERROR", "FORMAL_VIOLATION", "TIMEOUT"],
+    BeforeValidator(_read_legacy_verified),
+]
 DebuggingStatus = Literal["NOT_REQUIRED", "PATCH_ADVICE_GENERATED", "CANNOT_DEBUG"]
-RepairLoopFinalStatus = Literal["VERIFIED", "FAILED", "ITERATION_LIMIT_REACHED"]
+RepairLoopFinalStatus = Annotated[
+    Literal["CHECKS_PASSED", "FAILED", "ITERATION_LIMIT_REACHED"],
+    BeforeValidator(_read_legacy_verified),
+]
+# Evidence ladder L0-L6 (D-003, D-033). Only L4 and above may be called verified.
+EvidenceLevel = Literal[
+    "GENERATED",
+    "COMPILES",
+    "STATIC_RULES_PASSED",
+    "SIMULATION_TESTED",
+    "PROPERTIES_PROVEN",
+    "HIL_PASSED",
+    "ENGINEER_APPROVED",
+]
 OptimizationStatus = Literal["OPTIMIZED", "NO_CHANGES", "ROLLED_BACK", "CANNOT_OPTIMIZE"]
 OptimizationPassStatus = Literal["applied", "rolled_back", "no_changes"]
 
@@ -320,6 +342,8 @@ class ValidationReport(ContractModel):
     formalPassed: bool
     solver: str
     validator: str
+    # Reports stored before D-033 have no level. They read as L0 because their compile may predate D-005.
+    evidenceLevel: EvidenceLevel = "GENERATED"
     checkedAt: str
     summary: str
     syntaxErrors: list[str] = Field(default_factory=list)

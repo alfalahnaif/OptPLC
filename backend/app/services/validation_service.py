@@ -237,7 +237,7 @@ class PLCVerifValidator(IValidator):
             raw_output = self._join_output(stdout_bytes, stderr_bytes)
             property_results = self._parse_property_results(raw_output, properties)
             all_passed = all(item.get("passed", False) for item in property_results) if property_results else ("is false" not in raw_output.lower())
-            classification = "VERIFIED" if all_passed else "FORMAL_VIOLATION"
+            classification = "CHECKS_PASSED" if all_passed else "FORMAL_VIOLATION"
             counterexample = self._extract_counterexample(raw_output)
             errors = [] if all_passed else [item["message"] for item in property_results if not item.get("passed", False)]
 

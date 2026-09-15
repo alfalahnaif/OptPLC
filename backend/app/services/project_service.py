@@ -329,7 +329,7 @@ Rules:
         await self.repository.update_session_state(
             self.db,
             session.id,
-            "validated" if report.status == "VERIFIED" else "failed",
+            "validated" if report.status == "CHECKS_PASSED" else "failed",
             validation_result=report.model_dump(),
             validation_report=report.model_dump(),
             validation_report_history=history,
@@ -337,7 +337,7 @@ Rules:
         await self.repository.update_project(
             self.db,
             project_id,
-            status="validated" if report.status == "VERIFIED" else "failed",
+            status="validated" if report.status == "CHECKS_PASSED" else "failed",
         )
         await self.db.commit()
         return report
@@ -442,8 +442,8 @@ Rules:
                 plan=plan,
             )
             validation_reports.append(validation)
-            if validation.status == "VERIFIED":
-                final_status = "VERIFIED"
+            if validation.status == "CHECKS_PASSED":
+                final_status = "CHECKS_PASSED"
                 break
 
             debugging = await DebuggingAgent(mode="llm").debug(
@@ -479,13 +479,13 @@ Rules:
                     }
                 )
             )
-        if timed_out and final_status != "VERIFIED":
+        if timed_out and final_status != "CHECKS_PASSED":
             final_status = "ITERATION_LIMIT_REACHED"
             validation_reports[-1] = validation_reports[-1].model_copy(
                 update={
                     "status": "TIMEOUT",
                     "summary": (
-                        "Repair loop time budget exceeded before verification; returning the latest generated artifact."
+                        "Repair loop time budget exceeded before the checks passed; returning the latest generated artifact."
                     ),
                 }
             )
@@ -493,7 +493,7 @@ Rules:
         final_validation = validation_reports[-1]
         summary = (
             "Repair loop stopped because the server time budget was exceeded; returning the latest generated artifact."
-            if timed_out and final_status != "VERIFIED"
+            if timed_out and final_status != "CHECKS_PASSED"
             else self._repair_summary(final_status, len(validation_reports), len(debugging_reports))
         )
         report = RepairLoopReport(
@@ -514,7 +514,7 @@ Rules:
         await self.repository.update_session_state(
             self.db,
             session.id,
-            "validated" if final_status == "VERIFIED" else "failed",
+            "validated" if final_status == "CHECKS_PASSED" else "failed",
             code_artifact=current_artifact.model_dump(),
             code_artifact_history=code_history,
             st_code=current_artifact.source,
@@ -528,7 +528,7 @@ Rules:
         await self.repository.update_project(
             self.db,
             project_id,
-            status="validated" if final_status == "VERIFIED" else "failed",
+            status="validated" if final_status == "CHECKS_PASSED" else "failed",
         )
         await self.db.commit()
         return report
@@ -558,8 +558,8 @@ Rules:
             ValidationReport,
             "ValidationReport must be generated before optimization.",
         )
-        if validation.status != "VERIFIED":
-            raise ValueError("Code must be verified before optimization. Run validation or repair loop first.")
+        if validation.status != "CHECKS_PASSED":
+            raise ValueError("Code must pass the validation checks before optimization. Run validation or repair loop first.")
         repair_loop_report = RepairLoopReport.model_validate(session.repair_loop_report) if session.repair_loop_report else None
         report = await OptimizationAgent(mode="llm").optimize(
             project_id=project_id,
@@ -757,7 +757,10 @@ Rules:
         )
         limitations_disclaimer = (
             "This report is generated from deterministic PLCForge pipeline artifacts. "
-            "Formal solver verification, benchmark runner execution, and PDF certificate export remain future work."
+            "Validation results are static checks, not formal verification: see the evidence level. "
+            "Safety functions (emergency stop, guards, safety interlocks) are out of scope; they belong in a "
+            "certified safety PLC or relay designed under IEC 62061 or ISO 13849. "
+            "Formal property proofs and PDF certificate export remain future work."
         )
         summary = (
             f"{final_status_summary} "
@@ -851,13 +854,13 @@ Rules:
 
     @staticmethod
     def _repair_summary(final_status: str, iterations: int, debugging_count: int) -> str:
-        if final_status == "VERIFIED":
+        if final_status == "CHECKS_PASSED":
             if debugging_count == 0:
-                return "Initial code artifact was already verified; no repair was required."
-            return f"Repair loop verified the code after {iterations} validation attempt(s) and {debugging_count} debugging pass(es)."
+                return "Initial code artifact already passed the validation checks; no repair was required."
+            return f"Repair loop reached passing validation checks after {iterations} validation attempt(s) and {debugging_count} debugging pass(es)."
         if final_status == "ITERATION_LIMIT_REACHED":
             return f"Repair loop stopped after reaching the iteration limit of {iterations} validation attempt(s)."
-        return "Repair loop stopped before verification because no actionable repair could be generated."
+        return "Repair loop stopped before the checks passed because no actionable repair could be generated."
 
     @staticmethod
     def _metrics_history(
@@ -1023,7 +1026,7 @@ Rules:
     ) -> str:
         parts = [f"Project status is '{project_status}'."]
         if validation is not None:
-            parts.append(f"Validation status: {validation.status}.")
+            parts.append(f"Validation status: {validation.status} (evidence level {validation.evidenceLevel}).")
         else:
             parts.append("Validation status: not generated yet.")
         if optimization is not None:
@@ -1048,11 +1051,11 @@ Rules:
         recommendations: list[str] = []
         if validation is None:
             recommendations.append("Run validation to generate syntax and safety evidence.")
-        elif validation.status != "VERIFIED":
+        elif validation.status != "CHECKS_PASSED":
             recommendations.append("Address validation issues using debugging guidance before deployment.")
-        if debugging is None and validation is not None and validation.status != "VERIFIED":
+        if debugging is None and validation is not None and validation.status != "CHECKS_PASSED":
             recommendations.append("Run debugging to generate patch advice for failing validations.")
-        if repair_loop is None and validation is not None and validation.status != "VERIFIED":
+        if repair_loop is None and validation is not None and validation.status != "CHECKS_PASSED":
             recommendations.append("Run repair loop to regenerate code until validation succeeds.")
         if optimization is None:
             recommendations.append("Run optimization to improve maintainability and scan time.")

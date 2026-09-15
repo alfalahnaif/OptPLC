@@ -115,7 +115,7 @@ function mockOptimizationReport(projectId: string): OptimizationReport {
       status: "applied",
       summary: pass.description,
       accepted: true,
-      revalidationStatus: "VERIFIED",
+      revalidationStatus: "CHECKS_PASSED",
       beforeMetrics: {
         loc: pass.loc[0],
         cyclomaticComplexity: pass.cc[0],
@@ -141,7 +141,7 @@ function mockOptimizationReport(projectId: string): OptimizationReport {
       maintainabilityGainPercent: 30.9,
       scanTimeReductionPercent: 41.5
     },
-    revalidationStatus: "VERIFIED",
+    revalidationStatus: "CHECKS_PASSED",
     rollbackEvents: [],
     createdAt: "2026-05-17T09:43:08Z",
     summary: "Static optimizer applied 3 pass(es); every accepted pass revalidated successfully.",
@@ -253,7 +253,7 @@ function mockMetricsReport(projectId: string): MetricsReport {
         createdAt: optimization.optimizedCode.generatedAt
       }
     ],
-    latestValidationStatus: "VERIFIED",
+    latestValidationStatus: "CHECKS_PASSED",
     latestOptimizationStatus: optimization.status,
     createdAt: "2026-05-17T09:43:10Z",
     summary: "Metrics compare generated Structured Text with the optimized code artifact."

@@ -16,7 +16,7 @@ async def test_valid_motor_structured_text_returns_verified() -> None:
 
     report = ValidationAgent().validate(project_id="PRJ-MOTOR", artifact=artifact, plan=plan)
 
-    assert report.status == "VERIFIED"
+    assert report.status == "CHECKS_PASSED"
     assert report.syntaxPassed is True
     assert report.formalPassed is True
     assert report.validator == "parser.v1"
@@ -191,7 +191,7 @@ async def test_tank_level_with_real_variables_and_safety_logic_returns_verified(
 
     report = ValidationAgent().validate(project_id="PRJ-TANK", artifact=artifact, plan=plan)
 
-    assert report.status == "VERIFIED"
+    assert report.status == "CHECKS_PASSED"
     assert all(result.status == "passed" for result in report.safetyResults)
 
 
@@ -223,7 +223,7 @@ async def test_formal_mode_fails_closed_when_matiec_is_missing(monkeypatch: pyte
 
     report = ValidationAgent(mode="formal").validate(project_id="PRJ-MOTOR", artifact=artifact, plan=plan)
 
-    assert report.status != "VERIFIED"
+    assert report.status != "CHECKS_PASSED"
     assert report.formalPassed is False
     assert any("MATIEC" in error for error in report.errors)
 
@@ -235,7 +235,7 @@ async def test_matiec_success_path_keeps_static_validation() -> None:
     report = ValidationAgent(matiec_validator=matiec).validate(project_id="PRJ-MOTOR", artifact=artifact, plan=plan)
 
     assert matiec.calls == 1
-    assert report.status == "VERIFIED"
+    assert report.status == "CHECKS_PASSED"
     assert report.syntaxPassed is True
     assert report.validator == "matiec"
 
@@ -258,7 +258,7 @@ async def test_matiec_unavailable_falls_back_to_static_validation() -> None:
 
     report = ValidationAgent(matiec_validator=matiec).validate(project_id="PRJ-MOTOR", artifact=artifact, plan=plan)
 
-    assert report.status == "VERIFIED"
+    assert report.status == "CHECKS_PASSED"
     assert report.syntaxPassed is True
     assert report.validator == "parser.v1"
 
@@ -271,5 +271,5 @@ async def test_matiec_timeout_fails_closed() -> None:
 
     report = ValidationAgent(matiec_validator=matiec).validate(project_id="PRJ-MOTOR", artifact=artifact, plan=plan)
 
-    assert report.status != "VERIFIED"
+    assert report.status != "CHECKS_PASSED"
     assert report.syntaxPassed is False

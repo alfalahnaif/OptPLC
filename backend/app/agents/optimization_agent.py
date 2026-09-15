@@ -121,7 +121,7 @@ class OptimizationAgent:
         repair_loop_report: RepairLoopReport | None = None,
     ) -> OptimizationReport:
         original_metrics = MetricsService.calculate(artifact.source)
-        if validation.status != "VERIFIED":
+        if validation.status != "CHECKS_PASSED":
             preserved_artifact = self._optimized_artifact(
                 project_id=project_id,
                 source_artifact=artifact,
@@ -145,7 +145,7 @@ class OptimizationAgent:
                 revalidationStatus=validation.status,
                 rollbackEvents=[],
                 createdAt=self._utc_now(),
-                summary="Static optimization did not run because the latest validation status is not VERIFIED.",
+                summary="Static optimization did not run because the latest validation status is not CHECKS_PASSED.",
                 revalidated=False,
             )
 
@@ -171,7 +171,7 @@ class OptimizationAgent:
                 plan=plan,
             )
 
-            if candidate_validation.status == "VERIFIED":
+            if candidate_validation.status == "CHECKS_PASSED":
                 after_metrics = MetricsService.calculate(candidate_source)
                 did_change = candidate_source != current_source
                 current_source = candidate_source
@@ -241,7 +241,7 @@ class OptimizationAgent:
             rollbackEvents=rollback_events,
             createdAt=self._utc_now(),
             summary=self._summary(status=status, passes=passes, repair_loop_report=repair_loop_report),
-            revalidated=final_validation.status == "VERIFIED",
+            revalidated=final_validation.status == "CHECKS_PASSED",
         )
 
     async def _optimize_with_llm(
@@ -332,7 +332,7 @@ class OptimizationAgent:
                     plan=plan,
                 )
 
-                if recheck.status == "VERIFIED":
+                if recheck.status == "CHECKS_PASSED":
                     after_metrics = MetricsService.calculate(candidate)
                     did_change = candidate != before_source
                     current_code = candidate
@@ -420,8 +420,8 @@ class OptimizationAgent:
         )
         if status == "ROLLED_BACK":
             summary = "LLM optimizer rolled back one or more passes after failed revalidation; safe baseline was preserved."
-        if repair_loop_report and repair_loop_report.finalStatus == "VERIFIED":
-            summary = f"{summary} Optimization ran after verified repair-loop output."
+        if repair_loop_report and repair_loop_report.finalStatus == "CHECKS_PASSED":
+            summary = f"{summary} Optimization ran after the repair loop reached passing checks."
 
         return OptimizationReport(
             projectId=project_id,
@@ -439,7 +439,7 @@ class OptimizationAgent:
             rollbackEvents=rollback_events,
             createdAt=self._utc_now(),
             summary=summary,
-            revalidated=current_validation.status == "VERIFIED",
+            revalidated=current_validation.status == "CHECKS_PASSED",
         )
 
     @staticmethod
@@ -607,11 +607,11 @@ class OptimizationAgent:
     ) -> str:
         accepted = sum(1 for item in passes if item.accepted and item.status == "applied")
         rolled_back = sum(1 for item in passes if item.status == "rolled_back")
-        repair_context = " after repair-loop verification" if repair_loop_report and repair_loop_report.finalStatus == "VERIFIED" else ""
+        repair_context = " after the repair loop reached passing checks" if repair_loop_report and repair_loop_report.finalStatus == "CHECKS_PASSED" else ""
         if status == "OPTIMIZED":
             return f"Static optimizer applied {accepted} pass(es){repair_context}; every accepted pass revalidated successfully."
         if status == "NO_CHANGES":
-            return "Static optimizer found no safe source changes; verified code was preserved."
+            return "Static optimizer found no safe source changes; the checked code was preserved."
         if status == "ROLLED_BACK":
             return f"Static optimizer rolled back {rolled_back} pass(es) because revalidation failed."
         return "Static optimizer could not run on the current artifact."

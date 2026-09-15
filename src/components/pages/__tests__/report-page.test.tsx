@@ -49,6 +49,9 @@ describe("ReportPage", () => {
     expect(await screen.findByText("Project summary")).toBeInTheDocument();
     expect(await screen.findByText("Conveyor Controller")).toBeInTheDocument();
     expect(await screen.findByText("Syntax: PASS")).toBeInTheDocument();
+    expect(screen.getByText("Evidence: L2 · Static rules passed")).toBeInTheDocument();
+    expect(screen.getByText("Safety functions are out of scope.")).toBeInTheDocument();
+    expect(screen.queryByText(/verified/i)).not.toBeInTheDocument();
   });
 
   it("renders missing section placeholders", async () => {
@@ -149,11 +152,12 @@ function reportFixture(overrides: Partial<FinalReport> = {}): FinalReport {
       projectId: "PRJ-0421",
       artifactId: "PRJ-0421-code-iter-1",
       iteration: 1,
-      status: "VERIFIED",
+      status: "CHECKS_PASSED",
       syntaxPassed: true,
       formalPassed: true,
       solver: "static.v1",
       validator: "static.v1",
+      evidenceLevel: "STATIC_RULES_PASSED",
       checkedAt: "2026-05-20T18:00:00Z",
       summary: "Validation passed.",
       syntaxErrors: [],
@@ -180,7 +184,7 @@ function reportFixture(overrides: Partial<FinalReport> = {}): FinalReport {
         scanTimeReductionPercent: 25
       },
       history: [],
-      latestValidationStatus: "VERIFIED",
+      latestValidationStatus: "CHECKS_PASSED",
       latestOptimizationStatus: null,
       createdAt: "2026-05-20T18:00:00Z",
       summary: "Metrics generated."

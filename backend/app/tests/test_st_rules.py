@@ -50,7 +50,7 @@ async def test_the_correct_motor_template_passes_and_a_start_dominant_variant_fa
     artifact = await CodeGenerationAgent(mode="template_based").generate_code(project_id="PRJ-MC2", plan=plan)
     agent = ValidationAgent()
 
-    assert agent.validate(project_id="PRJ-MC2", artifact=artifact, plan=plan).status == "VERIFIED"
+    assert agent.validate(project_id="PRJ-MC2", artifact=artifact, plan=plan).status == "CHECKS_PASSED"
 
     # Start wins over Stop when both happen in one scan: unsafe, and MC-2 must say so.
     start_dominant = artifact.source.replace("ELSIF Start_Edge.Q THEN", "END_IF;\nIF Start_Edge.Q THEN")
