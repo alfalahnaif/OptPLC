@@ -190,7 +190,7 @@ Compile one ST file with the pinned MATIEC, without normalization:
 powershell -ExecutionPolicy Bypass -File scripts\st-compile.ps1 -Path path\to\program.st
 ```
 
-`docker-compose.yml` still uses the older service name (`plcforge-app`) and mounts; it is updated in a later item.
+`docker-compose.yml` builds this image as `optplc-backend:local` (container `optplc-app`) with the database, the Chroma store, and the benchmark results mounted from the host. `docker compose up` replaces the older `plcforge-app` container (P0-13).
 
 ## Troubleshooting
 
