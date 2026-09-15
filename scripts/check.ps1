@@ -103,13 +103,24 @@ Invoke-Step 'backend' $backend {
 Invoke-Step 'audit' $repo -ReportOnly {
     npm audit --omit=dev --audit-level=high | Out-Host
     $npmOk = ($LASTEXITCODE -eq 0)
+    $npmNote = if ($npmOk) { 'npm clean' } else { 'npm findings' }
     & $python -m pip_audit --version *> $null
     if ($LASTEXITCODE -ne 0) {
-        $npmNote = if ($npmOk) { 'clean' } else { 'findings' }
-        return @{ Ok = $false; Note = "npm audit: $npmNote; pip-audit not installed" }
+        return @{ Ok = $false; Note = "$npmNote; pip-audit not installed" }
     }
-    & $python -m pip_audit -r (Join-Path $backend 'requirements.txt') | Out-Host
-    @{ Ok = ($npmOk -and $LASTEXITCODE -eq 0); Note = '' }
+    # Audit the hashed reference lock (P0-05): it is fully pinned, so pip-audit needs no temporary venv.
+    # The Windows system proxy on this machine is SOCKS, which requests cannot use without PySocks,
+    # and PyPI is reachable directly, so proxies are bypassed for this call only (D-027).
+    $savedNoProxy = $env:NO_PROXY
+    $env:NO_PROXY = '*'
+    try {
+        & $python -m pip_audit --progress-spinner off --disable-pip -r (Join-Path $backend 'requirements-docker.lock') | Out-Host
+        $pipOk = ($LASTEXITCODE -eq 0)
+    } finally {
+        $env:NO_PROXY = $savedNoProxy
+    }
+    $pipNote = if ($pipOk) { 'pip-audit clean' } else { 'pip-audit findings' }
+    @{ Ok = ($npmOk -and $pipOk); Note = "$npmNote; $pipNote" }
 }
 
 Write-Host "`n==> Summary" -ForegroundColor Cyan
