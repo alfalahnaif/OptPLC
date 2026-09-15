@@ -340,7 +340,8 @@ def test_motor_requirement_canonicalizes_emergency_stop_name(client: TestClient)
     input_names = {item["name"] for item in response.json()["inputs"]}
     assert "Emergency_Stop" in input_names
     assert "E_Stop" not in input_names
-    assert "Emergency_Stop" in " ".join(response.json()["safetyConstraints"])
+    # C-08 (P1-08): the signal name is canonical, but the user's constraint text is kept as written.
+    assert response.json()["safetyConstraints"] == ["Motor must not auto-restart after E-Stop"]
 
 
 def test_get_plan_returns_same_persisted_plan_object(client: TestClient) -> None:

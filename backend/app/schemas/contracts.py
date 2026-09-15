@@ -30,10 +30,28 @@ class Project(ContractModel):
     updatedAt: str
 
 
+# Input size limits (P1-08, D-032). Oversized input is rejected with 422 before any LLM call.
+MAX_PROJECT_NAME_LENGTH = 120
+MAX_DESCRIPTION_LENGTH = 2_000
+MAX_DOMAIN_LENGTH = 80
+MAX_REQUIREMENT_LENGTH = 8_000
+MAX_CONSTRAINT_LENGTH = 500
+MAX_CONSTRAINTS = 30
+MAX_SIGNAL_NAME_LENGTH = 64
+MAX_SIGNALS = 100
+
+
+def _check_item_lengths(values: list[str], limit: int, label: str) -> list[str]:
+    for value in values:
+        if len(value) > limit:
+            raise ValueError(f"Each {label} must be at most {limit} characters.")
+    return values
+
+
 class CreateProjectRequest(ContractModel):
-    name: str = Field(min_length=1)
-    description: str = Field(min_length=1)
-    domain: str = Field(min_length=1)
+    name: str = Field(min_length=1, max_length=MAX_PROJECT_NAME_LENGTH)
+    description: str = Field(min_length=1, max_length=MAX_DESCRIPTION_LENGTH)
+    domain: str = Field(min_length=1, max_length=MAX_DOMAIN_LENGTH)
     targetLanguage: Literal["Structured Text"]
     complexityTier: Literal["simple", "medium", "complex"]
 
@@ -47,9 +65,10 @@ class PerformanceTargets(ContractModel):
 
 class RequirementInput(ContractModel):
     projectId: str
-    text: str = Field(min_length=1)
+    text: str = Field(min_length=1, max_length=MAX_REQUIREMENT_LENGTH)
     safetyConstraints: list[str] = Field(
         default_factory=list,
+        max_length=MAX_CONSTRAINTS,
         validation_alias=AliasChoices("safetyConstraints", "safety_constraints"),
         serialization_alias="safetyConstraints",
     )
@@ -59,15 +78,17 @@ class RequirementInput(ContractModel):
     )
     confirmedOutputs: list[str] = Field(
         default_factory=list,
+        max_length=MAX_SIGNALS,
         validation_alias=AliasChoices("confirmedOutputs", "confirmed_outputs"),
         serialization_alias="confirmedOutputs",
     )
     confirmedInputs: list[str] = Field(
         default_factory=list,
+        max_length=MAX_SIGNALS,
         validation_alias=AliasChoices("confirmedInputs", "confirmed_inputs"),
         serialization_alias="confirmedInputs",
     )
-    domain: str | None = None
+    domain: str | None = Field(default=None, max_length=MAX_DOMAIN_LENGTH)
     complexityTier: str | None = Field(
         default=None,
         validation_alias=AliasChoices("complexityTier", "complexity_tier"),
@@ -80,6 +101,68 @@ class RequirementInput(ContractModel):
         if not value.strip():
             raise ValueError("Requirement text must not be empty.")
         return value
+
+    @field_validator("safetyConstraints")
+    @classmethod
+    def constraints_within_limit(cls, value: list[str]) -> list[str]:
+        return _check_item_lengths(value, MAX_CONSTRAINT_LENGTH, "safety constraint")
+
+    @field_validator("confirmedOutputs", "confirmedInputs")
+    @classmethod
+    def signal_names_within_limit(cls, value: list[str]) -> list[str]:
+        return _check_item_lengths(value, MAX_SIGNAL_NAME_LENGTH, "signal name")
+
+
+class AnalyzeRequirementRequest(ContractModel):
+    """Body of POST /api/projects/{id}/analyze-requirement. It was a free dict before P1-08 (S-05)."""
+
+    text: str = Field(default="", max_length=MAX_REQUIREMENT_LENGTH)
+    safetyConstraints: list[str] = Field(default_factory=list, max_length=MAX_CONSTRAINTS)
+
+    @field_validator("safetyConstraints")
+    @classmethod
+    def constraints_within_limit(cls, value: list[str]) -> list[str]:
+        return _check_item_lengths(value, MAX_CONSTRAINT_LENGTH, "safety constraint")
+
+
+class AnalysisSignal(BaseModel):
+    """A signal proposed by the requirement analysis. Mirrors AnalysisSignal in src/lib/api-contracts/types.ts."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    name: str = Field(min_length=1, max_length=MAX_SIGNAL_NAME_LENGTH)
+    type: Literal["BOOL", "INT", "REAL", "TIME"]
+    source: Literal["Operator", "Safety", "Sensor", "Timer"] | None = None
+    description: str | None = None
+    confirmed: bool | None = None
+
+    @field_validator("type", mode="before")
+    @classmethod
+    def type_upper_case(cls, value: object) -> object:
+        return value.upper() if isinstance(value, str) else value
+
+    @field_validator("source", mode="before")
+    @classmethod
+    def unknown_source_is_dropped(cls, value: object) -> object:
+        # source is optional display metadata, so an unknown label is dropped instead of failing the reply
+        return value if value in {"Operator", "Safety", "Sensor", "Timer"} else None
+
+
+class RequirementAnalysis(BaseModel):
+    """Validated requirement analysis (P1-08, D-032). Mirrors AnalysisResult in src/lib/api-contracts/types.ts."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    domain: str = Field(max_length=MAX_DOMAIN_LENGTH)
+    confidence: float = Field(ge=0.0, le=1.0)
+    inferred_inputs: list[AnalysisSignal] = Field(default_factory=list, max_length=MAX_SIGNALS)
+    suggested_outputs: list[AnalysisSignal] = Field(default_factory=list, max_length=MAX_SIGNALS)
+    suggested_internals: list[AnalysisSignal] = Field(default_factory=list, max_length=MAX_SIGNALS)
+    safety_constraints: list[str] = Field(default_factory=list)
+    suggested_constraints: list[str] = Field(default_factory=list, max_length=MAX_CONSTRAINTS)
+    projectId: str | None = None
+    analyzedAt: str | None = None
+    source: Literal["llm", "heuristic", "empty"] | None = None
 
 
 class RequirementPayload(ContractModel):
