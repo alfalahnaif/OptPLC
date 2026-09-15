@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.database import get_db
 from app.schemas.contracts import (
+    AnalyzeRequirementRequest,
     CodeArtifact,
     CreateProjectRequest,
     DebuggingReport,
@@ -13,6 +14,7 @@ from app.schemas.contracts import (
     PlanObject,
     Project,
     RepairLoopReport,
+    RequirementAnalysis,
     RequirementInput,
     RequirementPayload,
     ValidationReport,
@@ -180,29 +182,23 @@ async def get_requirements(
     return requirements
 
 
-@router.post("/{project_id}/analyze-requirement")
+@router.post("/{project_id}/analyze-requirement", response_model=RequirementAnalysis)
 async def analyze_requirement(
     project_id: str,
-    body: dict,
+    request: AnalyzeRequirementRequest,
     service: ProjectService = Depends(get_project_service),
-) -> dict:
-    text = str(body.get("text", ""))
-    constraints = body.get("safetyConstraints", [])
-    if not isinstance(constraints, list):
-        constraints = []
-    safe_constraints = [item for item in constraints if isinstance(item, str)]
-    if not text.strip():
-        return {
-            "domain": "Unknown",
-            "confidence": 0.0,
-            "inferred_inputs": [],
-            "suggested_outputs": [],
-            "suggested_internals": [],
-            "safety_constraints": [],
-            "suggested_constraints": [],
-            "source": "empty",
-        }
-    return await service.analyze_requirement(project_id, text, safe_constraints)
+) -> RequirementAnalysis:
+    """Live requirement preview. The body is validated (S-05). A malformed LLM reply gives 502, and the
+    frontend then shows its heuristic analysis (P1-08, D-032)."""
+    if not request.text.strip():
+        return RequirementAnalysis(domain="Unknown", confidence=0.0, source="empty")
+    try:
+        return await service.analyze_requirement(project_id, request.text, request.safetyConstraints)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"The LLM requirement analysis returned an invalid reply: {str(exc)[:200]}",
+        ) from exc
 
 
 @router.post("/{project_id}/generate", response_model=CodeArtifact)
