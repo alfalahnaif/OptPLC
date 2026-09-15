@@ -2,14 +2,6 @@
 # The check fails only on failures NOT listed here. Remove a line as soon as the test passes.
 # Categories and fixing items: docs/plan/TEST_BASELINE.md.
 
-# C. Template tests exposing C-10 (motor latch never holds) and C-11 (batch never completes) -> P1-22
-test_code_generation_agent::test_motor_plan_generates_structured_text_program
-test_code_generation_agent::test_different_domains_produce_different_code
-test_code_generation_agent::test_motor_template_uses_normally_closed_stop_pb_semantics
-test_code_generation_agent::test_batch_generation_includes_step_logic
-test_projects::test_different_project_domains_generate_different_code
-test_projects::test_generate_code_persists_artifact
-
 # D. Hidden behind C-01 until P1-01; they now reach the safety rules and fail for their own reasons.
 # D1. C-14: the static domain rules give wrong verdicts. MC-1/MC-3/MC-4 pass unsafe motor code,
 #     PC-1 fails the correct tank template, TC-1 fails the traffic template; TL-1 is C-09 -> P1-05

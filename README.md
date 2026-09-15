@@ -141,7 +141,8 @@ powershell -ExecutionPolicy Bypass -File scripts\st-compile.ps1 -Path path\to\pr
 
 - Validation is a compiler check plus heuristic text rules, not model checking. A program that ignores its emergency stop can pass the motor rules.
 - Without MATIEC, only the parser check `parser.v1` runs, and passing it is not L1 (P1-01). Inside the reference image, MATIEC compiles the source exactly as written (P1-02).
-- The motor and batch templates are behaviourally wrong (C-10, C-11), yet pass the static rules.
+- The traffic template is not a real phase controller (C-15, P1-24). The motor, batch, and interlock templates were redesigned in P1-22 and are tested for behavior over several scans.
+- The static rules misjudge code in both directions (C-14): they had passed the old motor template, which could never run.
 - RAG is used in planning and in benchmark `llm_rag` mode only, and its effect has not been measured.
 - The static cost proxy is not a scan time measured on PLC hardware.
 - There is no authentication or rate limiting on the API.

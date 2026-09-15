@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Literal
 
+from app.agents.domains import canonical_domain
 from app.agents.llm_client import llm_complete
 from app.schemas.contracts import InternalVar, PerformanceTargets, PlanObject, PlanScope, PlanSignal
 
@@ -354,7 +355,7 @@ class PlanningAgent:
         safety_constraints: list[str] | None = None,
     ) -> PlanningTemplate:
         key = f"{domain} {requirement_text}".lower()
-        normalized_domain = domain.strip().lower()
+        normalized_domain = canonical_domain(domain)
         confirmed = [name.strip() for name in (confirmed_outputs or []) if name.strip()]
         normalized_constraints_text = " ".join((safety_constraints or [])).lower()
 

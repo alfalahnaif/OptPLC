@@ -5,6 +5,7 @@ from sqlalchemy import select
 
 from app.database.database import AsyncSessionLocal
 from app.database.models import ProjectModel, SessionModel
+from app.tests.support.scan_sim import ScanSim
 
 
 def create_project_payload() -> dict:
@@ -640,10 +641,13 @@ def test_generate_code_persists_artifact(client: TestClient) -> None:
     assert artifact["language"] == "structured-text"
     assert "Emergency_Stop" in artifact["source"]
     assert "E_Stop" not in artifact["source"]
-    assert "Start_PB AND Stop_PB" in artifact["source"]
-    assert "IF NOT Stop_PB OR Fault_State OR NOT Safety_OK THEN" in artifact["source"]
-    assert "Start_PB AND NOT Stop_PB" not in artifact["source"]
-    assert "IF Stop_PB OR Fault_State" not in artifact["source"]
+    # Behavior, not wording (P1-22): Stop_PB is normally closed, so FALSE stops and blocks a start.
+    sim = ScanSim(artifact["source"])
+    inputs = {name: False for name in ("Start_PB", "Overload", "Reset_PB") if name.upper() in sim.inputs}
+    healthy = {**inputs, "Stop_PB": True, "Emergency_Stop": True}
+    assert sim.scan(**{**healthy, "Start_PB": True})["Motor_Run"] is True
+    assert sim.scan(**{**healthy, "Stop_PB": False})["Motor_Run"] is False
+    assert sim.scan(**{**healthy, "Start_PB": True, "Stop_PB": False})["Motor_Run"] is False
 
 
 def test_artifact_get_endpoints_return_persisted_values(client: TestClient) -> None:

@@ -142,7 +142,7 @@ Events:    PRJ-0001-wf-requirements-1, PRJ-0001-wf-plan-2 ...
 - **Parser check (`parser.v1`, P1-01):** runs only when MATIEC is missing and covers a subset of ST (no `FUNCTION` POUs, `TYPE`/`STRUCT`, or `=>` output parameters). Passing it is not L1.
 - **Local tests assume no MATIEC:** on the host they expect `parser.v1`; inside the reference image MATIEC runs instead. MATIEC itself now compiles the delivered code exactly as written (P1-02, D-005).
 - **C-02:** the repair loop shows the LLM the template code instead of the failed code (P1-06).
-- **C-10 / C-11:** the motor template can never start the motor, and the batch template never sets `Batch_Complete` (P1-22).
+- **C-15:** the traffic template is a combinational placeholder, not a phase controller: a detected vehicle holds amber, and there is no timing (P1-24). The motor, batch, and interlock templates were redesigned in P1-22 and have behavior tests over several scans (`app/tests/support/scan_sim.py`, a test oracle, not L3).
 - **C-14:** the static domain rules are proximity regexes, not data flow. An unsafe motor program without emergency-stop handling passes MC-1..MC-4, while PC-1 and TC-1 reject the correct tank and traffic templates (P1-05).
 - **Formal path:** the transpiler deletes `IF` blocks and emits no real LTL, and its result parsing fails open (P3).
 - **No authentication or rate limiting** on any endpoint (S-01; minimal protection in P1-14).
