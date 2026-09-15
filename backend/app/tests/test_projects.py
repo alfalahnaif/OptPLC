@@ -691,7 +691,7 @@ def test_validate_persists_validation_report(client: TestClient) -> None:
     assert response.status_code == 200
     report = response.json()
     assert report["projectId"] == project_id
-    assert report["validator"] == "static.v1"
+    assert report["validator"] == "parser.v1"
     assert "status" in report
     assert "syntaxErrors" in report
     assert "safetyResults" in report

@@ -41,7 +41,7 @@ Database  SQLite (dev) — tables `projects` and `sessions`; pipeline state stor
 |------|-------|------|-----------------------|
 | Plan | PlanningAgent | `llm` | Falls back to `rule_based` if the reply is not valid JSON twice |
 | Generate | CodeGenerationAgent | `llm` | Falls back to `template_based` if the reply has no `PROGRAM` or misses a plan output; RAG is off on `/generate` |
-| Validate | ValidationAgent | `static` | MATIEC when available (the code is normalized first, see §8), otherwise a regex fallback (bug C-01); then regex domain rules |
+| Validate | ValidationAgent | `static` | MATIEC when available (the code is normalized first, see §8), otherwise the parser check `parser.v1` (P1-01, not L1); then regex domain rules (C-14) |
 | Debug | DebuggingAgent | `llm` | Falls back to `rule_based` on any LLM error |
 | Optimize | OptimizationAgent | `llm` | Three passes with static revalidation and rollback; **no behavioural-equivalence check** (C-03) |
 
@@ -139,11 +139,11 @@ Events:    PRJ-0001-wf-requirements-1, PRJ-0001-wf-plan-2 ...
 
 ## 8. Known Gaps (details in `docs/plan/AUDIT_2026-09.md` and `docs/plan/TEST_BASELINE.md`)
 
-- **C-01:** the regex syntax fallback rejects every valid program with `VAR_INPUT`/`VAR_OUTPUT` (P1-01).
+- **Parser check (`parser.v1`, P1-01):** runs only when MATIEC is missing and covers a subset of ST (no `FUNCTION` POUs, `TYPE`/`STRUCT`, or `=>` output parameters). Passing it is not L1.
 - **MATIEC normalization:** timer calls are removed, `X.Q` becomes `FALSE`, and `T#` literals become `0` before compiling, so the checked code is not the delivered code (P1-02, D-005).
 - **C-02:** the repair loop shows the LLM the template code instead of the failed code (P1-06).
 - **C-10 / C-11:** the motor template can never start the motor, and the batch template never sets `Batch_Complete` (P1-22).
-- **Static domain rules** are text patterns; an unsafe motor program can pass them.
+- **C-14:** the static domain rules are proximity regexes, not data flow. An unsafe motor program without emergency-stop handling passes MC-1..MC-4, while PC-1 and TC-1 reject the correct tank and traffic templates (P1-05).
 - **Formal path:** the transpiler deletes `IF` blocks and emits no real LTL, and its result parsing fails open (P3).
 - **No authentication or rate limiting** on any endpoint (S-01; minimal protection in P1-14).
 - **Dependency advisories:** `npm audit` is clean after P0-12 (Next.js 15.5.25 with a `postcss` override, D-027; the Next.js 16 upgrade is P8-14). `pip-audit` on `backend/requirements-docker.lock` reports 12 known vulnerabilities in `chromadb`, `transformers`, and `pydantic-settings`, not yet addressed; `torch 2.5.1+cpu` cannot be audited because that build is not on PyPI.

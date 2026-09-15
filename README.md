@@ -20,7 +20,7 @@ This table describes what the code does today, not what is planned. Findings are
 | Code generation | Implemented | LLM mode with a template fallback; RAG is not enabled on `/generate` |
 | LLM provider abstraction | Implemented | Anthropic, OpenAI, Gemini, Groq, Ollama via `LLM_PROVIDER` |
 | RAG retrieval | Partial | 12 patterns; used in planning and in benchmark `llm_rag` mode; storage paths are hard-coded to `/app/...` |
-| Validation | Partial | MATIEC compile when available (the source is normalized first), otherwise a regex fallback that currently rejects valid programs (C-01); then heuristic domain rules. The status `VERIFIED` means "static checks passed", not a proof |
+| Validation | Partial | MATIEC compile when available (the source is normalized first), otherwise the parser check `parser.v1` (a Lark grammar for a subset of ST plus a declaration check; passing it is not L1); then heuristic domain rules, which give wrong verdicts in both directions (C-14). The status `VERIFIED` means "static checks passed", not a proof |
 | Debugging / repair loop | Implemented, with a known defect | The repair prompt shows the template code instead of the failed code (C-02) |
 | Optimization | Partial | LLM passes with static revalidation and rollback; behavioural equivalence is not checked (C-03) |
 | Metrics | Implemented | LOC, cyclomatic complexity, a maintainability-index variant, and a static cost proxy that is not milliseconds (M-03) |

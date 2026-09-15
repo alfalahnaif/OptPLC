@@ -7,6 +7,8 @@ from lark import Lark, Tree, Visitor
 from lark.exceptions import LarkError
 
 
+# Supported IEC 61131-3 Structured Text subset (widened in P1-01, D-029; full coverage is P2-01).
+# Keywords are reserved: IDENT never matches them, so TRUE, AND, END_IF, ... are never variable names.
 ST_GRAMMAR: Final[str] = r"""
     start: compilation_unit
 
@@ -20,7 +22,7 @@ ST_GRAMMAR: Final[str] = r"""
     function_block: FUNCTION_BLOCK identifier declaration_block* statement_list? END_FUNCTION_BLOCK
 
 
-    declaration_block: var_header declaration* END_VAR
+    declaration_block: var_header var_qualifier? declaration* END_VAR
 
     var_header: VAR
               | VAR_INPUT
@@ -28,6 +30,11 @@ ST_GRAMMAR: Final[str] = r"""
               | VAR_IN_OUT
               | VAR_TEMP
               | VAR_GLOBAL
+              | VAR_EXTERNAL
+
+    var_qualifier: CONSTANT
+                 | RETAIN
+                 | NON_RETAIN
 
     declaration: identifier_list ":" type_spec initializer? ";"
 
@@ -35,6 +42,7 @@ ST_GRAMMAR: Final[str] = r"""
 
     type_spec: primitive_type
              | timer_type
+             | array_type
              | identifier
 
     primitive_type: BOOL
@@ -49,7 +57,13 @@ ST_GRAMMAR: Final[str] = r"""
               | TOF
               | TP
 
-    initializer: ASSIGN expr
+    array_type: ARRAY "[" subrange ("," subrange)* "]" OF type_spec
+
+    subrange: BOUND_INT RANGE BOUND_INT
+
+    initializer: ASSIGN (expr | array_initializer)
+
+    array_initializer: "[" expr ("," expr)* "]"
 
 
     statement_list: statement*
@@ -59,6 +73,9 @@ ST_GRAMMAR: Final[str] = r"""
               | case_stmt
               | for_stmt
               | while_stmt
+              | repeat_stmt
+              | exit_stmt
+              | return_stmt
               | function_call ";"+
               | ";"
 
@@ -86,18 +103,28 @@ ST_GRAMMAR: Final[str] = r"""
 
     while_stmt: WHILE expr DO statement_list END_WHILE ";"*
 
+    repeat_stmt: REPEAT statement_list UNTIL expr END_REPEAT ";"*
+
+    exit_stmt: EXIT ";"+
+
+    return_stmt: RETURN ";"+
+
 
     ?expr: or_expr
 
-    ?or_expr: and_expr (OR and_expr)*
+    ?or_expr: xor_expr (OR xor_expr)*
 
-    ?and_expr: comparison_expr (AND comparison_expr)*
+    ?xor_expr: and_expr (XOR and_expr)*
+
+    ?and_expr: comparison_expr ((AND | AMP) comparison_expr)*
 
     ?comparison_expr: add_expr (COMPOP add_expr)*
 
     ?add_expr: mul_expr ((PLUS | MINUS) mul_expr)*
 
-    ?mul_expr: unary_expr ((MUL | DIV) unary_expr)*
+    ?mul_expr: power_expr ((MUL | DIV | MOD) power_expr)*
+
+    ?power_expr: unary_expr (POW unary_expr)*
 
     ?unary_expr: NOT unary_expr
                | MINUS unary_expr
@@ -118,10 +145,12 @@ ST_GRAMMAR: Final[str] = r"""
     variable: identifier selector*
 
     selector: "." identifier
-            | "[" expr "]"
+            | "[" expr ("," expr)* "]"
 
     ?literal: BOOL_LITERAL
             | TIME_LITERAL
+            | TYPED_LITERAL
+            | BASED_NUMBER
             | STRING_LITERAL
             | SIGNED_NUMBER
 
@@ -138,8 +167,12 @@ ST_GRAMMAR: Final[str] = r"""
     VAR_IN_OUT: /(?i:VAR_IN_OUT)\b/
     VAR_TEMP: /(?i:VAR_TEMP)\b/
     VAR_GLOBAL: /(?i:VAR_GLOBAL)\b/
+    VAR_EXTERNAL: /(?i:VAR_EXTERNAL)\b/
     VAR: /(?i:VAR)\b/
     END_VAR: /(?i:END_VAR)\b/
+    CONSTANT: /(?i:CONSTANT)\b/
+    RETAIN: /(?i:RETAIN)\b/
+    NON_RETAIN: /(?i:NON_RETAIN)\b/
 
     IF: /(?i:IF)\b/
     THEN: /(?i:THEN)\b/
@@ -160,6 +193,15 @@ ST_GRAMMAR: Final[str] = r"""
     WHILE: /(?i:WHILE)\b/
     END_WHILE: /(?i:END_WHILE)\b/
 
+    REPEAT: /(?i:REPEAT)\b/
+    UNTIL: /(?i:UNTIL)\b/
+    END_REPEAT: /(?i:END_REPEAT)\b/
+
+    EXIT: /(?i:EXIT)\b/
+    RETURN: /(?i:RETURN)\b/
+
+    ARRAY: /(?i:ARRAY)\b/
+
     BOOL: /(?i:BOOL)\b/
     INT: /(?i:INT)\b/
     DINT: /(?i:DINT)\b/
@@ -173,20 +215,27 @@ ST_GRAMMAR: Final[str] = r"""
 
     AND: /(?i:AND)\b/
     OR: /(?i:OR)\b/
+    XOR: /(?i:XOR)\b/
     NOT: /(?i:NOT)\b/
+    MOD: /(?i:MOD)\b/
 
     BOOL_LITERAL: /(?i:TRUE|FALSE)\b/
     TIME_LITERAL: /(?i:(?:T|TIME)#[0-9]+(?:\.[0-9]+)?(?:MS|S|M|H|D)(?:[0-9]+(?:\.[0-9]+)?(?:MS|S|M|H|D))*)/
+    TYPED_LITERAL: /(?i:(?:BOOL|SINT|INT|DINT|LINT|USINT|UINT|UDINT|ULINT|REAL|LREAL|BYTE|WORD|DWORD|LWORD)#(?:TRUE|FALSE|(?:2|8|16)#[0-9A-F_]+|[-+]?[0-9][0-9_]*(?:\.[0-9_]+)?(?:E[-+]?[0-9]+)?))/
+    BASED_NUMBER: /(?:2|8|16)#[0-9A-Fa-f_]+/
+    BOUND_INT: /[-+]?[0-9]+/
     STRING_LITERAL: /'([^']|'')*'|"(?:[^"\\]|\\.)*"/
-    IDENT: /[A-Za-z_][A-Za-z0-9_]*/
+    IDENT: /(?!(?i:PROGRAM|END_PROGRAM|FUNCTION_BLOCK|END_FUNCTION_BLOCK|VAR|VAR_INPUT|VAR_OUTPUT|VAR_IN_OUT|VAR_TEMP|VAR_GLOBAL|VAR_EXTERNAL|END_VAR|CONSTANT|RETAIN|NON_RETAIN|IF|THEN|ELSIF|ELSE|END_IF|CASE|OF|END_CASE|FOR|TO|BY|DO|END_FOR|WHILE|END_WHILE|REPEAT|UNTIL|END_REPEAT|EXIT|RETURN|ARRAY|AND|OR|XOR|NOT|MOD|TRUE|FALSE)\b)[A-Za-z_][A-Za-z0-9_]*/
 
     ASSIGN: ":="
     RANGE: ".."
     COMPOP: "<=" | ">=" | "<>" | "=" | "<" | ">"
     PLUS: "+"
     MINUS: "-"
+    POW: "**"
     MUL: "*"
     DIV: "/"
+    AMP: "&"
 
     ML_COMMENT: /\(\*(.|\n|\r)*?\*\)/
     SL_COMMENT: /\/\/[^\n\r]*/
@@ -218,6 +267,9 @@ class DecisionCounter(Visitor):
         self.count += 1
 
     def while_stmt(self, _: Tree) -> None:
+        self.count += 1
+
+    def repeat_stmt(self, _: Tree) -> None:
         self.count += 1
 
 
