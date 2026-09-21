@@ -1,0 +1,210 @@
+<title>Intent-Aware PLC Assurance</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@500;600&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&display=swap">
+<style>
+  :root {
+    --paper: #fbfcfd;
+    --ink: #1d2430;
+    --muted: #5b6573;
+    --rule: #d9dee6;
+    --accent: #1f5fa8;
+    --accent-soft: #e8f0fa;
+    --warn: #9a5b00;
+    --warn-soft: #fbf1e1;
+    --sans: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+    --serif: "Source Serif 4", Georgia, "Times New Roman", serif;
+    --mono: "IBM Plex Mono", Consolas, "Courier New", monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper: #12161c;
+      --ink: #e6e9ee;
+      --muted: #9aa4b2;
+      --rule: #2a313b;
+      --accent: #7fb0ec;
+      --accent-soft: #1a2636;
+      --warn: #e0a64a;
+      --warn-soft: #2a2114;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper: #12161c;
+    --ink: #e6e9ee;
+    --muted: #9aa4b2;
+    --rule: #2a313b;
+    --accent: #7fb0ec;
+    --accent-soft: #1a2636;
+    --warn: #e0a64a;
+    --warn-soft: #2a2114;
+  }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font: 16px/1.55 var(--serif);
+    padding-inline: 16px;
+    padding-block: 32px 48px;
+  }
+  main { max-width: 46rem; margin: 0 auto; display: grid; gap: 28px; }
+  h1, h2, .label, th, .meta dt { font-family: var(--sans); }
+  h1 { font-size: 1.75rem; line-height: 1.2; margin: 0; text-wrap: balance; font-weight: 600; }
+  h2 {
+    font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--accent); margin: 0 0 10px; font-weight: 600;
+  }
+  p { margin: 0 0 10px; max-width: 68ch; }
+  p:last-child { margin-bottom: 0; }
+  section { border-top: 1px solid var(--rule); padding-top: 18px; }
+  .meta {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+    gap: 8px 24px; margin: 14px 0 0; font-size: 0.9rem;
+  }
+  .meta div { display: grid; gap: 2px; }
+  .meta dt { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+  .meta dd { margin: 0; }
+  .status {
+    display: inline-block; font: 500 0.78rem var(--sans); color: var(--warn);
+    background: var(--warn-soft); padding: 2px 8px; border-radius: 3px;
+  }
+  .question {
+    font-size: 1.12rem; font-style: italic; border-left: 3px solid var(--accent);
+    padding: 4px 0 4px 14px; margin: 0 0 12px;
+  }
+  ul, ol { margin: 0; padding-left: 1.2rem; display: grid; gap: 6px; }
+  li { max-width: 68ch; }
+  .table-wrap { overflow-x: auto; margin: 6px 0 8px; }
+  table { border-collapse: collapse; font-size: 0.9rem; width: 100%; }
+  th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  th { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); font-weight: 600; }
+  td.num, th.num { text-align: center; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  tr.diverge td { background: var(--accent-soft); }
+  tr.diverge td.num strong { color: var(--accent); }
+  .caption { font-size: 0.85rem; color: var(--muted); }
+  code { font-family: var(--mono); font-size: 0.88em; }
+  .split { display: grid; grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr)); gap: 16px 28px; }
+  .split h3 { font: 600 0.9rem var(--sans); margin: 0 0 6px; }
+  .refs { font-size: 0.8rem; color: var(--muted); }
+  .refs ol { gap: 3px; }
+  @media print {
+    body { padding-block: 0; font-size: 10.5pt; }
+    main { gap: 14px; }
+    section { break-inside: avoid; }
+  }
+</style>
+
+<main>
+  <header>
+    <h1>Intent-Aware Assurance for LLM-Generated PLC Code</h1>
+    <dl class="meta">
+      <div><dt>For</dt><dd>Thesis supervisor, for discussion</dd></div>
+      <div><dt>Project</dt><dd>OptPLC · Master's thesis, SPbPU</dd></div>
+      <div><dt>Date</dt><dd>21 September 2026</dd></div>
+      <div><dt>Status</dt><dd><span class="status">Proposed direction · no results yet</span></dd></div>
+    </dl>
+  </header>
+
+  <section>
+    <h2>Why refocus now</h2>
+    <p>A literature scan in September 2026 shows that an LLM that generates Structured Text and then checks it with a compiler and a model checker in a loop is already published: Agents4PLC appeared in IEEE TSE in 2026 [1]. Benchmarks with formal properties and reference solutions also exist: Agents4PLC v2.0 has 96 tasks, and another study uses 100 tasks with MatIEC, PLCverif and OpenPLC [1, 2]. A thesis that only reports "better generation" would therefore add little.</p>
+  </section>
+
+  <section>
+    <h2>Research question</h2>
+    <p class="question">When a pipeline reports an LLM-generated PLC program as "verified", was it verified against a specification that actually captures the engineer's safety intent?</p>
+    <p>A model checker proves that the code satisfies a specification, not that the specification is complete. Here is an example with a motor, an emergency stop and a reset button. Take the specification <code>G(E-Stop active → Motor off)</code>, and a faulty variant of the program that drops the reset interlock. The faulty variant still satisfies the specification:</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Scan</th><th>Inputs</th><th class="num">Motor, reference</th><th class="num">Motor, faulty variant</th></tr></thead>
+        <tbody>
+          <tr><td class="num">1</td><td>Start pressed, E-Stop healthy</td><td class="num">1</td><td class="num">1</td></tr>
+          <tr><td class="num">2</td><td>E-Stop activated</td><td class="num">0</td><td class="num">0</td></tr>
+          <tr class="diverge"><td class="num">3</td><td>E-Stop released, no Reset</td><td class="num"><strong>0</strong></td><td class="num"><strong>1</strong></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="caption">This is an illustration, not a result. The variant restarts the motor without a Reset, and the specification cannot see it. The three-scan scenario is exactly the question we would put to an engineer: "Should the motor restart here?"</p>
+  </section>
+
+  <section>
+    <h2>Hypotheses (falsifiable)</h2>
+    <ol>
+      <li><strong>H1.</strong> A non-trivial share of intent-violating safety faults survive <em>independent</em> specifications, that is, human-written benchmark specifications and LLM-generated ones.</li>
+      <li><strong>H2.</strong> In LLM generate-verify-repair pipelines, some outputs accepted as "verified" violate the intent, mostly because the specification is inadequate rather than because the verifier is wrong.</li>
+      <li><strong>H3.</strong> Showing engineers distinguishing scan-cycle scenarios raises specification adequacy with a small number of questions.</li>
+    </ol>
+    <p class="caption">The thresholds are pre-registered before the main data collection. A refuted hypothesis is reported as a result.</p>
+  </section>
+
+  <section>
+    <h2>Positioning: what is known and what would be new</h2>
+    <div class="split">
+      <div>
+        <h3>Known, and we build on it</h3>
+        <ul>
+          <li>Mutation-based coverage for model checking [3], and model-checker counterexamples that distinguish mutants [4].</li>
+          <li>Measuring the completeness of LLM-generated specifications with mutants, for sequential Python and Java code [5].</li>
+          <li>Clarifying user intent through test queries (TiCoder) [6].</li>
+          <li>LLM plus formal verification for PLC code [1, 2].</li>
+        </ul>
+      </div>
+      <div>
+        <h3>New, to be confirmed by a systematic review</h3>
+        <ul>
+          <li>Measured specification adequacy and false assurance in LLM-based PLC pipelines, under scan-cycle semantics.</li>
+          <li>Safety mutation operators derived from real faults we observe in LLM-generated IEC 61131-3 code, including NO/NC polarity, reset and interlock faults.</li>
+          <li>An intent loop that engineers answer through timing scenarios, not temporal logic, and that is combined with counterexample-guided repair.</li>
+          <li>A benchmark track that scores specifications, not only code.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Method and ground truth</h2>
+    <ul>
+      <li>Specifications refer to input and output signals only. We measure them from independent sources: Agents4PLC's published specifications (Apache-2.0) and specifications generated by several LLM families.</li>
+      <li>Every behavioural difference has a witness scenario, replayed in two executors: a scan-cycle interpreter and MatIEC-generated C. Samples are cross-checked with two verifiers, nuXmv and ESBMC-PLC+ [7].</li>
+      <li>Whether a fault violates the intent is decided by people, never by a tool or an LLM. A second, independent control engineer labels at least 20% of the cases, and we report inter-rater agreement (κ).</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Plan and decision gates</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>When</th><th>Step</th><th>Gate</th></tr></thead>
+        <tbody>
+          <tr><td>to 11 Oct 2026</td><td>Feasibility pilot on 6 tasks, and a systematic literature review</td><td>Feasibility, a real signal from independent specifications, and novelty confirmed. <strong>Otherwise we reframe; alternatives are defined in advance.</strong></td></tr>
+          <tr><td>to 25 Oct</td><td>Real LLM faults, then derived operators, then pre-registration</td><td>Protocol frozen</td></tr>
+          <tr><td>Nov – Jan</td><td>Corpus, labelling, false-assurance study, analysis</td><td>Paper 1 (measurement), target submission 31 Jan 2027</td></tr>
+          <tr><td>Dec – May</td><td>Intent loop, engineer study, benchmark v1.0</td><td>Paper 2 (method), and the thesis core</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>All five points of your roadmap stay in the plan. Formal verification and the benchmark become the core. HIL, the Pareto optimiser and local models remain as applied chapters.</p>
+  </section>
+
+  <section>
+    <h2>Questions for you</h2>
+    <ol>
+      <li>Do you agree to this question as the core of the thesis?</li>
+      <li>Target journal for Paper 1. Our shortlist is J. Systems and Software, Information and Software Technology, Empirical Software Engineering and Computers in Industry. More ambitious options are IEEE TSE and IEEE TII. We would also value a suitable VAK journal.</li>
+      <li>How deep should HIL, the optimiser and local-model fine-tuning go in the thesis?</li>
+      <li>Could you help us find one or two independent control engineers for labelling, about 6 to 10 hours each in November and December?</li>
+      <li>Which master's thesis requirements should we plan for: novelty statements, approbation and publications?</li>
+    </ol>
+  </section>
+
+  <section class="refs">
+    <h2>References</h2>
+    <ol>
+      <li>Liu et al., "Agents4PLC", IEEE TSE 2026; arXiv:2410.14209; benchmark repository Luoji-zju/Agents4PLC_release.</li>
+      <li>Empirical study of Structured Text generation with MatIEC, PLCverif and OpenPLC; GitHub warmjademe/plc_generation_empirical_study; no associated paper identified yet.</li>
+      <li>Chockler, Kupferman, Vardi, "Coverage Metrics for Temporal Logic Model Checking", TACAS 2001.</li>
+      <li>Ammann, Black, Majurski, "Using Model Checking to Generate Tests from Specifications", ICFEM 1998.</li>
+      <li>Endres et al., "Can LLMs Transform Natural Language Intent into Formal Method Postconditions?", FSE 2024; see also PostCondBench, 2026.</li>
+      <li>Lahiri et al., "Interactive Code Generation via Test-Driven User-Intent Formalization", arXiv:2208.05950; Lahiri, "Intent Formalization: A Grand Challenge", arXiv:2603.17150.</li>
+      <li>Dantas, Cordeiro, Junior, "ESBMC-PLC+", arXiv:2606.23870.</li>
+    </ol>
+  </section>
+</main>
