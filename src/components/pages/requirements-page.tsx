@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { type ReactNode, useEffect, useState } from "react";
+import { type ReactNode, useState } from "react";
 import { ArrowRight, FileText, Loader2, Pencil, Plus, ShieldCheck, X } from "lucide-react";
 
 import { PageStateGate, type PageState } from "@/components/common/page-state";
@@ -28,38 +28,13 @@ import {
 import type { AnalysisResult } from "@/lib/api-contracts";
 import { deriveRequirementAnalysisPreview } from "@/lib/requirement-analysis";
 
+type RequirementPageData = Awaited<ReturnType<typeof getRequirementPageData>>;
+
 export function RequirementsPage({ projectId = ACTIVE_PROJECT_ID, state }: { projectId?: string; state?: PageState } = {}) {
-  const router = useRouter();
-  const mockMode = isMockApiEnabled();
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitError, setSubmitError] = useState<string | null>(null);
-  const [controlRequirementText, setControlRequirementText] = useState("");
-  const [confirmedSafetyConstraints, setConfirmedSafetyConstraints] = useState<string[]>([]);
-  const [newSafetyConstraint, setNewSafetyConstraint] = useState("");
-  const [performanceTargets, setPerformanceTargets] = useState({
-    maxScanTimeMs: 5,
-    maxCyclomaticComplexity: 8,
-    minMaintainabilityIndex: 75,
-    maxIterations: 5
-  });
-  const [hasUserEdited, setHasUserEdited] = useState(false);
-  const [hasHydratedFromLoad, setHasHydratedFromLoad] = useState(false);
-  const [analyzeError, setAnalyzeError] = useState<string | null>(null);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [hasAnalyzedRequirement, setHasAnalyzedRequirement] = useState(false);
-  const [analysisPreview, setAnalysisPreview] = useState<AnalysisResult | null>(null);
-  const [confirmedInputs, setConfirmedInputs] = useState<string[]>([]);
-  const [confirmedOutputs, setConfirmedOutputs] = useState<string[]>([]);
-  const [dismissedSuggestedOutputs, setDismissedSuggestedOutputs] = useState<string[]>([]);
-  const [suggestedSafetyConstraints, setSuggestedSafetyConstraints] = useState<string[]>([]);
-  const [inferredInputs, setInferredInputs] = useState<EditableSignal[]>([]);
-  const [suggestedOutputs, setSuggestedOutputs] = useState<EditableSignal[]>([]);
-  const [suggestedInternals, setSuggestedInternals] = useState<EditableSignal[]>([]);
-  const [newInputDraft, setNewInputDraft] = useState<EditableSignal>({ name: "", type: "BOOL", source: "Operator", description: "" });
-  const [newOutputDraft, setNewOutputDraft] = useState<EditableSignal>({ name: "", type: "BOOL", source: "Operator", description: "" });
-  const resource = useApiResource(() => getRequirementPageData(projectId), [projectId]);
+  // The loaded data carries its project id, so a project switch never shows the previous project's data.
+  const resource = useApiResource(async () => ({ projectId, page: await getRequirementPageData(projectId) }), [projectId]);
   const effectiveState = state ?? resource.state;
-  const data = resource.data;
+  const data = resource.data?.projectId === projectId ? resource.data.page : null;
   const stateView =
     effectiveState !== "ready" || !data ? (
       <PageStateGate
@@ -70,28 +45,44 @@ export function RequirementsPage({ projectId = ACTIVE_PROJECT_ID, state }: { pro
       />
     ) : null;
 
-  useEffect(() => {
-    setHasUserEdited(false);
-    setHasHydratedFromLoad(false);
-  }, [projectId]);
+  return (
+    <>
+      <PipelineStrip projectId={projectId} />
+      <PageHeader
+        eyebrow="Pipeline - Step 2 of 9"
+        title="Requirement Input"
+        description="Describe the control behavior in plain industrial English. The Planning Agent extracts I/O, control rules and safety constraints into a Plan Object."
+        actions={<PlanningModeBadge />}
+      />
+      {stateView ?? (data ? <RequirementsForm key={projectId} projectId={projectId} data={data} /> : null)}
+    </>
+  );
+}
 
-  useEffect(() => {
-    if (!data || hasHydratedFromLoad || hasUserEdited) return;
-    setControlRequirementText(data.requirementText);
-    setConfirmedSafetyConstraints(data.userSafetyConstraints);
-    setPerformanceTargets(data.performanceTargets);
-    setAnalyzeError(null);
-    setHasAnalyzedRequirement(false);
-    setAnalysisPreview(null);
-    setConfirmedInputs(data.confirmedInputs);
-    setConfirmedOutputs(data.confirmedOutputs);
-    setDismissedSuggestedOutputs([]);
-    setSuggestedSafetyConstraints([]);
-    setInferredInputs([]);
-    setSuggestedOutputs([]);
-    setSuggestedInternals([]);
-    setHasHydratedFromLoad(true);
-  }, [data, hasHydratedFromLoad, hasUserEdited]);
+// Created only once the data has loaded, so the form state starts from it without a load effect.
+// A load effect could run after the first keystroke and overwrite the typed text (P1-25, D-034).
+function RequirementsForm({ projectId, data }: { projectId: string; data: RequirementPageData }) {
+  const router = useRouter();
+  const mockMode = isMockApiEnabled();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [controlRequirementText, setControlRequirementText] = useState(data.requirementText);
+  const [confirmedSafetyConstraints, setConfirmedSafetyConstraints] = useState<string[]>(data.userSafetyConstraints);
+  const [newSafetyConstraint, setNewSafetyConstraint] = useState("");
+  const [performanceTargets, setPerformanceTargets] = useState(data.performanceTargets);
+  const [analyzeError, setAnalyzeError] = useState<string | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [hasAnalyzedRequirement, setHasAnalyzedRequirement] = useState(false);
+  const [analysisPreview, setAnalysisPreview] = useState<AnalysisResult | null>(null);
+  const [confirmedInputs, setConfirmedInputs] = useState<string[]>(data.confirmedInputs);
+  const [confirmedOutputs, setConfirmedOutputs] = useState<string[]>(data.confirmedOutputs);
+  const [dismissedSuggestedOutputs, setDismissedSuggestedOutputs] = useState<string[]>([]);
+  const [suggestedSafetyConstraints, setSuggestedSafetyConstraints] = useState<string[]>([]);
+  const [inferredInputs, setInferredInputs] = useState<EditableSignal[]>([]);
+  const [suggestedOutputs, setSuggestedOutputs] = useState<EditableSignal[]>([]);
+  const [suggestedInternals, setSuggestedInternals] = useState<EditableSignal[]>([]);
+  const [newInputDraft, setNewInputDraft] = useState<EditableSignal>({ name: "", type: "BOOL", source: "Operator", description: "" });
+  const [newOutputDraft, setNewOutputDraft] = useState<EditableSignal>({ name: "", type: "BOOL", source: "Operator", description: "" });
 
   const visibleSuggestedOutputs = suggestedOutputs.filter(
     (item) => !confirmedOutputs.includes(item.name) && !dismissedSuggestedOutputs.includes(item.name)
@@ -174,7 +165,7 @@ export function RequirementsPage({ projectId = ACTIVE_PROJECT_ID, state }: { pro
       applyAnalysisResult(result);
     } catch (error) {
       const fallback = deriveRequirementAnalysisPreview({
-        projectDomain: data?.projectDomain ?? "",
+        projectDomain: data.projectDomain,
         requirementText: text,
         safetyConstraints: confirmedSafetyConstraints
       });
@@ -208,8 +199,8 @@ export function RequirementsPage({ projectId = ACTIVE_PROJECT_ID, state }: { pro
         performanceTargets,
         confirmedInputs,
         confirmedOutputs,
-        domain: data?.projectDomain || undefined,
-        complexityTier: data?.projectComplexityTier || undefined
+        domain: data.projectDomain || undefined,
+        complexityTier: data.projectComplexityTier || undefined
       };
       if (process.env.NODE_ENV !== "production") {
         console.debug("[requirements-submit]", {
@@ -230,455 +221,438 @@ export function RequirementsPage({ projectId = ACTIVE_PROJECT_ID, state }: { pro
   }
 
   return (
-    <>
-      <PipelineStrip projectId={projectId} />
-      <PageHeader
-        eyebrow="Pipeline - Step 2 of 9"
-        title="Requirement Input"
-        description="Describe the control behavior in plain industrial English. The Planning Agent extracts I/O, control rules and safety constraints into a Plan Object."
-        actions={<PlanningModeBadge />}
-      />
-      {stateView ?? (data ? <form onSubmit={handleSubmit} className="grid gap-6 xl:grid-cols-[1.4fr_1fr]">
-        <div className="space-y-5">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div>
-                <CardTitle className="flex items-center gap-2">
-                  <FileText className="size-4 text-primary" />
-                  Control requirement
-                </CardTitle>
-                <CardDescription>Plain-English description with pre-conditions, fault behavior, and operator actions.</CardDescription>
-              </div>
-              <div className="font-mono text-xs text-muted-foreground">{controlRequirementText.length} chars</div>
-            </CardHeader>
-            <CardContent>
-              <Textarea
-                name="requirementText"
-                aria-label="Requirement text"
-                className="min-h-56"
-                value={controlRequirementText}
-                onChange={(event) => {
-                  setHasUserEdited(true);
-                  setControlRequirementText(event.target.value);
-                  resetAnalysisState();
-                }}
-              />
-              <div className="mt-4 space-y-2">
-                <Button type="button" variant="outline" onClick={handleAnalyzeRequirement} disabled={isAnalyzing}>
-                  {isAnalyzing ? <Loader2 className="animate-spin" /> : null}
-                  Analyze Requirement
+    <form onSubmit={handleSubmit} className="grid gap-6 xl:grid-cols-[1.4fr_1fr]">
+      <div className="space-y-5">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="size-4 text-primary" />
+                Control requirement
+              </CardTitle>
+              <CardDescription>Plain-English description with pre-conditions, fault behavior, and operator actions.</CardDescription>
+            </div>
+            <div className="font-mono text-xs text-muted-foreground">{controlRequirementText.length} chars</div>
+          </CardHeader>
+          <CardContent>
+            <Textarea
+              name="requirementText"
+              aria-label="Requirement text"
+              className="min-h-56"
+              value={controlRequirementText}
+              onChange={(event) => {
+                setControlRequirementText(event.target.value);
+                resetAnalysisState();
+              }}
+            />
+            <div className="mt-4 space-y-2">
+              <Button type="button" variant="outline" onClick={handleAnalyzeRequirement} disabled={isAnalyzing}>
+                {isAnalyzing ? <Loader2 className="animate-spin" /> : null}
+                Analyze Requirement
+              </Button>
+              {analyzeError ? <div className="text-sm text-destructive">{analyzeError}</div> : null}
+            </div>
+            <div className="mt-4 flex flex-wrap gap-2">
+              {["Motor start/stop with emergency stop", "Traffic light controller", "Tank level control", "Sequential batch process"].map((item) => (
+                <Button
+                  key={item}
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setControlRequirementText(item);
+                    resetAnalysisState();
+                  }}
+                >
+                  {item}
                 </Button>
-                {analyzeError ? <div className="text-sm text-destructive">{analyzeError}</div> : null}
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <ShieldCheck className="size-4 text-warning" />
+              Safety constraints
+            </CardTitle>
+            <CardDescription>Asserted properties the Validation Agent will formally check.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {confirmedSafetyConstraints.length === 0 ? (
+              <div className="rounded-md border bg-muted/20 p-3 text-sm text-muted-foreground">
+                No confirmed safety constraints yet.
               </div>
-              <div className="mt-4 flex flex-wrap gap-2">
-                {["Motor start/stop with emergency stop", "Traffic light controller", "Tank level control", "Sequential batch process"].map((item) => (
+            ) : null}
+            {confirmedSafetyConstraints.map((constraint, index) => (
+              <div className="flex items-center justify-between rounded-md border bg-muted/30 p-3 text-sm" key={constraint}>
+                <span>{constraint}</span>
+                <div className="flex items-center gap-3">
+                  <span className="font-mono text-xs text-muted-foreground">SC{index + 1}</span>
                   <Button
-                    key={item}
                     type="button"
                     variant="outline"
                     size="sm"
                     onClick={() => {
-                      setHasUserEdited(true);
-                      setControlRequirementText(item);
-                      resetAnalysisState();
+                      setConfirmedSafetyConstraints((prev) => prev.filter((item) => item !== constraint));
                     }}
                   >
-                    {item}
+                    Remove
                   </Button>
-                ))}
+                </div>
               </div>
-            </CardContent>
-          </Card>
+            ))}
+            {suggestedSafetyConstraints.length > 0 ? (
+              <div className="rounded-md border bg-muted/20 p-3 text-sm">
+                <div className="mb-2 text-xs uppercase tracking-wider text-muted-foreground">Suggested constraints</div>
+                <div className="space-y-2">
+                  {suggestedSafetyConstraints.map((constraint) => (
+                    <div className="flex items-center justify-between gap-2" key={constraint}>
+                      <span>{constraint}</span>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setConfirmedSafetyConstraints((prev) => (prev.includes(constraint) ? prev : [...prev, constraint]));
+                          setSuggestedSafetyConstraints((prev) => prev.filter((item) => item !== constraint));
+                        }}
+                      >
+                        Accept
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+            <div className="flex gap-2">
+              <Input
+                name="newSafetyConstraint"
+                placeholder="Add a safety property"
+                value={newSafetyConstraint}
+                onChange={(event) => setNewSafetyConstraint(event.target.value)}
+              />
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  const constraint = newSafetyConstraint.trim();
+                  if (!constraint) return;
+                  setConfirmedSafetyConstraints((prev) => (prev.includes(constraint) ? prev : [...prev, constraint]));
+                  setNewSafetyConstraint("");
+                }}
+              >
+                <Plus /> Add
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <ShieldCheck className="size-4 text-warning" />
-                Safety constraints
-              </CardTitle>
-              <CardDescription>Asserted properties the Validation Agent will formally check.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {confirmedSafetyConstraints.length === 0 ? (
-                <div className="rounded-md border bg-muted/20 p-3 text-sm text-muted-foreground">
-                  No confirmed safety constraints yet.
+        <Card>
+          <CardHeader>
+            <CardTitle>Performance targets</CardTitle>
+            <CardDescription>The Optimization Agent iterates until targets are met or all passes are exhausted.</CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-6 md:grid-cols-2">
+            <div>
+              <div className="mb-2 text-sm font-medium">Max scan time</div>
+              <Input
+                type="range"
+                aria-label="Max scan time"
+                min={1}
+                max={20}
+                value={performanceTargets.maxScanTimeMs}
+                onChange={(event) => {
+                  setPerformanceTargets((prev) => ({ ...prev, maxScanTimeMs: Number(event.target.value) }));
+                }}
+              />
+              <div className="mt-2 text-xs text-muted-foreground">{performanceTargets.maxScanTimeMs} ms</div>
+            </div>
+            <div>
+              <div className="mb-2 text-sm font-medium">Max cyclomatic CC</div>
+              <Input
+                type="range"
+                aria-label="Max cyclomatic complexity"
+                min={1}
+                max={20}
+                value={performanceTargets.maxCyclomaticComplexity}
+                onChange={(event) => {
+                  setPerformanceTargets((prev) => ({ ...prev, maxCyclomaticComplexity: Number(event.target.value) }));
+                }}
+              />
+              <div className="mt-2 text-xs text-muted-foreground">{performanceTargets.maxCyclomaticComplexity}</div>
+            </div>
+            <div>
+              <div className="mb-2 text-sm font-medium">Min maintainability</div>
+              <Input
+                type="range"
+                aria-label="Min maintainability index"
+                min={1}
+                max={100}
+                value={performanceTargets.minMaintainabilityIndex}
+                onChange={(event) => {
+                  setPerformanceTargets((prev) => ({ ...prev, minMaintainabilityIndex: Number(event.target.value) }));
+                }}
+              />
+              <div className="mt-2 text-xs text-muted-foreground">{performanceTargets.minMaintainabilityIndex} / 100</div>
+            </div>
+            {submitError ? (
+              <div className="md:col-span-3">
+                <Alert variant="destructive">
+                  <AlertTitle>Requirement submission failed</AlertTitle>
+                  <AlertDescription>{submitError}</AlertDescription>
+                </Alert>
+              </div>
+            ) : null}
+            <div className="md:col-span-3 flex justify-end border-t pt-4">
+              {mockMode ? <Button asChild>
+                <Link href={projectPath(projectId, "plan")}>
+                  Generate Plan Object
+                  <ArrowRight />
+                </Link>
+              </Button> : (
+                <Button type="submit" disabled={isSubmitting}>
+                  {isSubmitting ? <Loader2 className="animate-spin" /> : null}
+                  Generate Plan Object
+                  <ArrowRight />
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card className="h-fit">
+        <CardHeader>
+          <CardTitle>Live preview - derived Plan</CardTitle>
+          <CardDescription>Suggested preview - not submitted until confirmed.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          {isAnalyzing ? (
+            <div className="flex items-center gap-2 rounded-md border bg-muted/20 p-3 text-sm text-muted-foreground">
+              <Loader2 className="size-4 animate-spin" />
+              Running LLM analysis...
+            </div>
+          ) : !shouldShowAnalyzedPreview ? (
+            <div className="rounded-md border bg-muted/20 p-3 text-sm text-muted-foreground">
+              {hasRequirementText
+                ? "Click Analyze Requirement to preview suggested I/O, logic, and safety constraints."
+                : "Enter a control requirement and analyze it to preview suggested I/O, logic, and safety constraints."}
+            </div>
+          ) : (
+            <>
+              <div className="grid gap-3 md:grid-cols-2">
+                <div className="rounded-md border bg-muted/40 p-3">
+                  <div className="text-[11px] uppercase tracking-wider text-muted-foreground">Detected domain</div>
+                  <div className="mt-1 font-medium">{analysisPreview.domain}</div>
                 </div>
-              ) : null}
-              {confirmedSafetyConstraints.map((constraint, index) => (
-                <div className="flex items-center justify-between rounded-md border bg-muted/30 p-3 text-sm" key={constraint}>
-                  <span>{constraint}</span>
-                  <div className="flex items-center gap-3">
-                    <span className="font-mono text-xs text-muted-foreground">SC{index + 1}</span>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setHasUserEdited(true);
-                        setConfirmedSafetyConstraints((prev) => prev.filter((item) => item !== constraint));
-                      }}
-                    >
-                      Remove
-                    </Button>
+                <div className="rounded-md border bg-muted/40 p-3">
+                  <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                    {analysisPreview.source === "llm" ? "LLM Analysis" : "Heuristic fallback"}
                   </div>
+                  <div className="mt-1 font-medium">Confidence {(Number(analysisPreview.confidence) * 100).toFixed(0)}%</div>
                 </div>
-              ))}
-              {suggestedSafetyConstraints.length > 0 ? (
-                <div className="rounded-md border bg-muted/20 p-3 text-sm">
-                  <div className="mb-2 text-xs uppercase tracking-wider text-muted-foreground">Suggested constraints</div>
-                  <div className="space-y-2">
-                    {suggestedSafetyConstraints.map((constraint) => (
-                      <div className="flex items-center justify-between gap-2" key={constraint}>
-                        <span>{constraint}</span>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setHasUserEdited(true);
-                            setConfirmedSafetyConstraints((prev) => (prev.includes(constraint) ? prev : [...prev, constraint]));
-                            setSuggestedSafetyConstraints((prev) => prev.filter((item) => item !== constraint));
-                          }}
-                        >
-                          Accept
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ) : null}
-              <div className="flex gap-2">
+              </div>
+              <EditableSignalList
+                title="Inferred inputs"
+                items={inferredInputs}
+                tag="IN"
+                emptyMessage="No inferred inputs."
+                onChange={(nextItems) => {
+                  setInferredInputs(nextItems);
+                  syncConfirmedInputs(nextItems);
+                }}
+                onRemove={(index) => {
+                  const nextItems = inferredInputs.filter((_, currentIndex) => currentIndex !== index);
+                  setInferredInputs(nextItems);
+                  syncConfirmedInputs(nextItems);
+                }}
+              />
+              <div className="flex gap-2 rounded-md border bg-muted/20 p-2">
                 <Input
-                  name="newSafetyConstraint"
-                  placeholder="Add a safety property"
-                  value={newSafetyConstraint}
-                  onChange={(event) => setNewSafetyConstraint(event.target.value)}
+                  placeholder="Input name"
+                  value={newInputDraft.name}
+                  onChange={(event) => setNewInputDraft((prev) => ({ ...prev, name: event.target.value }))}
+                />
+                <Input
+                  placeholder="Type"
+                  value={newInputDraft.type}
+                  onChange={(event) =>
+                    setNewInputDraft((prev) => ({
+                      ...prev,
+                      type: event.target.value.toUpperCase() as EditableSignal["type"]
+                    }))
+                  }
+                />
+                <Input
+                  placeholder="Source"
+                  value={newInputDraft.source ?? ""}
+                  onChange={(event) =>
+                    setNewInputDraft((prev) => ({
+                      ...prev,
+                      source: event.target.value as EditableSignal["source"]
+                    }))
+                  }
                 />
                 <Button
                   type="button"
                   variant="outline"
                   onClick={() => {
-                    const constraint = newSafetyConstraint.trim();
-                    if (!constraint) return;
-                    setHasUserEdited(true);
-                    setConfirmedSafetyConstraints((prev) => (prev.includes(constraint) ? prev : [...prev, constraint]));
-                    setNewSafetyConstraint("");
+                    const name = normalizeSignalName(newInputDraft.name);
+                    if (!name) return;
+                    const nextSignal: EditableSignal = {
+                      name,
+                      type: newInputDraft.type || "BOOL",
+                      source: newInputDraft.source || "Operator",
+                      description: newInputDraft.description || ""
+                    };
+                    const nextItems = dedupeSignals([...inferredInputs, nextSignal]);
+                    setInferredInputs(nextItems);
+                    syncConfirmedInputs(nextItems);
+                    setNewInputDraft({ name: "", type: "BOOL", source: "Operator", description: "" });
                   }}
                 >
-                  <Plus /> Add
+                  <Plus className="size-4" />
                 </Button>
               </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Performance targets</CardTitle>
-              <CardDescription>The Optimization Agent iterates until targets are met or all passes are exhausted.</CardDescription>
-            </CardHeader>
-            <CardContent className="grid gap-6 md:grid-cols-2">
-              <div>
-                <div className="mb-2 text-sm font-medium">Max scan time</div>
-                <Input
-                  type="range"
-                  aria-label="Max scan time"
-                  min={1}
-                  max={20}
-                  value={performanceTargets.maxScanTimeMs}
-                  onChange={(event) => {
-                    setHasUserEdited(true);
-                    setPerformanceTargets((prev) => ({ ...prev, maxScanTimeMs: Number(event.target.value) }));
-                  }}
-                />
-                <div className="mt-2 text-xs text-muted-foreground">{performanceTargets.maxScanTimeMs} ms</div>
-              </div>
-              <div>
-                <div className="mb-2 text-sm font-medium">Max cyclomatic CC</div>
-                <Input
-                  type="range"
-                  aria-label="Max cyclomatic complexity"
-                  min={1}
-                  max={20}
-                  value={performanceTargets.maxCyclomaticComplexity}
-                  onChange={(event) => {
-                    setHasUserEdited(true);
-                    setPerformanceTargets((prev) => ({ ...prev, maxCyclomaticComplexity: Number(event.target.value) }));
-                  }}
-                />
-                <div className="mt-2 text-xs text-muted-foreground">{performanceTargets.maxCyclomaticComplexity}</div>
-              </div>
-              <div>
-                <div className="mb-2 text-sm font-medium">Min maintainability</div>
-                <Input
-                  type="range"
-                  aria-label="Min maintainability index"
-                  min={1}
-                  max={100}
-                  value={performanceTargets.minMaintainabilityIndex}
-                  onChange={(event) => {
-                    setHasUserEdited(true);
-                    setPerformanceTargets((prev) => ({ ...prev, minMaintainabilityIndex: Number(event.target.value) }));
-                  }}
-                />
-                <div className="mt-2 text-xs text-muted-foreground">{performanceTargets.minMaintainabilityIndex} / 100</div>
-              </div>
-              {submitError ? (
-                <div className="md:col-span-3">
-                  <Alert variant="destructive">
-                    <AlertTitle>Requirement submission failed</AlertTitle>
-                    <AlertDescription>{submitError}</AlertDescription>
-                  </Alert>
-                </div>
-              ) : null}
-              <div className="md:col-span-3 flex justify-end border-t pt-4">
-                {mockMode ? <Button asChild>
-                  <Link href={projectPath(projectId, "plan")}>
-                    Generate Plan Object
-                    <ArrowRight />
-                  </Link>
-                </Button> : (
-                  <Button type="submit" disabled={isSubmitting}>
-                    {isSubmitting ? <Loader2 className="animate-spin" /> : null}
-                    Generate Plan Object
-                    <ArrowRight />
-                  </Button>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        <Card className="h-fit">
-          <CardHeader>
-            <CardTitle>Live preview - derived Plan</CardTitle>
-            <CardDescription>Suggested preview - not submitted until confirmed.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-5">
-            {isAnalyzing ? (
-              <div className="flex items-center gap-2 rounded-md border bg-muted/20 p-3 text-sm text-muted-foreground">
-                <Loader2 className="size-4 animate-spin" />
-                Running LLM analysis...
-              </div>
-            ) : !shouldShowAnalyzedPreview ? (
-              <div className="rounded-md border bg-muted/20 p-3 text-sm text-muted-foreground">
-                {hasRequirementText
-                  ? "Click Analyze Requirement to preview suggested I/O, logic, and safety constraints."
-                  : "Enter a control requirement and analyze it to preview suggested I/O, logic, and safety constraints."}
-              </div>
-            ) : (
-              <>
-                <div className="grid gap-3 md:grid-cols-2">
-                  <div className="rounded-md border bg-muted/40 p-3">
-                    <div className="text-[11px] uppercase tracking-wider text-muted-foreground">Detected domain</div>
-                    <div className="mt-1 font-medium">{analysisPreview.domain}</div>
-                  </div>
-                  <div className="rounded-md border bg-muted/40 p-3">
-                    <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
-                      {analysisPreview.source === "llm" ? "LLM Analysis" : "Heuristic fallback"}
-                    </div>
-                    <div className="mt-1 font-medium">Confidence {(Number(analysisPreview.confidence) * 100).toFixed(0)}%</div>
-                  </div>
-                </div>
-                <EditableSignalList
-                  title="Inferred inputs"
-                  items={inferredInputs}
-                  tag="IN"
-                  emptyMessage="No inferred inputs."
-                  onChange={(nextItems) => {
-                    setInferredInputs(nextItems);
-                    syncConfirmedInputs(nextItems);
-                  }}
-                  onRemove={(index) => {
-                    const nextItems = inferredInputs.filter((_, currentIndex) => currentIndex !== index);
-                    setInferredInputs(nextItems);
-                    syncConfirmedInputs(nextItems);
-                  }}
-                />
-                <div className="flex gap-2 rounded-md border bg-muted/20 p-2">
-                  <Input
-                    placeholder="Input name"
-                    value={newInputDraft.name}
-                    onChange={(event) => setNewInputDraft((prev) => ({ ...prev, name: event.target.value }))}
-                  />
-                  <Input
-                    placeholder="Type"
-                    value={newInputDraft.type}
-                    onChange={(event) =>
-                      setNewInputDraft((prev) => ({
-                        ...prev,
-                        type: event.target.value.toUpperCase() as EditableSignal["type"]
-                      }))
-                    }
-                  />
-                  <Input
-                    placeholder="Source"
-                    value={newInputDraft.source ?? ""}
-                    onChange={(event) =>
-                      setNewInputDraft((prev) => ({
-                        ...prev,
-                        source: event.target.value as EditableSignal["source"]
-                      }))
-                    }
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => {
-                      const name = normalizeSignalName(newInputDraft.name);
-                      if (!name) return;
-                      const nextSignal: EditableSignal = {
-                        name,
-                        type: newInputDraft.type || "BOOL",
-                        source: newInputDraft.source || "Operator",
-                        description: newInputDraft.description || ""
-                      };
-                      const nextItems = dedupeSignals([...inferredInputs, nextSignal]);
-                      setInferredInputs(nextItems);
-                      syncConfirmedInputs(nextItems);
-                      setNewInputDraft({ name: "", type: "BOOL", source: "Operator", description: "" });
-                    }}
-                  >
-                    <Plus className="size-4" />
-                  </Button>
-                </div>
-                <EditableSignalList
-                  title="Confirmed outputs"
-                  items={confirmedOutputSignals}
-                  tag="OUT"
-                  emptyMessage="No confirmed outputs yet."
-                  onChange={(nextItems) => {
-                    const currentConfirmed = [...confirmedOutputSignals];
-                    setSuggestedOutputs((prev) => {
-                      const next = [...prev];
-                      currentConfirmed.forEach((current, index) => {
-                        const foundIndex = next.findIndex((item) => item.name === current.name);
-                        if (foundIndex >= 0 && nextItems[index]) {
-                          next[foundIndex] = nextItems[index];
-                        }
-                      });
-                      return dedupeSignals(next);
+              <EditableSignalList
+                title="Confirmed outputs"
+                items={confirmedOutputSignals}
+                tag="OUT"
+                emptyMessage="No confirmed outputs yet."
+                onChange={(nextItems) => {
+                  const currentConfirmed = [...confirmedOutputSignals];
+                  setSuggestedOutputs((prev) => {
+                    const next = [...prev];
+                    currentConfirmed.forEach((current, index) => {
+                      const foundIndex = next.findIndex((item) => item.name === current.name);
+                      if (foundIndex >= 0 && nextItems[index]) {
+                        next[foundIndex] = nextItems[index];
+                      }
                     });
-                    setConfirmedOutputs(nextItems.map((item) => item.name));
-                  }}
-                  onRemove={(index) => {
-                    const target = confirmedOutputSignals[index];
-                    if (!target) return;
-                    setConfirmedOutputs((prev) => prev.filter((name) => name !== target.name));
-                  }}
-                />
-                <div>
-                  <div className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                    Suggested outputs (not yet confirmed)
-                  </div>
-                  <EditableSignalList
-                    title="Suggested outputs"
-                    items={visibleSuggestedOutputs}
-                    tag="OUT"
-                    emptyMessage="No suggested outputs."
-                    onChange={(nextItems) => {
-                      const currentVisible = [...visibleSuggestedOutputs];
-                      setSuggestedOutputs((prev) =>
-                        prev.map((item) => {
-                          const currentIndex = currentVisible.findIndex((visibleItem) => visibleItem.name === item.name);
-                          if (currentIndex === -1) return item;
-                          return nextItems[currentIndex] ?? item;
-                        })
-                      );
-                    }}
-                    renderActions={(signal) => (
-                      <>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          onClick={() => setConfirmedOutputs((prev) => (prev.includes(signal.name) ? prev : [...prev, signal.name]))}
-                        >
-                          Accept
-                        </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          onClick={() => setDismissedSuggestedOutputs((prev) => (prev.includes(signal.name) ? prev : [...prev, signal.name]))}
-                        >
-                          Remove
-                        </Button>
-                      </>
-                    )}
-                  />
-                </div>
-                <div className="flex gap-2 rounded-md border bg-muted/20 p-2">
-                  <Input
-                    placeholder="Output name"
-                    value={newOutputDraft.name}
-                    onChange={(event) => setNewOutputDraft((prev) => ({ ...prev, name: event.target.value }))}
-                  />
-                  <Input
-                    placeholder="Type"
-                    value={newOutputDraft.type}
-                    onChange={(event) =>
-                      setNewOutputDraft((prev) => ({
-                        ...prev,
-                        type: event.target.value.toUpperCase() as EditableSignal["type"]
-                      }))
-                    }
-                  />
-                  <Input
-                    placeholder="Source"
-                    value={newOutputDraft.source ?? ""}
-                    onChange={(event) =>
-                      setNewOutputDraft((prev) => ({
-                        ...prev,
-                        source: event.target.value as EditableSignal["source"]
-                      }))
-                    }
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => {
-                      const name = normalizeSignalName(newOutputDraft.name);
-                      if (!name) return;
-                      const nextSignal: EditableSignal = {
-                        name,
-                        type: newOutputDraft.type || "BOOL",
-                        source: newOutputDraft.source || "Operator",
-                        description: newOutputDraft.description || ""
-                      };
-                      setSuggestedOutputs((prev) => dedupeSignals([...prev, nextSignal]));
-                      setConfirmedOutputs((prev) => (prev.includes(name) ? prev : [...prev, name]));
-                      setNewOutputDraft({ name: "", type: "BOOL", source: "Operator", description: "" });
-                    }}
-                  >
-                    <Plus className="size-4" />
-                  </Button>
+                    return dedupeSignals(next);
+                  });
+                  setConfirmedOutputs(nextItems.map((item) => item.name));
+                }}
+                onRemove={(index) => {
+                  const target = confirmedOutputSignals[index];
+                  if (!target) return;
+                  setConfirmedOutputs((prev) => prev.filter((name) => name !== target.name));
+                }}
+              />
+              <div>
+                <div className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Suggested outputs (not yet confirmed)
                 </div>
                 <EditableSignalList
-                  title="Suggested internals"
-                  items={suggestedInternals}
-                  tag="INT"
-                  emptyMessage="No suggested internals."
-                  onChange={setSuggestedInternals}
+                  title="Suggested outputs"
+                  items={visibleSuggestedOutputs}
+                  tag="OUT"
+                  emptyMessage="No suggested outputs."
+                  onChange={(nextItems) => {
+                    const currentVisible = [...visibleSuggestedOutputs];
+                    setSuggestedOutputs((prev) =>
+                      prev.map((item) => {
+                        const currentIndex = currentVisible.findIndex((visibleItem) => visibleItem.name === item.name);
+                        if (currentIndex === -1) return item;
+                        return nextItems[currentIndex] ?? item;
+                      })
+                    );
+                  }}
+                  renderActions={(signal) => (
+                    <>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setConfirmedOutputs((prev) => (prev.includes(signal.name) ? prev : [...prev, signal.name]))}
+                      >
+                        Accept
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setDismissedSuggestedOutputs((prev) => (prev.includes(signal.name) ? prev : [...prev, signal.name]))}
+                      >
+                        Remove
+                      </Button>
+                    </>
+                  )}
                 />
-              </>
-            )}
-            <div>
-              <div className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                Safety constraints - {confirmedSafetyConstraints.length}
               </div>
-              <div className="space-y-2 text-sm">
-                {confirmedSafetyConstraints.map((constraint, index) => (
-                  <div key={constraint}><span className="mr-2 font-mono text-xs text-muted-foreground">SC{index + 1}</span>{constraint}</div>
-                ))}
+              <div className="flex gap-2 rounded-md border bg-muted/20 p-2">
+                <Input
+                  placeholder="Output name"
+                  value={newOutputDraft.name}
+                  onChange={(event) => setNewOutputDraft((prev) => ({ ...prev, name: event.target.value }))}
+                />
+                <Input
+                  placeholder="Type"
+                  value={newOutputDraft.type}
+                  onChange={(event) =>
+                    setNewOutputDraft((prev) => ({
+                      ...prev,
+                      type: event.target.value.toUpperCase() as EditableSignal["type"]
+                    }))
+                  }
+                />
+                <Input
+                  placeholder="Source"
+                  value={newOutputDraft.source ?? ""}
+                  onChange={(event) =>
+                    setNewOutputDraft((prev) => ({
+                      ...prev,
+                      source: event.target.value as EditableSignal["source"]
+                    }))
+                  }
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    const name = normalizeSignalName(newOutputDraft.name);
+                    if (!name) return;
+                    const nextSignal: EditableSignal = {
+                      name,
+                      type: newOutputDraft.type || "BOOL",
+                      source: newOutputDraft.source || "Operator",
+                      description: newOutputDraft.description || ""
+                    };
+                    setSuggestedOutputs((prev) => dedupeSignals([...prev, nextSignal]));
+                    setConfirmedOutputs((prev) => (prev.includes(name) ? prev : [...prev, name]));
+                    setNewOutputDraft({ name: "", type: "BOOL", source: "Operator", description: "" });
+                  }}
+                >
+                  <Plus className="size-4" />
+                </Button>
               </div>
+              <EditableSignalList
+                title="Suggested internals"
+                items={suggestedInternals}
+                tag="INT"
+                emptyMessage="No suggested internals."
+                onChange={setSuggestedInternals}
+              />
+            </>
+          )}
+          <div>
+            <div className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              Safety constraints - {confirmedSafetyConstraints.length}
             </div>
-            <div className="rounded-md border border-sky-200 bg-sky-50 p-3 text-sm text-sky-800 dark:border-sky-900 dark:bg-sky-950/30 dark:text-sky-300">
-              Continue to generate the canonical Plan Object, including I/O wiring, control logic, and IEC scope.
+            <div className="space-y-2 text-sm">
+              {confirmedSafetyConstraints.map((constraint, index) => (
+                <div key={constraint}><span className="mr-2 font-mono text-xs text-muted-foreground">SC{index + 1}</span>{constraint}</div>
+              ))}
             </div>
-          </CardContent>
-        </Card>
-      </form> : null)}
-    </>
+          </div>
+          <div className="rounded-md border border-sky-200 bg-sky-50 p-3 text-sm text-sky-800 dark:border-sky-900 dark:bg-sky-950/30 dark:text-sky-300">
+            Continue to generate the canonical Plan Object, including I/O wiring, control logic, and IEC scope.
+          </div>
+        </CardContent>
+      </Card>
+    </form>
   );
 }
 
