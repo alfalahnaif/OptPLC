@@ -7,7 +7,9 @@
 
 - **P1-04 مدموج** (D-033): `CHECKS_PASSED` بدل `VERIFIED`، و`evidenceLevel` في كل تقرير تحقق، وتنبيه "وظائف السلامة خارج النطاق".
 
-**البند التالي:** `P1-25`، تثبيت اختبار الواجهة `planning-flow` غير المستقر، ثم `P1-05` مع `P1-24` (كتالوج القواعد وC-14، وقالب المرور).
+- **P1-25 مدموج** (D-034): فشل `planning-flow` المتقطع كان سباق تحميل في صفحة المتطلبات، وأُصلح.
+
+**البند التالي:** `P1-05` مع `P1-24` (كتالوج القواعد وC-14، وقالب المرور).
 
 **البوابة التالية:** `G1`. معاييرها في [phases/PHASE_1_BRIEF.md](phases/PHASE_1_BRIEF.md).
 **المناقشة وتسليم الأطروحة:** يونيو 2027 (U-41).
@@ -17,15 +19,15 @@
 | الفرع | الحالة |
 | --- | --- |
 | `main` | لم يُمس، على `b345385`. الدمج فيه بموافقتك فقط |
-| `staging` | فرع التكامل، وفيه كل المرحلة 0، وإغلاق G0، والموجة 1 كاملة، وP1-04 |
-| فروع مدموجة | `p0/P0-01-plan-docs`، و`p0/P0-02-requirement-analysis-module`، و`p0/P0-03-runtime-backup`، و`p0/P0-10-test-timeouts`، و`p0/P0-04-hermetic-backend-tests`، و`p0/P0-07-local-check-script`، و`p0/P0-11-stale-tests`، و`p0/P0-05-docker-reference-env`، و`p0/P0-06-st-compile-script`، و`p0/P0-08-docs-refresh`، و`p0/P0-12-npm-vulns`، و`p0/P0-13-compose-reference-image`، و`p0/G0-close`، و`p1/P1-01-parser-check`، و`p1/P1-02-matiec-raw`، و`p1/P1-03-timers-matiec`، و`p1/P1-22-template-redesign`، و`p1/P1-08-input-integrity`، و`p1/P1-04-evidence-levels` |
+| `staging` | فرع التكامل، وفيه كل المرحلة 0، وإغلاق G0، والموجة 1 كاملة، وP1-04، وP1-25 |
+| فروع مدموجة | `p0/P0-01-plan-docs`، و`p0/P0-02-requirement-analysis-module`، و`p0/P0-03-runtime-backup`، و`p0/P0-10-test-timeouts`، و`p0/P0-04-hermetic-backend-tests`، و`p0/P0-07-local-check-script`، و`p0/P0-11-stale-tests`، و`p0/P0-05-docker-reference-env`، و`p0/P0-06-st-compile-script`، و`p0/P0-08-docs-refresh`، و`p0/P0-12-npm-vulns`، و`p0/P0-13-compose-reference-image`، و`p0/G0-close`، و`p1/P1-01-parser-check`، و`p1/P1-02-matiec-raw`، و`p1/P1-03-timers-matiec`، و`p1/P1-22-template-redesign`، و`p1/P1-08-input-integrity`، و`p1/P1-04-evidence-levels`، و`p1/P1-25-planning-flow-flake` |
 
 ### أمر الرفع إلى GitHub (تنفّذه أنت، D-023)
 
-بعد دمج P1-04:
+بعد دمج P1-25:
 
 ```
-git push -u origin staging p0/P0-01-plan-docs p0/P0-02-requirement-analysis-module p0/P0-03-runtime-backup p0/P0-10-test-timeouts p0/P0-04-hermetic-backend-tests p0/P0-07-local-check-script p0/P0-11-stale-tests p0/P0-05-docker-reference-env p0/P0-06-st-compile-script p0/P0-08-docs-refresh p0/P0-12-npm-vulns p0/P0-13-compose-reference-image p0/G0-close p1/P1-01-parser-check p1/P1-02-matiec-raw p1/P1-03-timers-matiec p1/P1-22-template-redesign p1/P1-08-input-integrity p1/P1-04-evidence-levels
+git push -u origin staging p0/P0-01-plan-docs p0/P0-02-requirement-analysis-module p0/P0-03-runtime-backup p0/P0-10-test-timeouts p0/P0-04-hermetic-backend-tests p0/P0-07-local-check-script p0/P0-11-stale-tests p0/P0-05-docker-reference-env p0/P0-06-st-compile-script p0/P0-08-docs-refresh p0/P0-12-npm-vulns p0/P0-13-compose-reference-image p0/G0-close p1/P1-01-parser-check p1/P1-02-matiec-raw p1/P1-03-timers-matiec p1/P1-22-template-redesign p1/P1-08-input-integrity p1/P1-04-evidence-levels p1/P1-25-planning-flow-flake
 ```
 
 ## المرحلة 1 · التقدم
@@ -33,7 +35,7 @@ git push -u origin staging p0/P0-01-plan-docs p0/P0-02-requirement-analysis-modu
 | الموجة | البنود | الحالة |
 | --- | --- | --- |
 | 1 · إصلاح أدوات القياس | P1-01، وP1-02، وP1-03، وP1-22، وP1-08 | **مكتملة ومدموجة** |
-| 2 · تسمية صادقة وحلقات صحيحة | P1-04، وP1-25، وP1-05، وP1-06، وP1-07، وP1-09، وP1-10، وP1-24 | P1-04 مدموج، وP1-25 التالي |
+| 2 · تسمية صادقة وحلقات صحيحة | P1-04، وP1-25، وP1-05، وP1-06، وP1-07، وP1-09، وP1-10، وP1-24 | P1-04 وP1-25 مدموجان، وP1-05 مع P1-24 التاليان |
 | 3 · المنصة والنماذج والـ RAG والمنسِّق | P1-11، وP1-12، وP1-13، وP1-23، وP1-14، وP1-19، وP1-20، وP1-21 | TODO |
 | 4 · القياس الأول | P1-15، وP1-16، وP1-17، وP1-18 | TODO |
 
@@ -57,6 +59,7 @@ git push -u origin staging p0/P0-01-plan-docs p0/P0-02-requirement-analysis-modu
 - **M-01 عولج في العقود والواجهة (P1-04):**
   - `CHECKS_PASSED` بدل `VERIFIED`، ومستوى أدلة في كل تقرير.
   - أول قياس للمستويات بـ MATIEC الحقيقي: القوالب الخمسة L1، والمحرك وحده L2.
+- **فشل الواجهة المتقطع كان خطأ منتج (P1-25):** سباق تحميل يكتب النص المخزن فوق نص المستخدم. أُصلح (D-034)، وهو على الأرجح فشل P0-13 غير المفسَّر.
 
 ## بوابة G0 · مغلقة في 2026-09-15 (D-028)
 
@@ -74,14 +77,14 @@ git push -u origin staging p0/P0-01-plan-docs p0/P0-02-requirement-analysis-modu
 | 2026-09-15 | `P1-03` | قواعد prompt مبنية على الدليل |
 | 2026-09-15 | `P1-22` | قوالب صحيحة سلوكيًا، وMC-2 دلالية، والقوالب الخمسة تُترجم |
 | 2026-09-15 | `P1-08` | قيود حرفية، وحدود طول، وردود LLM مُتحقَّق منها، وتسوير نص المستخدم |
+| 2026-09-16 | `P1-25` | سباق التحميل في صفحة المتطلبات أُصلح، واختبار انحدار يُجبر الترتيب السيئ |
 | 2026-09-16 | `P1-04` | `CHECKS_PASSED` و`evidenceLevel`، وتنبيه النطاق، ولا "verified" دون L4 في الواجهة |
 
 ## بانتظارك الآن
 
 | المطلوب | التفاصيل |
 | --- | --- |
-| **P1-25** | أعرض عليك خطته قبل أي تعديل |
-| **P1-05 مع P1-24** | أعرض عليك خطتهما وقراراتهما قبل أي تعديل، بعد P1-25 |
+| **P1-05 مع P1-24** | أعرض عليك خطتهما وقراراتهما قبل أي تعديل |
 | `D-026` | اختيار استراتيجية الورقة الأولى: أ، أو ب، أو ج |
 | `U-20` | المجلة المستهدفة، مع المشرف، قبل نهاية أكتوبر |
 | الرفع | تنفيذ أمر الرفع أعلاه |
@@ -94,7 +97,7 @@ git push -u origin staging p0/P0-01-plan-docs p0/P0-02-requirement-analysis-modu
 - **C-15:** قالب المرور ليس متحكم مراحل حتى P1-24.
 - **حقن الأوامر النصية:** التسوير تخفيف جزئي فقط، ولا مصادقة بعد (P1-14).
 - **مفسِّر المسح أداة اختبار لا L3.**
-- **اختبار الواجهة `planning-flow` غير مستقر:** فشل في 2 من 5 تشغيلات، فقد يُسقط `check.ps1` دون خطأ حقيقي (P1-25).
+- **مهلة `findBy*` في اختبارات الواجهة** ما زالت مرفوعة إلى 5 ثوانٍ مؤقتًا (D-021). سبب فشل `planning-flow` نفسه أُصلح (P1-25).
 - **`parser.v1` مجموعة جزئية من ST** (D-029).
 - **التزام الـ LLM بقواعد الـ prompt الجديدة** لم يُقس بعد (P1-18).
 - **الاختبارات المحلية تفترض غياب MATIEC.**
@@ -108,8 +111,8 @@ git push -u origin staging p0/P0-01-plan-docs p0/P0-02-requirement-analysis-modu
 
 | المقياس | القيمة | التاريخ |
 | --- | --- | --- |
-| `check.ps1` | PASS في التشغيل الثاني، والأول فشل باختبار `planning-flow` غير المستقر. و`audit` بحالة WARN بسبب `pip-audit` | 2026-09-16 |
-| اختبارات الواجهة (`vitest`) | 113 من 113 | 2026-09-16 |
+| `check.ps1` | PASS، و`audit` بحالة WARN بسبب `pip-audit` | 2026-09-16 |
+| اختبارات الواجهة (`vitest`) | 114 من 114، و10 تشغيلات كاملة متتالية تنجح | 2026-09-16 |
 | `tsc` و`eslint` | 0 أخطاء | 2026-09-16 |
 | `next build` | ينجح | 2026-09-15 |
 | `docker compose build` | ينجح، والصورة `70b083ea5615` | 2026-09-15 |
