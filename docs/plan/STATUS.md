@@ -1,6 +1,6 @@
 # لوحة حالة OptPLC
 
-**آخر تحديث:** 2026-09-16
+**آخر تحديث:** 2026-09-21
 **المرحلة الحالية:** 1 (استعادة المصداقية). بدأت مبكرًا في 2026-09-15 (D-028)، وتنتهي في 2026-10-25.
 
 - **الموجة 1 اكتملت ودُمجت كلها في `staging`:** P1-01، وP1-02، وP1-03، وP1-22، وP1-08.
@@ -9,9 +9,23 @@
 
 - **P1-25 مدموج** (D-034): فشل `planning-flow` المتقطع كان سباق تحميل في صفحة المتطلبات، وأُصلح.
 
-**البند التالي:** `P1-05` مع `P1-24` (كتالوج القواعد وC-14، وقالب المرور).
+- **مسار البحث أُضيف** (D-035، مقبول بشرط): كفاية المواصفة وحلقة النية.
+  - المرجعان: [التعريف البحثي](../research/RESEARCH_DEFINITION_v1.md) و[خطة التنفيذ](../research/RESEARCH_EXECUTION_PLAN_v1.md).
+  - المرحلة 1 أُعيد ترتيبها (D-036)، والمزودون الجدد في D-037، وESBMC-PLC+ في D-038.
 
-**البوابة التالية:** `G1`. معاييرها في [phases/PHASE_1_BRIEF.md](phases/PHASE_1_BRIEF.md).
+**التالي:**
+
+- **في المرحلة 1:** `P1-05` مع `P1-24` (كتالوج القواعد وC-14، وقالب المرور)، و`P1-19` (Ollama ثُبّت، والنماذج بعد موافقتك).
+- **في مسار البحث:**
+  - `R0-02`: المراجعة المنهجية.
+  - `R0-03`: سجل الادعاءات.
+  - `R0-04`: صفحة المشرف.
+  - ثم `R1`، أي تجربة الجدوى، من 09-28 إلى 10-11.
+
+**البوابات التالية:**
+
+- `G1` في 2026-10-25، ومعاييرها في [phases/PHASE_1_BRIEF.md](phases/PHASE_1_BRIEF.md).
+- البوابات البحثية A وB وN1 في 2026-10-11 (D-035).
 **المناقشة وتسليم الأطروحة:** يونيو 2027 (U-41).
 
 ## الفروع (D-017)
@@ -19,15 +33,15 @@
 | الفرع | الحالة |
 | --- | --- |
 | `main` | لم يُمس، على `b345385`. الدمج فيه بموافقتك فقط |
-| `staging` | فرع التكامل، وفيه كل المرحلة 0، وإغلاق G0، والموجة 1 كاملة، وP1-04، وP1-25 |
-| فروع مدموجة | `p0/P0-01-plan-docs`، و`p0/P0-02-requirement-analysis-module`، و`p0/P0-03-runtime-backup`، و`p0/P0-10-test-timeouts`، و`p0/P0-04-hermetic-backend-tests`، و`p0/P0-07-local-check-script`، و`p0/P0-11-stale-tests`، و`p0/P0-05-docker-reference-env`، و`p0/P0-06-st-compile-script`، و`p0/P0-08-docs-refresh`، و`p0/P0-12-npm-vulns`، و`p0/P0-13-compose-reference-image`، و`p0/G0-close`، و`p1/P1-01-parser-check`، و`p1/P1-02-matiec-raw`، و`p1/P1-03-timers-matiec`، و`p1/P1-22-template-redesign`، و`p1/P1-08-input-integrity`، و`p1/P1-04-evidence-levels`، و`p1/P1-25-planning-flow-flake` |
+| `staging` | فرع التكامل، وفيه كل المرحلة 0، وإغلاق G0، والموجة 1 كاملة، وP1-04، وP1-25، وR0-01 (مسار البحث) |
+| فروع مدموجة | `p0/P0-01-plan-docs`، و`p0/P0-02-requirement-analysis-module`، و`p0/P0-03-runtime-backup`، و`p0/P0-10-test-timeouts`، و`p0/P0-04-hermetic-backend-tests`، و`p0/P0-07-local-check-script`، و`p0/P0-11-stale-tests`، و`p0/P0-05-docker-reference-env`، و`p0/P0-06-st-compile-script`، و`p0/P0-08-docs-refresh`، و`p0/P0-12-npm-vulns`، و`p0/P0-13-compose-reference-image`، و`p0/G0-close`، و`p1/P1-01-parser-check`، و`p1/P1-02-matiec-raw`، و`p1/P1-03-timers-matiec`، و`p1/P1-22-template-redesign`، و`p1/P1-08-input-integrity`، و`p1/P1-04-evidence-levels`، و`p1/P1-25-planning-flow-flake`، و`p1/R0-01-research-track` |
 
 ### أمر الرفع إلى GitHub (تنفّذه أنت، D-023)
 
-بعد دمج P1-25:
+بعد دمج R0-01:
 
 ```
-git push -u origin staging p0/P0-01-plan-docs p0/P0-02-requirement-analysis-module p0/P0-03-runtime-backup p0/P0-10-test-timeouts p0/P0-04-hermetic-backend-tests p0/P0-07-local-check-script p0/P0-11-stale-tests p0/P0-05-docker-reference-env p0/P0-06-st-compile-script p0/P0-08-docs-refresh p0/P0-12-npm-vulns p0/P0-13-compose-reference-image p0/G0-close p1/P1-01-parser-check p1/P1-02-matiec-raw p1/P1-03-timers-matiec p1/P1-22-template-redesign p1/P1-08-input-integrity p1/P1-04-evidence-levels p1/P1-25-planning-flow-flake
+git push -u origin staging p0/P0-01-plan-docs p0/P0-02-requirement-analysis-module p0/P0-03-runtime-backup p0/P0-10-test-timeouts p0/P0-04-hermetic-backend-tests p0/P0-07-local-check-script p0/P0-11-stale-tests p0/P0-05-docker-reference-env p0/P0-06-st-compile-script p0/P0-08-docs-refresh p0/P0-12-npm-vulns p0/P0-13-compose-reference-image p0/G0-close p1/P1-01-parser-check p1/P1-02-matiec-raw p1/P1-03-timers-matiec p1/P1-22-template-redesign p1/P1-08-input-integrity p1/P1-04-evidence-levels p1/P1-25-planning-flow-flake p1/R0-01-research-track
 ```
 
 ## المرحلة 1 · التقدم
@@ -35,9 +49,10 @@ git push -u origin staging p0/P0-01-plan-docs p0/P0-02-requirement-analysis-modu
 | الموجة | البنود | الحالة |
 | --- | --- | --- |
 | 1 · إصلاح أدوات القياس | P1-01، وP1-02، وP1-03، وP1-22، وP1-08 | **مكتملة ومدموجة** |
-| 2 · تسمية صادقة وحلقات صحيحة | P1-04، وP1-25، وP1-05، وP1-06، وP1-07، وP1-09، وP1-10، وP1-24 | P1-04 وP1-25 مدموجان، وP1-05 مع P1-24 التاليان |
-| 3 · المنصة والنماذج والـ RAG والمنسِّق | P1-11، وP1-12، وP1-13، وP1-23، وP1-14، وP1-19، وP1-20، وP1-21 | TODO |
-| 4 · القياس الأول | P1-15، وP1-16، وP1-17، وP1-18 | TODO |
+| 2 · تسمية صادقة وحلقات صحيحة | P1-04، وP1-25، وP1-05، وP1-06، وP1-07، وP1-24 | P1-04 وP1-25 مدموجان، وP1-05 مع P1-24 التاليان |
+| 3 · المنصة والنماذج | P1-12، وP1-19 | P1-19 بدأ (Ollama مثبت) |
+| 4 · القياس الأول | P1-15، وP1-16، وP1-17، وP1-18 | تُنفَّذ ضمن مسار البحث: R1-03 وR2-03، وR2-01، وR0-02، وR2-02 (D-036) |
+| تنتقل إلى بداية المرحلة 2 (D-036) | P1-09، وP1-10، وP1-11، وP1-13، وP1-14، وP1-20، وP1-21، وP1-23 | TODO |
 
 **معايير G1 المتحققة حتى الآن:**
 
@@ -79,17 +94,25 @@ git push -u origin staging p0/P0-01-plan-docs p0/P0-02-requirement-analysis-modu
 | 2026-09-15 | `P1-08` | قيود حرفية، وحدود طول، وردود LLM مُتحقَّق منها، وتسوير نص المستخدم |
 | 2026-09-16 | `P1-25` | سباق التحميل في صفحة المتطلبات أُصلح، واختبار انحدار يُجبر الترتيب السيئ |
 | 2026-09-16 | `P1-04` | `CHECKS_PASSED` و`evidenceLevel`، وتنبيه النطاق، ولا "verified" دون L4 في الواجهة |
+| 2026-09-21 | `P1-25` مدموج (`8352339`) | بعد إعادة `check.ps1` (PASS) |
+| 2026-09-21 | `R0-01` | مسح الأدبيات، والتعريف البحثي، وخطة التنفيذ، والقرارات من D-035 إلى D-038 |
 
 ## بانتظارك الآن
 
 | المطلوب | التفاصيل |
 | --- | --- |
 | **P1-05 مع P1-24** | أعرض عليك خطتهما وقراراتهما قبل أي تعديل |
-| `D-026` | اختيار استراتيجية الورقة الأولى: أ، أو ب، أو ج |
-| `U-20` | المجلة المستهدفة، مع المشرف، قبل نهاية أكتوبر |
+| `U-43` | حسابات API المتاحة، **وسقف الإنفاق الشهري**. لا تُشغَّل نماذج مدفوعة قبل تحديده |
+| `U-45` مع `U-20` | اجتماع المشرف بالصفحة الإنجليزية (R0-04)، قبل 2026-10-11: الاتجاه البحثي، والمجلة، وعمق SUP-2 وSUP-3 وSUP-4 |
+| `P1-19` | اختيار النماذج المحلية التي تُنزَّل |
 | الرفع | تنفيذ أمر الرفع أعلاه |
 
 ## مخاطر نشطة
+
+- **مسار البحث:**
+  - البوابة B قد تفشل إن كانت المواصفات المستقلة كافية. الخيارات F1 إلى F3 محددة مسبقًا (خطة التنفيذ، §4).
+  - النوفلتي لم يُثبت بعد: البوابة N1.
+- **القرص C:** الحر 12 GB فقط. لذلك Ollama ونماذجه على القرص E.
 
 - **C-14:**
   - `CHECKS_PASSED` من المسار الساكن لا تعني الأمان. مستوى الأدلة يقول ذلك الآن صراحةً، لكن القواعد نفسها ما زالت تخطئ.
@@ -123,6 +146,7 @@ git push -u origin staging p0/P0-01-plan-docs p0/P0-02-requirement-analysis-modu
 | `parser.v1` مقابل MATIEC (24 برنامجًا) | متطابقان في 20 | 2026-09-15 |
 | أحكام خاطئة مؤكدة لقواعد السلامة الساكنة | MC-1 وMC-3 وMC-4 تمرر غير الآمن، وPC-1 وTC-1 وBT-6 وSI-3 ترفض الصحيح. أما MC-2 فأُصلحت | 2026-09-15 |
 | ثغرات npm | 0 | 2026-09-15 |
+| Ollama | 0.34.2 على E، والـ GPU مكتشف (CUDA compute 5.0، و3.3 GiB متاحة من 4)، ولا نماذج بعد | 2026-09-21 |
 | ثغرات Python (`pip-audit`) | 12 في 3 حزم | 2026-09-15 |
 | نتائج benchmark صالحة | 0 | 2026-09-15 |
 | حالات الـ benchmark | 5 من 20 مطلوبة | 2026-09-14 |
