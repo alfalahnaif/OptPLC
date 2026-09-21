@@ -17,9 +17,8 @@
 
 - **في المرحلة 1:** `P1-05` مع `P1-24` (كتالوج القواعد وC-14، وقالب المرور)، و`P1-19` (Ollama ثُبّت، والنماذج بعد موافقتك).
 - **في مسار البحث:**
-  - `R0-02`: المراجعة المنهجية.
-  - `R0-03`: سجل الادعاءات.
-  - `R0-04`: صفحة المشرف.
+  - `R0-02` و`R0-03` منجزان (2026-09-21).
+  - `R0-04`: صفحة المشرف جاهزة، وتُرسل بعد مراجعتك.
   - ثم `R1`، أي تجربة الجدوى، من 09-28 إلى 10-11.
 
 **البوابات التالية:**
@@ -33,15 +32,15 @@
 | الفرع | الحالة |
 | --- | --- |
 | `main` | لم يُمس، على `b345385`. الدمج فيه بموافقتك فقط |
-| `staging` | فرع التكامل، وفيه كل المرحلة 0، وإغلاق G0، والموجة 1 كاملة، وP1-04، وP1-25، وR0-01 (مسار البحث) |
-| فروع مدموجة | `p0/P0-01-plan-docs`، و`p0/P0-02-requirement-analysis-module`، و`p0/P0-03-runtime-backup`، و`p0/P0-10-test-timeouts`، و`p0/P0-04-hermetic-backend-tests`، و`p0/P0-07-local-check-script`، و`p0/P0-11-stale-tests`، و`p0/P0-05-docker-reference-env`، و`p0/P0-06-st-compile-script`، و`p0/P0-08-docs-refresh`، و`p0/P0-12-npm-vulns`، و`p0/P0-13-compose-reference-image`، و`p0/G0-close`، و`p1/P1-01-parser-check`، و`p1/P1-02-matiec-raw`، و`p1/P1-03-timers-matiec`، و`p1/P1-22-template-redesign`، و`p1/P1-08-input-integrity`، و`p1/P1-04-evidence-levels`، و`p1/P1-25-planning-flow-flake`، و`p1/R0-01-research-track` |
+| `staging` | فرع التكامل، وفيه كل المرحلة 0، وإغلاق G0، والموجة 1 كاملة، وP1-04، وP1-25، وR0-01 وR0-02 (مسار البحث) |
+| فروع مدموجة | `p0/P0-01-plan-docs`، و`p0/P0-02-requirement-analysis-module`، و`p0/P0-03-runtime-backup`، و`p0/P0-10-test-timeouts`، و`p0/P0-04-hermetic-backend-tests`، و`p0/P0-07-local-check-script`، و`p0/P0-11-stale-tests`، و`p0/P0-05-docker-reference-env`، و`p0/P0-06-st-compile-script`، و`p0/P0-08-docs-refresh`، و`p0/P0-12-npm-vulns`، و`p0/P0-13-compose-reference-image`، و`p0/G0-close`، و`p1/P1-01-parser-check`، و`p1/P1-02-matiec-raw`، و`p1/P1-03-timers-matiec`، و`p1/P1-22-template-redesign`، و`p1/P1-08-input-integrity`، و`p1/P1-04-evidence-levels`، و`p1/P1-25-planning-flow-flake`، و`p1/R0-01-research-track`، و`p1/R0-02-systematic-review` |
 
 ### أمر الرفع إلى GitHub (تنفّذه أنت، D-023)
 
-بعد دمج R0-01:
+بعد دمج R0-02:
 
 ```
-git push -u origin staging p0/P0-01-plan-docs p0/P0-02-requirement-analysis-module p0/P0-03-runtime-backup p0/P0-10-test-timeouts p0/P0-04-hermetic-backend-tests p0/P0-07-local-check-script p0/P0-11-stale-tests p0/P0-05-docker-reference-env p0/P0-06-st-compile-script p0/P0-08-docs-refresh p0/P0-12-npm-vulns p0/P0-13-compose-reference-image p0/G0-close p1/P1-01-parser-check p1/P1-02-matiec-raw p1/P1-03-timers-matiec p1/P1-22-template-redesign p1/P1-08-input-integrity p1/P1-04-evidence-levels p1/P1-25-planning-flow-flake p1/R0-01-research-track
+git push -u origin staging p0/P0-01-plan-docs p0/P0-02-requirement-analysis-module p0/P0-03-runtime-backup p0/P0-10-test-timeouts p0/P0-04-hermetic-backend-tests p0/P0-07-local-check-script p0/P0-11-stale-tests p0/P0-05-docker-reference-env p0/P0-06-st-compile-script p0/P0-08-docs-refresh p0/P0-12-npm-vulns p0/P0-13-compose-reference-image p0/G0-close p1/P1-01-parser-check p1/P1-02-matiec-raw p1/P1-03-timers-matiec p1/P1-22-template-redesign p1/P1-08-input-integrity p1/P1-04-evidence-levels p1/P1-25-planning-flow-flake p1/R0-01-research-track p1/R0-02-systematic-review
 ```
 
 ## المرحلة 1 · التقدم
@@ -95,6 +94,7 @@ git push -u origin staging p0/P0-01-plan-docs p0/P0-02-requirement-analysis-modu
 | 2026-09-16 | `P1-25` | سباق التحميل في صفحة المتطلبات أُصلح، واختبار انحدار يُجبر الترتيب السيئ |
 | 2026-09-16 | `P1-04` | `CHECKS_PASSED` و`evidenceLevel`، وتنبيه النطاق، ولا "verified" دون L4 في الواجهة |
 | 2026-09-21 | `P1-25` مدموج (`8352339`) | بعد إعادة `check.ps1` (PASS) |
+| 2026-09-21 | `R0-02` و`R0-03` | مراجعة منهجية قابلة للإعادة، ومصفوفة النوفلتي، وسجل الادعاءات |
 | 2026-09-21 | `R0-01` | مسح الأدبيات، والتعريف البحثي، وخطة التنفيذ، والقرارات من D-035 إلى D-038 |
 
 ## بانتظارك الآن
@@ -102,6 +102,8 @@ git push -u origin staging p0/P0-01-plan-docs p0/P0-02-requirement-analysis-modu
 | المطلوب | التفاصيل |
 | --- | --- |
 | **P1-05 مع P1-24** | أعرض عليك خطتهما وقراراتهما قبل أي تعديل |
+| **قرار K3** | المراجعة وجدت الآلية العامة لحلقة السيناريوهات منشورة (ARTEMIS، وC-GRiD)، وتوضيحًا تفاعليًا لكود PLC (IPC+AL). أقترح إعادة صياغة K3 كسؤال مقارنة: فضاء البرامج مقابل فضاء المواصفات. التفاصيل في [NOVELTY_MATRIX](../research/related-work/NOVELTY_MATRIX.md) §4. يعدّل وثيقة التعريف المعتمدة، فيحتاج موافقتك |
+| `U-46` | نص ورقة Yang وزملائه (JSS 2025) عبر الجامعة، وهي حاسمة للبوابة N1 |
 | `U-43` | حسابات API المتاحة، **وسقف الإنفاق الشهري**. لا تُشغَّل نماذج مدفوعة قبل تحديده |
 | `U-45` مع `U-20` | اجتماع المشرف بالصفحة الإنجليزية (R0-04)، قبل 2026-10-11: الاتجاه البحثي، والمجلة، وعمق SUP-2 وSUP-3 وSUP-4 |
 | `P1-19` | اختيار النماذج المحلية التي تُنزَّل |
