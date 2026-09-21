@@ -1,0 +1,133 @@
+{
+  "run_date": "2026-09-21",
+  "queries": {
+    "OA1_llm_plc": {
+      "source": "openalex",
+      "filter": "title_and_abstract.search:(\"PLC\" OR \"programmable logic controller\" OR \"IEC 61131\" OR \"IEC 61131-3\" OR \"structured text\" OR \"ladder diagram\" OR \"ladder logic\" OR \"IEC 61499\" OR \"control logic\") AND (\"large language model\" OR \"large language models\" OR \"LLM\" OR \"LLMs\" OR \"GPT\" OR \"ChatGPT\" OR \"language model\"),from_publication_date:2021-01-01",
+      "hits": 907,
+      "fetched": 909
+    },
+    "OA2_plc_spec_adequacy": {
+      "source": "openalex",
+      "filter": "title_and_abstract.search:(\"PLC\" OR \"programmable logic controller\" OR \"IEC 61131\") AND (\"mutation\" OR \"mutant\" OR \"specification coverage\" OR \"vacuity\" OR \"specification completeness\" OR \"requirements coverage\") AND (\"model checking\" OR \"formal verification\" OR \"specification\" OR \"property\")",
+      "hits": 150,
+      "fetched": 150
+    },
+    "OA3_llm_spec_adequacy": {
+      "source": "openalex",
+      "filter": "title_and_abstract.search:(\"large language model\" OR \"large language models\" OR \"LLM\" OR \"LLMs\" OR \"GPT\" OR \"ChatGPT\" OR \"language model\") AND (\"formal specification\" OR \"formal specifications\" OR \"temporal logic\" OR \"LTL\" OR \"postcondition\" OR \"postconditions\") AND (\"completeness\" OR \"adequacy\" OR \"mutation\" OR \"mutant\" OR \"mutants\" OR \"vacuity\"),from_publication_date:2022-01-01",
+      "hits": 192,
+      "fetched": 192
+    },
+    "OA4_llm_nl_to_temporal_logic": {
+      "source": "openalex",
+      "filter": "title_and_abstract.search:(\"large language model\" OR \"large language models\" OR \"LLM\" OR \"LLMs\" OR \"GPT\" OR \"ChatGPT\" OR \"language model\") AND (\"LTL\" OR \"linear temporal logic\" OR \"temporal logic\" OR \"signal temporal logic\" OR \"CTL\") AND (\"requirement\" OR \"requirements\") AND (\"formalization\" OR \"formalisation\" OR \"translation\" OR \"generation\"),from_publication_date:2022-01-01",
+      "hits": 78,
+      "fetched": 78
+    },
+    "OA5_interactive_intent": {
+      "source": "openalex",
+      "filter": "title_and_abstract.search:(\"large language model\" OR \"large language models\" OR \"LLM\" OR \"LLMs\" OR \"GPT\" OR \"ChatGPT\" OR \"language model\") AND (\"user intent\" OR \"intent formalization\" OR \"intent clarification\" OR \"specification\") AND (\"disambiguation\" OR \"disambiguate\" OR \"clarification\" OR \"clarifying\" OR \"distinguishing\") AND (\"test\" OR \"tests\" OR \"trace\" OR \"traces\" OR \"scenario\" OR \"scenarios\" OR \"example\" OR \"examples\"),from_publication_date:2021-01-01",
+      "hits": 425,
+      "fetched": 425
+    },
+    "OA6_plc_benchmark": {
+      "source": "openalex",
+      "filter": "title_and_abstract.search:(\"benchmark\" OR \"dataset\") AND (\"PLC\" OR \"programmable logic controller\" OR \"IEC 61131\" OR \"structured text\" OR \"ladder logic\") AND (\"code generation\" OR \"language model\" OR \"LLM\" OR \"formal verification\" OR \"model checking\"),from_publication_date:2022-01-01",
+      "hits": 355,
+      "fetched": 355
+    },
+    "AX1_llm_plc": {
+      "source": "arxiv",
+      "search_query": "(all:\"IEC 61131\" OR all:PLC OR all:\"programmable logic controller\" OR all:\"structured text\" OR all:\"ladder logic\" OR all:\"ladder diagram\") AND (all:LLM OR all:\"large language model\" OR all:\"language models\")",
+      "hits": 166,
+      "fetched": 166
+    },
+    "AX2_llm_spec_adequacy": {
+      "source": "arxiv",
+      "search_query": "(all:LLM OR all:\"large language model\" OR all:\"large language models\") AND (all:\"temporal logic\" OR all:LTL OR all:\"formal specification\" OR all:postcondition OR all:postconditions) AND (all:completeness OR all:mutation OR all:mutants OR all:adequacy OR all:vacuity)",
+      "hits": 42,
+      "fetched": 42
+    },
+    "AX3_intent_formalization": {
+      "source": "arxiv",
+      "search_query": "(all:\"intent formalization\" OR all:\"user intent formalization\")",
+      "hits": 3,
+      "fetched": 3
+    }
+  },
+  "seeds": {
+    "agents4plc_arxiv": {
+      "doi": "10.48550/arxiv.2410.14209",
+      "resolved": "W4403995628",
+      "filter": "cites:W4403995628",
+      "citing": 2,
+      "fetched": 2
+    },
+    "llm4plc_icse_seip": {
+      "doi": "10.1145/3639477.3639743",
+      "resolved": "W4399213405",
+      "filter": "cites:W4399213405",
+      "citing": 64,
+      "fetched": 64
+    },
+    "llm4plc_arxiv": {
+      "doi": "10.48550/arxiv.2401.05443",
+      "resolved": "W4390832859",
+      "filter": "cites:W4390832859",
+      "citing": 0,
+      "fetched": 0
+    },
+    "nl2postcond_fse": {
+      "doi": "10.1145/3660791",
+      "resolved": "W4400582518",
+      "filter": "cites:W4400582518",
+      "citing": 43,
+      "fetched": 43
+    },
+    "ticoder_arxiv": {
+      "doi": "10.48550/arxiv.2208.05950",
+      "resolved": "W4291238279",
+      "filter": "cites:W4291238279",
+      "citing": 24,
+      "fetched": 24
+    },
+    "haag_st_feedback_arxiv": {
+      "doi": "10.48550/arxiv.2410.22159",
+      "resolved": "W4404342131",
+      "filter": "cites:W4404342131",
+      "citing": 1,
+      "fetched": 1
+    },
+    "autoplc_arxiv": {
+      "doi": "10.48550/arxiv.2412.02410",
+      "resolved": "W4405055842",
+      "filter": "cites:W4405055842",
+      "citing": 2,
+      "fetched": 2
+    },
+    "chockler_coverage_tacas01": {
+      "doi": "10.1007/3-540-45319-9_36",
+      "resolved": "W1480351298",
+      "filter": "cites:W1480351298,title_and_abstract.search:(\"large language model\" OR \"LLM\" OR \"PLC\" OR \"IEC 61131\")",
+      "citing": 0,
+      "fetched": 0
+    },
+    "stmutants_arxiv": {
+      "doi": "10.48550/arxiv.2606.05499",
+      "resolved": "W7163704323",
+      "filter": "cites:W7163704323",
+      "citing": 0,
+      "fetched": 0
+    },
+    "esbmc_plcplus_arxiv": {
+      "doi": "10.48550/arxiv.2606.23870",
+      "resolved": "W7165781615",
+      "filter": "cites:W7165781615",
+      "citing": 0,
+      "fetched": 0
+    }
+  },
+  "records_before_dedup": 2456,
+  "candidates_after_dedup": 1356
+}
