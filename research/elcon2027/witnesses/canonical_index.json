@@ -1,0 +1,986 @@
+{
+  "schema_version": 1,
+  "manifest_sha256": "8c453dc8ce300ab82ed515f8e66b8ba5aef909f861da3e24664e8acba0c22ec0",
+  "verdicts": [
+    {
+      "case_id": "E27-M01",
+      "mutant_id": "reference",
+      "property_set": "E27-M01",
+      "property_id": "P_M4_RESET_REQUIRED",
+      "verification_status": "SATISFIED",
+      "source_output_path": "E27-M01_G3_reference.txt",
+      "source_sha256": "b9ac778a6e3def507a361077f5b5208a2dfd0f980ec0e52f070e607659797705",
+      "witness_path": "runs/E27-M01/reference.json"
+    },
+    {
+      "case_id": "E27-M01",
+      "mutant_id": "reference",
+      "property_set": "E27-M01",
+      "property_id": "P_M1_ESTOP_OFF",
+      "verification_status": "SATISFIED",
+      "source_output_path": "E27-M01_G3_reference.txt",
+      "source_sha256": "b9ac778a6e3def507a361077f5b5208a2dfd0f980ec0e52f070e607659797705",
+      "witness_path": "runs/E27-M01/reference.json"
+    },
+    {
+      "case_id": "E27-M01",
+      "mutant_id": "reference",
+      "property_set": "E27-M01",
+      "property_id": "P_M2_OVERLOAD_OFF",
+      "verification_status": "SATISFIED",
+      "source_output_path": "E27-M01_G3_reference.txt",
+      "source_sha256": "b9ac778a6e3def507a361077f5b5208a2dfd0f980ec0e52f070e607659797705",
+      "witness_path": "runs/E27-M01/reference.json"
+    },
+    {
+      "case_id": "E27-M01",
+      "mutant_id": "reference",
+      "property_set": "E27-M01",
+      "property_id": "P_M3_STOP_OFF",
+      "verification_status": "SATISFIED",
+      "source_output_path": "E27-M01_G3_reference.txt",
+      "source_sha256": "b9ac778a6e3def507a361077f5b5208a2dfd0f980ec0e52f070e607659797705",
+      "witness_path": "runs/E27-M01/reference.json"
+    },
+    {
+      "case_id": "E27-M01",
+      "mutant_id": "M-M1",
+      "property_set": "E27-M01",
+      "property_id": "P_M4_RESET_REQUIRED",
+      "verification_status": "SATISFIED",
+      "source_output_path": "E27-M01_G3_M-M1_estop_bypass.txt",
+      "source_sha256": "5cae1ec928ee62ce640aada469ad68079a7daad0f9adc00c654b59741065880d",
+      "witness_path": "runs/E27-M01/M-M1.json"
+    },
+    {
+      "case_id": "E27-M01",
+      "mutant_id": "M-M1",
+      "property_set": "E27-M01",
+      "property_id": "P_M1_ESTOP_OFF",
+      "verification_status": "VIOLATED",
+      "source_output_path": "E27-M01_G3_M-M1_estop_bypass.txt",
+      "source_sha256": "5cae1ec928ee62ce640aada469ad68079a7daad0f9adc00c654b59741065880d",
+      "witness_path": "runs/E27-M01/M-M1.json"
+    },
+    {
+      "case_id": "E27-M01",
+      "mutant_id": "M-M1",
+      "property_set": "E27-M01",
+      "property_id": "P_M2_OVERLOAD_OFF",
+      "verification_status": "SATISFIED",
+      "source_output_path": "E27-M01_G3_M-M1_estop_bypass.txt",
+      "source_sha256": "5cae1ec928ee62ce640aada469ad68079a7daad0f9adc00c654b59741065880d",
+      "witness_path": "runs/E27-M01/M-M1.json"
+    },
+    {
+      "case_id": "E27-M01",
+      "mutant_id": "M-M1",
+      "property_set": "E27-M01",
+      "property_id": "P_M3_STOP_OFF",
+      "verification_status": "SATISFIED",
+      "source_output_path": "E27-M01_G3_M-M1_estop_bypass.txt",
+      "source_sha256": "5cae1ec928ee62ce640aada469ad68079a7daad0f9adc00c654b59741065880d",
+      "witness_path": "runs/E27-M01/M-M1.json"
+    },
+    {
+      "case_id": "E27-M01",
+      "mutant_id": "M-M2",
+      "property_set": "E27-M01",
+      "property_id": "P_M4_RESET_REQUIRED",
+      "verification_status": "SATISFIED",
+      "source_output_path": "E27-M01_G3_M-M2_estop_polarity.txt",
+      "source_sha256": "88896afd195308aa493f8d63a30da5e3c9ce6530be182dff864ba3dc87ac30bc",
+      "witness_path": "runs/E27-M01/M-M2.json"
+    },
+    {
+      "case_id": "E27-M01",
+      "mutant_id": "M-M2",
+      "property_set": "E27-M01",
+      "property_id": "P_M1_ESTOP_OFF",
+      "verification_status": "VIOLATED",
+      "source_output_path": "E27-M01_G3_M-M2_estop_polarity.txt",
+      "source_sha256": "88896afd195308aa493f8d63a30da5e3c9ce6530be182dff864ba3dc87ac30bc",
+      "witness_path": "runs/E27-M01/M-M2.json"
+    },
+    {
+      "case_id": "E27-M01",
+      "mutant_id": "M-M2",
+      "property_set": "E27-M01",
+      "property_id": "P_M2_OVERLOAD_OFF",
+      "verification_status": "SATISFIED",
+      "source_output_path": "E27-M01_G3_M-M2_estop_polarity.txt",
+      "source_sha256": "88896afd195308aa493f8d63a30da5e3c9ce6530be182dff864ba3dc87ac30bc",
+      "witness_path": "runs/E27-M01/M-M2.json"
+    },
+    {
+      "case_id": "E27-M01",
+      "mutant_id": "M-M2",
+      "property_set": "E27-M01",
+      "property_id": "P_M3_STOP_OFF",
+      "verification_status": "SATISFIED",
+      "source_output_path": "E27-M01_G3_M-M2_estop_polarity.txt",
+      "source_sha256": "88896afd195308aa493f8d63a30da5e3c9ce6530be182dff864ba3dc87ac30bc",
+      "witness_path": "runs/E27-M01/M-M2.json"
+    },
+    {
+      "case_id": "E27-M01",
+      "mutant_id": "M-M3",
+      "property_set": "E27-M01",
+      "property_id": "P_M4_RESET_REQUIRED",
+      "verification_status": "VIOLATED",
+      "source_output_path": "E27-M01_G3_M-M3_reset_bypass.txt",
+      "source_sha256": "b1aa1e79bf78355b650926f3ba04b05318f19f86c6c10fb52e49993dc7d2278e",
+      "witness_path": "runs/E27-M01/M-M3.json"
+    },
+    {
+      "case_id": "E27-M01",
+      "mutant_id": "M-M3",
+      "property_set": "E27-M01",
+      "property_id": "P_M1_ESTOP_OFF",
+      "verification_status": "SATISFIED",
+      "source_output_path": "E27-M01_G3_M-M3_reset_bypass.txt",
+      "source_sha256": "b1aa1e79bf78355b650926f3ba04b05318f19f86c6c10fb52e49993dc7d2278e",
+      "witness_path": "runs/E27-M01/M-M3.json"
+    },
+    {
+      "case_id": "E27-M01",
+      "mutant_id": "M-M3",
+      "property_set": "E27-M01",
+      "property_id": "P_M2_OVERLOAD_OFF",
+      "verification_status": "SATISFIED",
+      "source_output_path": "E27-M01_G3_M-M3_reset_bypass.txt",
+      "source_sha256": "b1aa1e79bf78355b650926f3ba04b05318f19f86c6c10fb52e49993dc7d2278e",
+      "witness_path": "runs/E27-M01/M-M3.json"
+    },
+    {
+      "case_id": "E27-M01",
+      "mutant_id": "M-M3",
+      "property_set": "E27-M01",
+      "property_id": "P_M3_STOP_OFF",
+      "verification_status": "SATISFIED",
+      "source_output_path": "E27-M01_G3_M-M3_reset_bypass.txt",
+      "source_sha256": "b1aa1e79bf78355b650926f3ba04b05318f19f86c6c10fb52e49993dc7d2278e",
+      "witness_path": "runs/E27-M01/M-M3.json"
+    },
+    {
+      "case_id": "E27-M01",
+      "mutant_id": "M-M4",
+      "property_set": "E27-M01",
+      "property_id": "P_M4_RESET_REQUIRED",
+      "verification_status": "SATISFIED",
+      "source_output_path": "E27-M01_G3_M-M4_start_over_stop.txt",
+      "source_sha256": "4e3de355f0857bf6f66bbe6adb573c7a7003f152e1a8be292cfa06c782ffa740",
+      "witness_path": "runs/E27-M01/M-M4.json"
+    },
+    {
+      "case_id": "E27-M01",
+      "mutant_id": "M-M4",
+      "property_set": "E27-M01",
+      "property_id": "P_M1_ESTOP_OFF",
+      "verification_status": "SATISFIED",
+      "source_output_path": "E27-M01_G3_M-M4_start_over_stop.txt",
+      "source_sha256": "4e3de355f0857bf6f66bbe6adb573c7a7003f152e1a8be292cfa06c782ffa740",
+      "witness_path": "runs/E27-M01/M-M4.json"
+    },
+    {
+      "case_id": "E27-M01",
+      "mutant_id": "M-M4",
+      "property_set": "E27-M01",
+      "property_id": "P_M2_OVERLOAD_OFF",
+      "verification_status": "SATISFIED",
+      "source_output_path": "E27-M01_G3_M-M4_start_over_stop.txt",
+      "source_sha256": "4e3de355f0857bf6f66bbe6adb573c7a7003f152e1a8be292cfa06c782ffa740",
+      "witness_path": "runs/E27-M01/M-M4.json"
+    },
+    {
+      "case_id": "E27-M01",
+      "mutant_id": "M-M4",
+      "property_set": "E27-M01",
+      "property_id": "P_M3_STOP_OFF",
+      "verification_status": "VIOLATED",
+      "source_output_path": "E27-M01_G3_M-M4_start_over_stop.txt",
+      "source_sha256": "4e3de355f0857bf6f66bbe6adb573c7a7003f152e1a8be292cfa06c782ffa740",
+      "witness_path": "runs/E27-M01/M-M4.json"
+    },
+    {
+      "case_id": "E27-M01",
+      "mutant_id": "M-M5",
+      "property_set": "E27-M01",
+      "property_id": "P_M4_RESET_REQUIRED",
+      "verification_status": "SATISFIED",
+      "source_output_path": "E27-M01_G3_M-M5_overload_bypass.txt",
+      "source_sha256": "0737dab3adc92e8a5478a977a0e44c64813b3d2bc2270faab4cd08b9f980753b",
+      "witness_path": "runs/E27-M01/M-M5.json"
+    },
+    {
+      "case_id": "E27-M01",
+      "mutant_id": "M-M5",
+      "property_set": "E27-M01",
+      "property_id": "P_M1_ESTOP_OFF",
+      "verification_status": "SATISFIED",
+      "source_output_path": "E27-M01_G3_M-M5_overload_bypass.txt",
+      "source_sha256": "0737dab3adc92e8a5478a977a0e44c64813b3d2bc2270faab4cd08b9f980753b",
+      "witness_path": "runs/E27-M01/M-M5.json"
+    },
+    {
+      "case_id": "E27-M01",
+      "mutant_id": "M-M5",
+      "property_set": "E27-M01",
+      "property_id": "P_M2_OVERLOAD_OFF",
+      "verification_status": "VIOLATED",
+      "source_output_path": "E27-M01_G3_M-M5_overload_bypass.txt",
+      "source_sha256": "0737dab3adc92e8a5478a977a0e44c64813b3d2bc2270faab4cd08b9f980753b",
+      "witness_path": "runs/E27-M01/M-M5.json"
+    },
+    {
+      "case_id": "E27-M01",
+      "mutant_id": "M-M5",
+      "property_set": "E27-M01",
+      "property_id": "P_M3_STOP_OFF",
+      "verification_status": "SATISFIED",
+      "source_output_path": "E27-M01_G3_M-M5_overload_bypass.txt",
+      "source_sha256": "0737dab3adc92e8a5478a977a0e44c64813b3d2bc2270faab4cd08b9f980753b",
+      "witness_path": "runs/E27-M01/M-M5.json"
+    },
+    {
+      "case_id": "E27-M01",
+      "mutant_id": "M-M6",
+      "property_set": "E27-M01",
+      "property_id": "P_M1_ESTOP_OFF",
+      "verification_status": "SATISFIED",
+      "source_output_path": "E27-M01_G3_M-M6_fault_memory_removal.txt",
+      "source_sha256": "b0fc65e417e75883463488fcd1c464a556f34ba9a1bce2a524fa17ee4c133a62",
+      "witness_path": "runs/E27-M01/M-M6.json"
+    },
+    {
+      "case_id": "E27-M01",
+      "mutant_id": "M-M6",
+      "property_set": "E27-M01",
+      "property_id": "P_M2_OVERLOAD_OFF",
+      "verification_status": "SATISFIED",
+      "source_output_path": "E27-M01_G3_M-M6_fault_memory_removal.txt",
+      "source_sha256": "b0fc65e417e75883463488fcd1c464a556f34ba9a1bce2a524fa17ee4c133a62",
+      "witness_path": "runs/E27-M01/M-M6.json"
+    },
+    {
+      "case_id": "E27-M01",
+      "mutant_id": "M-M6",
+      "property_set": "E27-M01",
+      "property_id": "P_M3_STOP_OFF",
+      "verification_status": "SATISFIED",
+      "source_output_path": "E27-M01_G3_M-M6_fault_memory_removal.txt",
+      "source_sha256": "b0fc65e417e75883463488fcd1c464a556f34ba9a1bce2a524fa17ee4c133a62",
+      "witness_path": "runs/E27-M01/M-M6.json"
+    },
+    {
+      "case_id": "E27-M01",
+      "mutant_id": "M-M6",
+      "property_set": "E27-M01",
+      "property_id": "P_M4_RESET_REQUIRED",
+      "verification_status": "VIOLATED",
+      "source_output_path": "E27-M01_G3_M-M6_fault_memory_removal.txt",
+      "source_sha256": "b0fc65e417e75883463488fcd1c464a556f34ba9a1bce2a524fa17ee4c133a62",
+      "witness_path": "runs/E27-M01/M-M6.json"
+    },
+    {
+      "case_id": "E27-I01",
+      "mutant_id": "reference",
+      "property_set": "E27-I01",
+      "property_id": "P_I1_GUARD_OFF",
+      "verification_status": "SATISFIED",
+      "source_output_path": "E27-I01/G3_reference.txt",
+      "source_sha256": "78ed6f4310022ea8422270d4601b783426687f0b8c142f425903d2c584021022",
+      "witness_path": "runs/E27-I01/reference.json"
+    },
+    {
+      "case_id": "E27-I01",
+      "mutant_id": "reference",
+      "property_set": "E27-I01",
+      "property_id": "P_I2_ESTOP_OFF",
+      "verification_status": "SATISFIED",
+      "source_output_path": "E27-I01/G3_reference.txt",
+      "source_sha256": "78ed6f4310022ea8422270d4601b783426687f0b8c142f425903d2c584021022",
+      "witness_path": "runs/E27-I01/reference.json"
+    },
+    {
+      "case_id": "E27-I01",
+      "mutant_id": "reference",
+      "property_set": "E27-I01",
+      "property_id": "P_I3_FAULT_OFF",
+      "verification_status": "SATISFIED",
+      "source_output_path": "E27-I01/G3_reference.txt",
+      "source_sha256": "78ed6f4310022ea8422270d4601b783426687f0b8c142f425903d2c584021022",
+      "witness_path": "runs/E27-I01/reference.json"
+    },
+    {
+      "case_id": "E27-I01",
+      "mutant_id": "reference",
+      "property_set": "E27-I01",
+      "property_id": "P_I4_TWO_HAND_REQUIRED",
+      "verification_status": "SATISFIED",
+      "source_output_path": "E27-I01/G3_reference.txt",
+      "source_sha256": "78ed6f4310022ea8422270d4601b783426687f0b8c142f425903d2c584021022",
+      "witness_path": "runs/E27-I01/reference.json"
+    },
+    {
+      "case_id": "E27-I01",
+      "mutant_id": "reference",
+      "property_set": "E27-I01",
+      "property_id": "P_I5_RESET_REQUIRED",
+      "verification_status": "SATISFIED",
+      "source_output_path": "E27-I01/G3_reference.txt",
+      "source_sha256": "78ed6f4310022ea8422270d4601b783426687f0b8c142f425903d2c584021022",
+      "witness_path": "runs/E27-I01/reference.json"
+    },
+    {
+      "case_id": "E27-I01",
+      "mutant_id": "I-M1",
+      "property_set": "E27-I01",
+      "property_id": "P_I1_GUARD_OFF",
+      "verification_status": "VIOLATED",
+      "source_output_path": "E27-I01/G3_I-M1_guard_bypass.txt",
+      "source_sha256": "06fd45f1cc6ce0cc4bfbe39b7e54d0db996175e2d1f00cf78dffa7340b8dabc2",
+      "witness_path": "runs/E27-I01/I-M1.json"
+    },
+    {
+      "case_id": "E27-I01",
+      "mutant_id": "I-M1",
+      "property_set": "E27-I01",
+      "property_id": "P_I2_ESTOP_OFF",
+      "verification_status": "SATISFIED",
+      "source_output_path": "E27-I01/G3_I-M1_guard_bypass.txt",
+      "source_sha256": "06fd45f1cc6ce0cc4bfbe39b7e54d0db996175e2d1f00cf78dffa7340b8dabc2",
+      "witness_path": "runs/E27-I01/I-M1.json"
+    },
+    {
+      "case_id": "E27-I01",
+      "mutant_id": "I-M1",
+      "property_set": "E27-I01",
+      "property_id": "P_I3_FAULT_OFF",
+      "verification_status": "SATISFIED",
+      "source_output_path": "E27-I01/G3_I-M1_guard_bypass.txt",
+      "source_sha256": "06fd45f1cc6ce0cc4bfbe39b7e54d0db996175e2d1f00cf78dffa7340b8dabc2",
+      "witness_path": "runs/E27-I01/I-M1.json"
+    },
+    {
+      "case_id": "E27-I01",
+      "mutant_id": "I-M1",
+      "property_set": "E27-I01",
+      "property_id": "P_I4_TWO_HAND_REQUIRED",
+      "verification_status": "SATISFIED",
+      "source_output_path": "E27-I01/G3_I-M1_guard_bypass.txt",
+      "source_sha256": "06fd45f1cc6ce0cc4bfbe39b7e54d0db996175e2d1f00cf78dffa7340b8dabc2",
+      "witness_path": "runs/E27-I01/I-M1.json"
+    },
+    {
+      "case_id": "E27-I01",
+      "mutant_id": "I-M1",
+      "property_set": "E27-I01",
+      "property_id": "P_I5_RESET_REQUIRED",
+      "verification_status": "SATISFIED",
+      "source_output_path": "E27-I01/G3_I-M1_guard_bypass.txt",
+      "source_sha256": "06fd45f1cc6ce0cc4bfbe39b7e54d0db996175e2d1f00cf78dffa7340b8dabc2",
+      "witness_path": "runs/E27-I01/I-M1.json"
+    },
+    {
+      "case_id": "E27-I01",
+      "mutant_id": "I-M2",
+      "property_set": "E27-I01",
+      "property_id": "P_I1_GUARD_OFF",
+      "verification_status": "VIOLATED",
+      "source_output_path": "E27-I01/G3_I-M2_guard_polarity.txt",
+      "source_sha256": "be441bd2a7a681174748ebd8eaf5099c41fdef9bd4c85ca9a74651361bfe7f0b",
+      "witness_path": "runs/E27-I01/I-M2.json"
+    },
+    {
+      "case_id": "E27-I01",
+      "mutant_id": "I-M2",
+      "property_set": "E27-I01",
+      "property_id": "P_I2_ESTOP_OFF",
+      "verification_status": "SATISFIED",
+      "source_output_path": "E27-I01/G3_I-M2_guard_polarity.txt",
+      "source_sha256": "be441bd2a7a681174748ebd8eaf5099c41fdef9bd4c85ca9a74651361bfe7f0b",
+      "witness_path": "runs/E27-I01/I-M2.json"
+    },
+    {
+      "case_id": "E27-I01",
+      "mutant_id": "I-M2",
+      "property_set": "E27-I01",
+      "property_id": "P_I3_FAULT_OFF",
+      "verification_status": "SATISFIED",
+      "source_output_path": "E27-I01/G3_I-M2_guard_polarity.txt",
+      "source_sha256": "be441bd2a7a681174748ebd8eaf5099c41fdef9bd4c85ca9a74651361bfe7f0b",
+      "witness_path": "runs/E27-I01/I-M2.json"
+    },
+    {
+      "case_id": "E27-I01",
+      "mutant_id": "I-M2",
+      "property_set": "E27-I01",
+      "property_id": "P_I4_TWO_HAND_REQUIRED",
+      "verification_status": "SATISFIED",
+      "source_output_path": "E27-I01/G3_I-M2_guard_polarity.txt",
+      "source_sha256": "be441bd2a7a681174748ebd8eaf5099c41fdef9bd4c85ca9a74651361bfe7f0b",
+      "witness_path": "runs/E27-I01/I-M2.json"
+    },
+    {
+      "case_id": "E27-I01",
+      "mutant_id": "I-M2",
+      "property_set": "E27-I01",
+      "property_id": "P_I5_RESET_REQUIRED",
+      "verification_status": "SATISFIED",
+      "source_output_path": "E27-I01/G3_I-M2_guard_polarity.txt",
+      "source_sha256": "be441bd2a7a681174748ebd8eaf5099c41fdef9bd4c85ca9a74651361bfe7f0b",
+      "witness_path": "runs/E27-I01/I-M2.json"
+    },
+    {
+      "case_id": "E27-I01",
+      "mutant_id": "I-M3",
+      "property_set": "E27-I01",
+      "property_id": "P_I1_GUARD_OFF",
+      "verification_status": "SATISFIED",
+      "source_output_path": "E27-I01/G3_I-M3_reset_bypass.txt",
+      "source_sha256": "2cafd5b63b738e542a15e327c88d6dde27e36fdb1b37aa4c5b681c7c038e3f53",
+      "witness_path": "runs/E27-I01/I-M3.json"
+    },
+    {
+      "case_id": "E27-I01",
+      "mutant_id": "I-M3",
+      "property_set": "E27-I01",
+      "property_id": "P_I2_ESTOP_OFF",
+      "verification_status": "SATISFIED",
+      "source_output_path": "E27-I01/G3_I-M3_reset_bypass.txt",
+      "source_sha256": "2cafd5b63b738e542a15e327c88d6dde27e36fdb1b37aa4c5b681c7c038e3f53",
+      "witness_path": "runs/E27-I01/I-M3.json"
+    },
+    {
+      "case_id": "E27-I01",
+      "mutant_id": "I-M3",
+      "property_set": "E27-I01",
+      "property_id": "P_I3_FAULT_OFF",
+      "verification_status": "SATISFIED",
+      "source_output_path": "E27-I01/G3_I-M3_reset_bypass.txt",
+      "source_sha256": "2cafd5b63b738e542a15e327c88d6dde27e36fdb1b37aa4c5b681c7c038e3f53",
+      "witness_path": "runs/E27-I01/I-M3.json"
+    },
+    {
+      "case_id": "E27-I01",
+      "mutant_id": "I-M3",
+      "property_set": "E27-I01",
+      "property_id": "P_I4_TWO_HAND_REQUIRED",
+      "verification_status": "SATISFIED",
+      "source_output_path": "E27-I01/G3_I-M3_reset_bypass.txt",
+      "source_sha256": "2cafd5b63b738e542a15e327c88d6dde27e36fdb1b37aa4c5b681c7c038e3f53",
+      "witness_path": "runs/E27-I01/I-M3.json"
+    },
+    {
+      "case_id": "E27-I01",
+      "mutant_id": "I-M3",
+      "property_set": "E27-I01",
+      "property_id": "P_I5_RESET_REQUIRED",
+      "verification_status": "VIOLATED",
+      "source_output_path": "E27-I01/G3_I-M3_reset_bypass.txt",
+      "source_sha256": "2cafd5b63b738e542a15e327c88d6dde27e36fdb1b37aa4c5b681c7c038e3f53",
+      "witness_path": "runs/E27-I01/I-M3.json"
+    },
+    {
+      "case_id": "E27-I01",
+      "mutant_id": "I-M4",
+      "property_set": "E27-I01",
+      "property_id": "P_I1_GUARD_OFF",
+      "verification_status": "SATISFIED",
+      "source_output_path": "E27-I01/G3_I-M4_estop_bypass.txt",
+      "source_sha256": "5df375eaa69e56a339c6220374380c765b5cfd6a90436c1be84d502789ccae21",
+      "witness_path": "runs/E27-I01/I-M4.json"
+    },
+    {
+      "case_id": "E27-I01",
+      "mutant_id": "I-M4",
+      "property_set": "E27-I01",
+      "property_id": "P_I2_ESTOP_OFF",
+      "verification_status": "VIOLATED",
+      "source_output_path": "E27-I01/G3_I-M4_estop_bypass.txt",
+      "source_sha256": "5df375eaa69e56a339c6220374380c765b5cfd6a90436c1be84d502789ccae21",
+      "witness_path": "runs/E27-I01/I-M4.json"
+    },
+    {
+      "case_id": "E27-I01",
+      "mutant_id": "I-M4",
+      "property_set": "E27-I01",
+      "property_id": "P_I3_FAULT_OFF",
+      "verification_status": "SATISFIED",
+      "source_output_path": "E27-I01/G3_I-M4_estop_bypass.txt",
+      "source_sha256": "5df375eaa69e56a339c6220374380c765b5cfd6a90436c1be84d502789ccae21",
+      "witness_path": "runs/E27-I01/I-M4.json"
+    },
+    {
+      "case_id": "E27-I01",
+      "mutant_id": "I-M4",
+      "property_set": "E27-I01",
+      "property_id": "P_I4_TWO_HAND_REQUIRED",
+      "verification_status": "SATISFIED",
+      "source_output_path": "E27-I01/G3_I-M4_estop_bypass.txt",
+      "source_sha256": "5df375eaa69e56a339c6220374380c765b5cfd6a90436c1be84d502789ccae21",
+      "witness_path": "runs/E27-I01/I-M4.json"
+    },
+    {
+      "case_id": "E27-I01",
+      "mutant_id": "I-M4",
+      "property_set": "E27-I01",
+      "property_id": "P_I5_RESET_REQUIRED",
+      "verification_status": "SATISFIED",
+      "source_output_path": "E27-I01/G3_I-M4_estop_bypass.txt",
+      "source_sha256": "5df375eaa69e56a339c6220374380c765b5cfd6a90436c1be84d502789ccae21",
+      "witness_path": "runs/E27-I01/I-M4.json"
+    },
+    {
+      "case_id": "E27-I01",
+      "mutant_id": "I-M5",
+      "property_set": "E27-I01",
+      "property_id": "P_I1_GUARD_OFF",
+      "verification_status": "SATISFIED",
+      "source_output_path": "E27-I01/G3_I-M5_twohand_bypass.txt",
+      "source_sha256": "00e2d6d5a35789a79bc83bb5f0890d1c85df7e10ae779c3d80b2e2c103bc5e47",
+      "witness_path": "runs/E27-I01/I-M5.json"
+    },
+    {
+      "case_id": "E27-I01",
+      "mutant_id": "I-M5",
+      "property_set": "E27-I01",
+      "property_id": "P_I2_ESTOP_OFF",
+      "verification_status": "SATISFIED",
+      "source_output_path": "E27-I01/G3_I-M5_twohand_bypass.txt",
+      "source_sha256": "00e2d6d5a35789a79bc83bb5f0890d1c85df7e10ae779c3d80b2e2c103bc5e47",
+      "witness_path": "runs/E27-I01/I-M5.json"
+    },
+    {
+      "case_id": "E27-I01",
+      "mutant_id": "I-M5",
+      "property_set": "E27-I01",
+      "property_id": "P_I3_FAULT_OFF",
+      "verification_status": "SATISFIED",
+      "source_output_path": "E27-I01/G3_I-M5_twohand_bypass.txt",
+      "source_sha256": "00e2d6d5a35789a79bc83bb5f0890d1c85df7e10ae779c3d80b2e2c103bc5e47",
+      "witness_path": "runs/E27-I01/I-M5.json"
+    },
+    {
+      "case_id": "E27-I01",
+      "mutant_id": "I-M5",
+      "property_set": "E27-I01",
+      "property_id": "P_I4_TWO_HAND_REQUIRED",
+      "verification_status": "VIOLATED",
+      "source_output_path": "E27-I01/G3_I-M5_twohand_bypass.txt",
+      "source_sha256": "00e2d6d5a35789a79bc83bb5f0890d1c85df7e10ae779c3d80b2e2c103bc5e47",
+      "witness_path": "runs/E27-I01/I-M5.json"
+    },
+    {
+      "case_id": "E27-I01",
+      "mutant_id": "I-M5",
+      "property_set": "E27-I01",
+      "property_id": "P_I5_RESET_REQUIRED",
+      "verification_status": "SATISFIED",
+      "source_output_path": "E27-I01/G3_I-M5_twohand_bypass.txt",
+      "source_sha256": "00e2d6d5a35789a79bc83bb5f0890d1c85df7e10ae779c3d80b2e2c103bc5e47",
+      "witness_path": "runs/E27-I01/I-M5.json"
+    },
+    {
+      "case_id": "E27-I01",
+      "mutant_id": "I-M6",
+      "property_set": "E27-I01",
+      "property_id": "P_I1_GUARD_OFF",
+      "verification_status": "SATISFIED",
+      "source_output_path": "E27-I01/G3_I-M6_fault_memory_removal.txt",
+      "source_sha256": "df9ca2fb9c06a396bb1e03213b4e30ff20a540563ee3ee673ad89c53cbdd844a",
+      "witness_path": "runs/E27-I01/I-M6.json"
+    },
+    {
+      "case_id": "E27-I01",
+      "mutant_id": "I-M6",
+      "property_set": "E27-I01",
+      "property_id": "P_I2_ESTOP_OFF",
+      "verification_status": "SATISFIED",
+      "source_output_path": "E27-I01/G3_I-M6_fault_memory_removal.txt",
+      "source_sha256": "df9ca2fb9c06a396bb1e03213b4e30ff20a540563ee3ee673ad89c53cbdd844a",
+      "witness_path": "runs/E27-I01/I-M6.json"
+    },
+    {
+      "case_id": "E27-I01",
+      "mutant_id": "I-M6",
+      "property_set": "E27-I01",
+      "property_id": "P_I3_FAULT_OFF",
+      "verification_status": "SATISFIED",
+      "source_output_path": "E27-I01/G3_I-M6_fault_memory_removal.txt",
+      "source_sha256": "df9ca2fb9c06a396bb1e03213b4e30ff20a540563ee3ee673ad89c53cbdd844a",
+      "witness_path": "runs/E27-I01/I-M6.json"
+    },
+    {
+      "case_id": "E27-I01",
+      "mutant_id": "I-M6",
+      "property_set": "E27-I01",
+      "property_id": "P_I4_TWO_HAND_REQUIRED",
+      "verification_status": "SATISFIED",
+      "source_output_path": "E27-I01/G3_I-M6_fault_memory_removal.txt",
+      "source_sha256": "df9ca2fb9c06a396bb1e03213b4e30ff20a540563ee3ee673ad89c53cbdd844a",
+      "witness_path": "runs/E27-I01/I-M6.json"
+    },
+    {
+      "case_id": "E27-I01",
+      "mutant_id": "I-M6",
+      "property_set": "E27-I01",
+      "property_id": "P_I5_RESET_REQUIRED",
+      "verification_status": "VIOLATED",
+      "source_output_path": "E27-I01/G3_I-M6_fault_memory_removal.txt",
+      "source_sha256": "df9ca2fb9c06a396bb1e03213b4e30ff20a540563ee3ee673ad89c53cbdd844a",
+      "witness_path": "runs/E27-I01/I-M6.json"
+    },
+    {
+      "case_id": "E27-B01",
+      "mutant_id": "reference",
+      "property_set": "E27-B01",
+      "property_id": "P_B5_RESET_REQUIRED",
+      "verification_status": "SATISFIED",
+      "source_output_path": "E27-B01/G3_reference.txt",
+      "source_sha256": "48319dc274fb3bad0f6ab0a82977e0893005c6daa7a46fd9a6ed168a9b647ea0",
+      "witness_path": "runs/E27-B01/reference.json"
+    },
+    {
+      "case_id": "E27-B01",
+      "mutant_id": "reference",
+      "property_set": "E27-B01",
+      "property_id": "P_B1_ESTOP_OFF",
+      "verification_status": "SATISFIED",
+      "source_output_path": "E27-B01/G3_reference.txt",
+      "source_sha256": "48319dc274fb3bad0f6ab0a82977e0893005c6daa7a46fd9a6ed168a9b647ea0",
+      "witness_path": "runs/E27-B01/reference.json"
+    },
+    {
+      "case_id": "E27-B01",
+      "mutant_id": "reference",
+      "property_set": "E27-B01",
+      "property_id": "P_B2_ABORT_OFF",
+      "verification_status": "SATISFIED",
+      "source_output_path": "E27-B01/G3_reference.txt",
+      "source_sha256": "48319dc274fb3bad0f6ab0a82977e0893005c6daa7a46fd9a6ed168a9b647ea0",
+      "witness_path": "runs/E27-B01/reference.json"
+    },
+    {
+      "case_id": "E27-B01",
+      "mutant_id": "reference",
+      "property_set": "E27-B01",
+      "property_id": "P_B3_FILL_DRAIN_MUTEX",
+      "verification_status": "SATISFIED",
+      "source_output_path": "E27-B01/G3_reference.txt",
+      "source_sha256": "48319dc274fb3bad0f6ab0a82977e0893005c6daa7a46fd9a6ed168a9b647ea0",
+      "witness_path": "runs/E27-B01/reference.json"
+    },
+    {
+      "case_id": "E27-B01",
+      "mutant_id": "reference",
+      "property_set": "E27-B01",
+      "property_id": "P_B4_MIXER_STATE",
+      "verification_status": "SATISFIED",
+      "source_output_path": "E27-B01/G3_reference.txt",
+      "source_sha256": "48319dc274fb3bad0f6ab0a82977e0893005c6daa7a46fd9a6ed168a9b647ea0",
+      "witness_path": "runs/E27-B01/reference.json"
+    },
+    {
+      "case_id": "E27-B01",
+      "mutant_id": "B-M1",
+      "property_set": "E27-B01",
+      "property_id": "P_B5_RESET_REQUIRED",
+      "verification_status": "SATISFIED",
+      "source_output_path": "E27-B01/G3_B-M1_estop_bypass.txt",
+      "source_sha256": "3fa3f40a5275f5aca8c84f9b35fe6e010709621a8d9fba08d13fe22a6f3cb947",
+      "witness_path": "runs/E27-B01/B-M1.json"
+    },
+    {
+      "case_id": "E27-B01",
+      "mutant_id": "B-M1",
+      "property_set": "E27-B01",
+      "property_id": "P_B2_ABORT_OFF",
+      "verification_status": "SATISFIED",
+      "source_output_path": "E27-B01/G3_B-M1_estop_bypass.txt",
+      "source_sha256": "3fa3f40a5275f5aca8c84f9b35fe6e010709621a8d9fba08d13fe22a6f3cb947",
+      "witness_path": "runs/E27-B01/B-M1.json"
+    },
+    {
+      "case_id": "E27-B01",
+      "mutant_id": "B-M1",
+      "property_set": "E27-B01",
+      "property_id": "P_B3_FILL_DRAIN_MUTEX",
+      "verification_status": "SATISFIED",
+      "source_output_path": "E27-B01/G3_B-M1_estop_bypass.txt",
+      "source_sha256": "3fa3f40a5275f5aca8c84f9b35fe6e010709621a8d9fba08d13fe22a6f3cb947",
+      "witness_path": "runs/E27-B01/B-M1.json"
+    },
+    {
+      "case_id": "E27-B01",
+      "mutant_id": "B-M1",
+      "property_set": "E27-B01",
+      "property_id": "P_B4_MIXER_STATE",
+      "verification_status": "SATISFIED",
+      "source_output_path": "E27-B01/G3_B-M1_estop_bypass.txt",
+      "source_sha256": "3fa3f40a5275f5aca8c84f9b35fe6e010709621a8d9fba08d13fe22a6f3cb947",
+      "witness_path": "runs/E27-B01/B-M1.json"
+    },
+    {
+      "case_id": "E27-B01",
+      "mutant_id": "B-M1",
+      "property_set": "E27-B01",
+      "property_id": "P_B1_ESTOP_OFF",
+      "verification_status": "VIOLATED",
+      "source_output_path": "E27-B01/G3_B-M1_estop_bypass.txt",
+      "source_sha256": "3fa3f40a5275f5aca8c84f9b35fe6e010709621a8d9fba08d13fe22a6f3cb947",
+      "witness_path": "runs/E27-B01/B-M1.json"
+    },
+    {
+      "case_id": "E27-B01",
+      "mutant_id": "B-M2",
+      "property_set": "E27-B01",
+      "property_id": "P_B5_RESET_REQUIRED",
+      "verification_status": "SATISFIED",
+      "source_output_path": "E27-B01/G3_B-M2_abort_bypass.txt",
+      "source_sha256": "92aa0c0254715000a11756c03638033192d39b3fa9f9a7ce400b0770bd0dc085",
+      "witness_path": "runs/E27-B01/B-M2.json"
+    },
+    {
+      "case_id": "E27-B01",
+      "mutant_id": "B-M2",
+      "property_set": "E27-B01",
+      "property_id": "P_B1_ESTOP_OFF",
+      "verification_status": "SATISFIED",
+      "source_output_path": "E27-B01/G3_B-M2_abort_bypass.txt",
+      "source_sha256": "92aa0c0254715000a11756c03638033192d39b3fa9f9a7ce400b0770bd0dc085",
+      "witness_path": "runs/E27-B01/B-M2.json"
+    },
+    {
+      "case_id": "E27-B01",
+      "mutant_id": "B-M2",
+      "property_set": "E27-B01",
+      "property_id": "P_B3_FILL_DRAIN_MUTEX",
+      "verification_status": "SATISFIED",
+      "source_output_path": "E27-B01/G3_B-M2_abort_bypass.txt",
+      "source_sha256": "92aa0c0254715000a11756c03638033192d39b3fa9f9a7ce400b0770bd0dc085",
+      "witness_path": "runs/E27-B01/B-M2.json"
+    },
+    {
+      "case_id": "E27-B01",
+      "mutant_id": "B-M2",
+      "property_set": "E27-B01",
+      "property_id": "P_B4_MIXER_STATE",
+      "verification_status": "SATISFIED",
+      "source_output_path": "E27-B01/G3_B-M2_abort_bypass.txt",
+      "source_sha256": "92aa0c0254715000a11756c03638033192d39b3fa9f9a7ce400b0770bd0dc085",
+      "witness_path": "runs/E27-B01/B-M2.json"
+    },
+    {
+      "case_id": "E27-B01",
+      "mutant_id": "B-M2",
+      "property_set": "E27-B01",
+      "property_id": "P_B2_ABORT_OFF",
+      "verification_status": "VIOLATED",
+      "source_output_path": "E27-B01/G3_B-M2_abort_bypass.txt",
+      "source_sha256": "92aa0c0254715000a11756c03638033192d39b3fa9f9a7ce400b0770bd0dc085",
+      "witness_path": "runs/E27-B01/B-M2.json"
+    },
+    {
+      "case_id": "E27-B01",
+      "mutant_id": "B-M3",
+      "property_set": "E27-B01",
+      "property_id": "P_B5_RESET_REQUIRED",
+      "verification_status": "VIOLATED",
+      "source_output_path": "E27-B01/G3_B-M3_reset_bypass.txt",
+      "source_sha256": "dc4393c9347b0fc03bd960909ad5b27475119eaefc22213e3172a0e59324a09c",
+      "witness_path": "runs/E27-B01/B-M3.json"
+    },
+    {
+      "case_id": "E27-B01",
+      "mutant_id": "B-M3",
+      "property_set": "E27-B01",
+      "property_id": "P_B1_ESTOP_OFF",
+      "verification_status": "SATISFIED",
+      "source_output_path": "E27-B01/G3_B-M3_reset_bypass.txt",
+      "source_sha256": "dc4393c9347b0fc03bd960909ad5b27475119eaefc22213e3172a0e59324a09c",
+      "witness_path": "runs/E27-B01/B-M3.json"
+    },
+    {
+      "case_id": "E27-B01",
+      "mutant_id": "B-M3",
+      "property_set": "E27-B01",
+      "property_id": "P_B2_ABORT_OFF",
+      "verification_status": "SATISFIED",
+      "source_output_path": "E27-B01/G3_B-M3_reset_bypass.txt",
+      "source_sha256": "dc4393c9347b0fc03bd960909ad5b27475119eaefc22213e3172a0e59324a09c",
+      "witness_path": "runs/E27-B01/B-M3.json"
+    },
+    {
+      "case_id": "E27-B01",
+      "mutant_id": "B-M3",
+      "property_set": "E27-B01",
+      "property_id": "P_B3_FILL_DRAIN_MUTEX",
+      "verification_status": "SATISFIED",
+      "source_output_path": "E27-B01/G3_B-M3_reset_bypass.txt",
+      "source_sha256": "dc4393c9347b0fc03bd960909ad5b27475119eaefc22213e3172a0e59324a09c",
+      "witness_path": "runs/E27-B01/B-M3.json"
+    },
+    {
+      "case_id": "E27-B01",
+      "mutant_id": "B-M3",
+      "property_set": "E27-B01",
+      "property_id": "P_B4_MIXER_STATE",
+      "verification_status": "SATISFIED",
+      "source_output_path": "E27-B01/G3_B-M3_reset_bypass.txt",
+      "source_sha256": "dc4393c9347b0fc03bd960909ad5b27475119eaefc22213e3172a0e59324a09c",
+      "witness_path": "runs/E27-B01/B-M3.json"
+    },
+    {
+      "case_id": "E27-B01",
+      "mutant_id": "B-M4",
+      "property_set": "E27-B01",
+      "property_id": "P_B5_RESET_REQUIRED",
+      "verification_status": "SATISFIED",
+      "source_output_path": "E27-B01/G3_B-M4_fill_drain_conflict.txt",
+      "source_sha256": "1e47e1b82494e40681b530b96ac674538b9a3f15b3a4399b46a52b90c4c64bb1",
+      "witness_path": "runs/E27-B01/B-M4.json"
+    },
+    {
+      "case_id": "E27-B01",
+      "mutant_id": "B-M4",
+      "property_set": "E27-B01",
+      "property_id": "P_B1_ESTOP_OFF",
+      "verification_status": "SATISFIED",
+      "source_output_path": "E27-B01/G3_B-M4_fill_drain_conflict.txt",
+      "source_sha256": "1e47e1b82494e40681b530b96ac674538b9a3f15b3a4399b46a52b90c4c64bb1",
+      "witness_path": "runs/E27-B01/B-M4.json"
+    },
+    {
+      "case_id": "E27-B01",
+      "mutant_id": "B-M4",
+      "property_set": "E27-B01",
+      "property_id": "P_B2_ABORT_OFF",
+      "verification_status": "SATISFIED",
+      "source_output_path": "E27-B01/G3_B-M4_fill_drain_conflict.txt",
+      "source_sha256": "1e47e1b82494e40681b530b96ac674538b9a3f15b3a4399b46a52b90c4c64bb1",
+      "witness_path": "runs/E27-B01/B-M4.json"
+    },
+    {
+      "case_id": "E27-B01",
+      "mutant_id": "B-M4",
+      "property_set": "E27-B01",
+      "property_id": "P_B3_FILL_DRAIN_MUTEX",
+      "verification_status": "VIOLATED",
+      "source_output_path": "E27-B01/G3_B-M4_fill_drain_conflict.txt",
+      "source_sha256": "1e47e1b82494e40681b530b96ac674538b9a3f15b3a4399b46a52b90c4c64bb1",
+      "witness_path": "runs/E27-B01/B-M4.json"
+    },
+    {
+      "case_id": "E27-B01",
+      "mutant_id": "B-M4",
+      "property_set": "E27-B01",
+      "property_id": "P_B4_MIXER_STATE",
+      "verification_status": "SATISFIED",
+      "source_output_path": "E27-B01/G3_B-M4_fill_drain_conflict.txt",
+      "source_sha256": "1e47e1b82494e40681b530b96ac674538b9a3f15b3a4399b46a52b90c4c64bb1",
+      "witness_path": "runs/E27-B01/B-M4.json"
+    },
+    {
+      "case_id": "E27-B01",
+      "mutant_id": "B-M5",
+      "property_set": "E27-B01",
+      "property_id": "P_B5_RESET_REQUIRED",
+      "verification_status": "SATISFIED",
+      "source_output_path": "E27-B01/G3_B-M5_mixer_state_bypass.txt",
+      "source_sha256": "0364813afb49b0fc29ffa4308cc692c2f543612ef4213ff06d55e8b2163ae33c",
+      "witness_path": "runs/E27-B01/B-M5.json"
+    },
+    {
+      "case_id": "E27-B01",
+      "mutant_id": "B-M5",
+      "property_set": "E27-B01",
+      "property_id": "P_B1_ESTOP_OFF",
+      "verification_status": "SATISFIED",
+      "source_output_path": "E27-B01/G3_B-M5_mixer_state_bypass.txt",
+      "source_sha256": "0364813afb49b0fc29ffa4308cc692c2f543612ef4213ff06d55e8b2163ae33c",
+      "witness_path": "runs/E27-B01/B-M5.json"
+    },
+    {
+      "case_id": "E27-B01",
+      "mutant_id": "B-M5",
+      "property_set": "E27-B01",
+      "property_id": "P_B2_ABORT_OFF",
+      "verification_status": "SATISFIED",
+      "source_output_path": "E27-B01/G3_B-M5_mixer_state_bypass.txt",
+      "source_sha256": "0364813afb49b0fc29ffa4308cc692c2f543612ef4213ff06d55e8b2163ae33c",
+      "witness_path": "runs/E27-B01/B-M5.json"
+    },
+    {
+      "case_id": "E27-B01",
+      "mutant_id": "B-M5",
+      "property_set": "E27-B01",
+      "property_id": "P_B3_FILL_DRAIN_MUTEX",
+      "verification_status": "SATISFIED",
+      "source_output_path": "E27-B01/G3_B-M5_mixer_state_bypass.txt",
+      "source_sha256": "0364813afb49b0fc29ffa4308cc692c2f543612ef4213ff06d55e8b2163ae33c",
+      "witness_path": "runs/E27-B01/B-M5.json"
+    },
+    {
+      "case_id": "E27-B01",
+      "mutant_id": "B-M5",
+      "property_set": "E27-B01",
+      "property_id": "P_B4_MIXER_STATE",
+      "verification_status": "VIOLATED",
+      "source_output_path": "E27-B01/G3_B-M5_mixer_state_bypass.txt",
+      "source_sha256": "0364813afb49b0fc29ffa4308cc692c2f543612ef4213ff06d55e8b2163ae33c",
+      "witness_path": "runs/E27-B01/B-M5.json"
+    },
+    {
+      "case_id": "E27-B01",
+      "mutant_id": "B-M6",
+      "property_set": "E27-B01",
+      "property_id": "P_B5_RESET_REQUIRED",
+      "verification_status": "VIOLATED",
+      "source_output_path": "E27-B01/G3_B-M6_fault_memory_removal.txt",
+      "source_sha256": "9c7eeba81f5d758452c9cc0fa7527ec92641c141943bf5bed01bfedf8faf2514",
+      "witness_path": "runs/E27-B01/B-M6.json"
+    },
+    {
+      "case_id": "E27-B01",
+      "mutant_id": "B-M6",
+      "property_set": "E27-B01",
+      "property_id": "P_B1_ESTOP_OFF",
+      "verification_status": "SATISFIED",
+      "source_output_path": "E27-B01/G3_B-M6_fault_memory_removal.txt",
+      "source_sha256": "9c7eeba81f5d758452c9cc0fa7527ec92641c141943bf5bed01bfedf8faf2514",
+      "witness_path": "runs/E27-B01/B-M6.json"
+    },
+    {
+      "case_id": "E27-B01",
+      "mutant_id": "B-M6",
+      "property_set": "E27-B01",
+      "property_id": "P_B2_ABORT_OFF",
+      "verification_status": "SATISFIED",
+      "source_output_path": "E27-B01/G3_B-M6_fault_memory_removal.txt",
+      "source_sha256": "9c7eeba81f5d758452c9cc0fa7527ec92641c141943bf5bed01bfedf8faf2514",
+      "witness_path": "runs/E27-B01/B-M6.json"
+    },
+    {
+      "case_id": "E27-B01",
+      "mutant_id": "B-M6",
+      "property_set": "E27-B01",
+      "property_id": "P_B3_FILL_DRAIN_MUTEX",
+      "verification_status": "SATISFIED",
+      "source_output_path": "E27-B01/G3_B-M6_fault_memory_removal.txt",
+      "source_sha256": "9c7eeba81f5d758452c9cc0fa7527ec92641c141943bf5bed01bfedf8faf2514",
+      "witness_path": "runs/E27-B01/B-M6.json"
+    },
+    {
+      "case_id": "E27-B01",
+      "mutant_id": "B-M6",
+      "property_set": "E27-B01",
+      "property_id": "P_B4_MIXER_STATE",
+      "verification_status": "SATISFIED",
+      "source_output_path": "E27-B01/G3_B-M6_fault_memory_removal.txt",
+      "source_sha256": "9c7eeba81f5d758452c9cc0fa7527ec92641c141943bf5bed01bfedf8faf2514",
+      "witness_path": "runs/E27-B01/B-M6.json"
+    }
+  ]
+}

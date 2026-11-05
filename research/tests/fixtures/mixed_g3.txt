@@ -1,0 +1,16 @@
+*** This is nuXmv 2.2.0 (compiled on Fri May 29 11:00:56 2026)
+-- specification  G (!E_Stop -> !Machine_Enable_After_Scan)  is false
+-- as demonstrated by the following execution sequence
+Trace Description: LTL Counterexample
+Trace Type: Counterexample
+  -> State: 1.1 <-
+    E_Stop = TRUE
+    Machine_Enable_After_Scan = FALSE
+    Fault_Latched = FALSE
+    Step_State = 0
+  -> State: 1.2 <-
+    E_Stop = FALSE
+    Machine_Enable_After_Scan = TRUE
+  -- Loop starts here
+  -> State: 1.3 <-
+-- specification  G (Fault_Latched -> !Machine_Enable_After_Scan)  is true

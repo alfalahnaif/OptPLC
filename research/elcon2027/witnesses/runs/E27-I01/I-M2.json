@@ -1,0 +1,448 @@
+[
+  {
+    "case_id": "E27-I01",
+    "mutant_id": "I-M2",
+    "property_id": "P_I1_GUARD_OFF",
+    "specification": "G (!Guard_Closed -> !Machine_Enable_After_Scan)",
+    "verification_status": "VIOLATED",
+    "steps": [
+      {
+        "index": 0,
+        "nuxmv_state": "1.1",
+        "inputs": {
+          "Guard_Closed": false,
+          "E_Stop": false,
+          "Reset_PB": false,
+          "Fault_Input": false,
+          "TwoHand_Left": false,
+          "TwoHand_Right": false
+        },
+        "outputs": {
+          "Machine_Enable_After_Scan": false
+        },
+        "state": {
+          "Fault_Latched": true,
+          "Safety_Permissive_After_Scan": false,
+          "Fault_After_Scan": true,
+          "Reset_Guard": false,
+          "Trip_Cond": true,
+          "Safety_Healthy": false
+        },
+        "changed_variables": [],
+        "observed_variables": [
+          "Guard_Closed",
+          "E_Stop",
+          "Reset_PB",
+          "Fault_Input",
+          "TwoHand_Left",
+          "TwoHand_Right",
+          "Fault_Latched",
+          "Machine_Enable_After_Scan",
+          "Safety_Permissive_After_Scan",
+          "Fault_After_Scan",
+          "Reset_Guard",
+          "Trip_Cond",
+          "Safety_Healthy"
+        ],
+        "carried_variables": [],
+        "loop_start": false
+      },
+      {
+        "index": 1,
+        "nuxmv_state": "1.2",
+        "inputs": {
+          "Guard_Closed": false,
+          "E_Stop": true,
+          "Reset_PB": true,
+          "Fault_Input": false,
+          "TwoHand_Left": false,
+          "TwoHand_Right": false
+        },
+        "outputs": {
+          "Machine_Enable_After_Scan": false
+        },
+        "state": {
+          "Fault_Latched": true,
+          "Safety_Permissive_After_Scan": true,
+          "Fault_After_Scan": false,
+          "Reset_Guard": true,
+          "Trip_Cond": false,
+          "Safety_Healthy": false
+        },
+        "changed_variables": [
+          "E_Stop",
+          "Reset_PB",
+          "Safety_Permissive_After_Scan",
+          "Fault_After_Scan",
+          "Reset_Guard",
+          "Trip_Cond"
+        ],
+        "observed_variables": [
+          "E_Stop",
+          "Reset_PB",
+          "Safety_Permissive_After_Scan",
+          "Fault_After_Scan",
+          "Reset_Guard",
+          "Trip_Cond"
+        ],
+        "carried_variables": [
+          "Guard_Closed",
+          "Fault_Input",
+          "TwoHand_Left",
+          "TwoHand_Right",
+          "Fault_Latched",
+          "Machine_Enable_After_Scan",
+          "Safety_Healthy"
+        ],
+        "loop_start": false
+      },
+      {
+        "index": 2,
+        "nuxmv_state": "1.3",
+        "inputs": {
+          "Guard_Closed": false,
+          "E_Stop": true,
+          "Reset_PB": false,
+          "Fault_Input": false,
+          "TwoHand_Left": true,
+          "TwoHand_Right": true
+        },
+        "outputs": {
+          "Machine_Enable_After_Scan": true
+        },
+        "state": {
+          "Fault_Latched": false,
+          "Safety_Permissive_After_Scan": true,
+          "Fault_After_Scan": false,
+          "Reset_Guard": false,
+          "Trip_Cond": false,
+          "Safety_Healthy": false
+        },
+        "changed_variables": [
+          "Reset_PB",
+          "TwoHand_Left",
+          "TwoHand_Right",
+          "Fault_Latched",
+          "Machine_Enable_After_Scan",
+          "Reset_Guard"
+        ],
+        "observed_variables": [
+          "Reset_PB",
+          "TwoHand_Left",
+          "TwoHand_Right",
+          "Fault_Latched",
+          "Machine_Enable_After_Scan",
+          "Reset_Guard"
+        ],
+        "carried_variables": [
+          "Guard_Closed",
+          "E_Stop",
+          "Fault_Input",
+          "Safety_Permissive_After_Scan",
+          "Fault_After_Scan",
+          "Trip_Cond",
+          "Safety_Healthy"
+        ],
+        "loop_start": false
+      },
+      {
+        "index": 3,
+        "nuxmv_state": "1.4",
+        "inputs": {
+          "Guard_Closed": true,
+          "E_Stop": false,
+          "Reset_PB": false,
+          "Fault_Input": false,
+          "TwoHand_Left": false,
+          "TwoHand_Right": false
+        },
+        "outputs": {
+          "Machine_Enable_After_Scan": false
+        },
+        "state": {
+          "Fault_Latched": false,
+          "Safety_Permissive_After_Scan": false,
+          "Fault_After_Scan": true,
+          "Reset_Guard": false,
+          "Trip_Cond": true,
+          "Safety_Healthy": false
+        },
+        "changed_variables": [
+          "Guard_Closed",
+          "E_Stop",
+          "TwoHand_Left",
+          "TwoHand_Right",
+          "Machine_Enable_After_Scan",
+          "Safety_Permissive_After_Scan",
+          "Fault_After_Scan",
+          "Trip_Cond"
+        ],
+        "observed_variables": [
+          "Guard_Closed",
+          "E_Stop",
+          "TwoHand_Left",
+          "TwoHand_Right",
+          "Machine_Enable_After_Scan",
+          "Safety_Permissive_After_Scan",
+          "Fault_After_Scan",
+          "Trip_Cond"
+        ],
+        "carried_variables": [
+          "Reset_PB",
+          "Fault_Input",
+          "Fault_Latched",
+          "Reset_Guard",
+          "Safety_Healthy"
+        ],
+        "loop_start": true
+      },
+      {
+        "index": 4,
+        "nuxmv_state": "1.5",
+        "inputs": {
+          "Guard_Closed": false,
+          "E_Stop": true,
+          "Reset_PB": true,
+          "Fault_Input": false,
+          "TwoHand_Left": false,
+          "TwoHand_Right": false
+        },
+        "outputs": {
+          "Machine_Enable_After_Scan": false
+        },
+        "state": {
+          "Fault_Latched": true,
+          "Safety_Permissive_After_Scan": true,
+          "Fault_After_Scan": false,
+          "Reset_Guard": true,
+          "Trip_Cond": false,
+          "Safety_Healthy": false
+        },
+        "changed_variables": [
+          "Guard_Closed",
+          "E_Stop",
+          "Reset_PB",
+          "Fault_Latched",
+          "Safety_Permissive_After_Scan",
+          "Fault_After_Scan",
+          "Reset_Guard",
+          "Trip_Cond"
+        ],
+        "observed_variables": [
+          "Guard_Closed",
+          "E_Stop",
+          "Reset_PB",
+          "Fault_Latched",
+          "Safety_Permissive_After_Scan",
+          "Fault_After_Scan",
+          "Reset_Guard",
+          "Trip_Cond"
+        ],
+        "carried_variables": [
+          "Fault_Input",
+          "TwoHand_Left",
+          "TwoHand_Right",
+          "Machine_Enable_After_Scan",
+          "Safety_Healthy"
+        ],
+        "loop_start": false
+      },
+      {
+        "index": 5,
+        "nuxmv_state": "1.6",
+        "inputs": {
+          "Guard_Closed": true,
+          "E_Stop": false,
+          "Reset_PB": false,
+          "Fault_Input": false,
+          "TwoHand_Left": false,
+          "TwoHand_Right": false
+        },
+        "outputs": {
+          "Machine_Enable_After_Scan": false
+        },
+        "state": {
+          "Fault_Latched": false,
+          "Safety_Permissive_After_Scan": false,
+          "Fault_After_Scan": true,
+          "Reset_Guard": false,
+          "Trip_Cond": true,
+          "Safety_Healthy": false
+        },
+        "changed_variables": [
+          "Guard_Closed",
+          "E_Stop",
+          "Reset_PB",
+          "Fault_Latched",
+          "Safety_Permissive_After_Scan",
+          "Fault_After_Scan",
+          "Reset_Guard",
+          "Trip_Cond"
+        ],
+        "observed_variables": [
+          "Guard_Closed",
+          "E_Stop",
+          "Reset_PB",
+          "Fault_Latched",
+          "Safety_Permissive_After_Scan",
+          "Fault_After_Scan",
+          "Reset_Guard",
+          "Trip_Cond"
+        ],
+        "carried_variables": [
+          "Fault_Input",
+          "TwoHand_Left",
+          "TwoHand_Right",
+          "Machine_Enable_After_Scan",
+          "Safety_Healthy"
+        ],
+        "loop_start": false
+      }
+    ],
+    "transitions": [
+      {
+        "from_index": 0,
+        "to_index": 1,
+        "changed_variables": [
+          "E_Stop",
+          "Reset_PB",
+          "Safety_Permissive_After_Scan",
+          "Fault_After_Scan",
+          "Reset_Guard",
+          "Trip_Cond"
+        ],
+        "loop_back": false
+      },
+      {
+        "from_index": 1,
+        "to_index": 2,
+        "changed_variables": [
+          "Reset_PB",
+          "TwoHand_Left",
+          "TwoHand_Right",
+          "Fault_Latched",
+          "Machine_Enable_After_Scan",
+          "Reset_Guard"
+        ],
+        "loop_back": false
+      },
+      {
+        "from_index": 2,
+        "to_index": 3,
+        "changed_variables": [
+          "Guard_Closed",
+          "E_Stop",
+          "TwoHand_Left",
+          "TwoHand_Right",
+          "Machine_Enable_After_Scan",
+          "Safety_Permissive_After_Scan",
+          "Fault_After_Scan",
+          "Trip_Cond"
+        ],
+        "loop_back": false
+      },
+      {
+        "from_index": 3,
+        "to_index": 4,
+        "changed_variables": [
+          "Guard_Closed",
+          "E_Stop",
+          "Reset_PB",
+          "Fault_Latched",
+          "Safety_Permissive_After_Scan",
+          "Fault_After_Scan",
+          "Reset_Guard",
+          "Trip_Cond"
+        ],
+        "loop_back": false
+      },
+      {
+        "from_index": 4,
+        "to_index": 5,
+        "changed_variables": [
+          "Guard_Closed",
+          "E_Stop",
+          "Reset_PB",
+          "Fault_Latched",
+          "Safety_Permissive_After_Scan",
+          "Fault_After_Scan",
+          "Reset_Guard",
+          "Trip_Cond"
+        ],
+        "loop_back": false
+      },
+      {
+        "from_index": 5,
+        "to_index": 3,
+        "changed_variables": [],
+        "loop_back": true
+      }
+    ],
+    "tool": "nuXmv",
+    "tool_version": "2.2.0",
+    "source_output_path": "E27-I01/G3_I-M2_guard_polarity.txt",
+    "source_encoding": "utf-16",
+    "source_sha256": "be441bd2a7a681174748ebd8eaf5099c41fdef9bd4c85ca9a74651361bfe7f0b",
+    "raw_source": "*** This is nuXmv 2.2.0 (compiled on Fri May 29 11:00:56 2026)\r\n*** Copyright (c) 2014-2026, Fondazione Bruno Kessler\r\n*** For more information on nuXmv see https://nuxmv.fbk.eu\r\n*** or email to <nuxmv@fbk.eu>.\r\n*** Please report bugs at Please report bugs to <nusmv-users@fbk.eu>\r\n*** (click on \"Login Anonymously\" to access)\r\n*** Alternatively write to <nuxmv@fbk.eu>.\r\n\r\n*** This version of nuXmv is linked to NuSMV 2.7.0.\r\n*** For more information on NuSMV see <http://nusmv.fbk.eu>\r\n*** or email to <nusmv-users@fbk.eu>.\r\n*** Copyright (C) 2010-2026, Fondazione Bruno Kessler\r\n\r\n*** This version of nuXmv is linked to the CUDD library version 2.4.1\r\n*** Copyright (c) 1995-2004, Regents of the University of Colorado\r\n\r\n*** This version of nuXmv is linked to the MiniSat SAT solver. \r\n*** See http://minisat.se/MiniSat.html\r\n*** Copyright (c) 2003-2006, Niklas Een, Niklas Sorensson\r\n*** Copyright (c) 2007-2010, Niklas Sorensson\r\n\r\n*** This version of nuXmv is linked to MathSAT\r\n*** Copyright (C) 2009-2019 by Fondazione Bruno Kessler\r\n*** Copyright (C) 2009-2019 by University of Trento and others\r\n*** See http://mathsat.fbk.eu\r\n\r\n-- specification  G (!Guard_Closed -> !Machine_Enable_After_Scan)  is false\r\n-- as demonstrated by the following execution sequence\r\nTrace Description: LTL Counterexample \r\nTrace Type: Counterexample \r\n  -> State: 1.1 <-\r\n    Guard_Closed = FALSE\r\n    E_Stop = FALSE\r\n    Reset_PB = FALSE\r\n    Fault_Input = FALSE\r\n    TwoHand_Left = FALSE\r\n    TwoHand_Right = FALSE\r\n    Fault_Latched = TRUE\r\n    Machine_Enable_After_Scan = FALSE\r\n    Safety_Permissive_After_Scan = FALSE\r\n    Fault_After_Scan = TRUE\r\n    Reset_Guard = FALSE\r\n    Trip_Cond = TRUE\r\n    Safety_Healthy = FALSE\r\n  -> State: 1.2 <-\r\n    E_Stop = TRUE\r\n    Reset_PB = TRUE\r\n    Safety_Permissive_After_Scan = TRUE\r\n    Fault_After_Scan = FALSE\r\n    Reset_Guard = TRUE\r\n    Trip_Cond = FALSE\r\n  -> State: 1.3 <-\r\n    Reset_PB = FALSE\r\n    TwoHand_Left = TRUE\r\n    TwoHand_Right = TRUE\r\n    Fault_Latched = FALSE\r\n    Machine_Enable_After_Scan = TRUE\r\n    Reset_Guard = FALSE\r\n  -- Loop starts here\r\n  -> State: 1.4 <-\r\n    Guard_Closed = TRUE\r\n    E_Stop = FALSE\r\n    TwoHand_Left = FALSE\r\n    TwoHand_Right = FALSE\r\n    Machine_Enable_After_Scan = FALSE\r\n    Safety_Permissive_After_Scan = FALSE\r\n    Fault_After_Scan = TRUE\r\n    Trip_Cond = TRUE\r\n  -> State: 1.5 <-\r\n    Guard_Closed = FALSE\r\n    E_Stop = TRUE\r\n    Reset_PB = TRUE\r\n    Fault_Latched = TRUE\r\n    Safety_Permissive_After_Scan = TRUE\r\n    Fault_After_Scan = FALSE\r\n    Reset_Guard = TRUE\r\n    Trip_Cond = FALSE\r\n  -> State: 1.6 <-\r\n    Guard_Closed = TRUE\r\n    E_Stop = FALSE\r\n    Reset_PB = FALSE\r\n    Fault_Latched = FALSE\r\n    Safety_Permissive_After_Scan = FALSE\r\n    Fault_After_Scan = TRUE\r\n    Reset_Guard = FALSE\r\n    Trip_Cond = TRUE\r\n-- specification  G (!E_Stop -> !Machine_Enable_After_Scan)  is true\r\n-- specification  G (Fault_Input -> !Machine_Enable_After_Scan)  is true\r\n-- specification  G (!(TwoHand_Left & TwoHand_Right) -> !Machine_Enable_After_Scan)  is true\r\n-- specification  G (((Fault_Latched & Safety_Healthy) & !Reset_PB) ->  X Fault_Latched)  is true\r\n"
+  },
+  {
+    "case_id": "E27-I01",
+    "mutant_id": "I-M2",
+    "property_id": "P_I2_ESTOP_OFF",
+    "specification": "G (!E_Stop -> !Machine_Enable_After_Scan)",
+    "verification_status": "SATISFIED",
+    "steps": [],
+    "transitions": [],
+    "tool": "nuXmv",
+    "tool_version": "2.2.0",
+    "source_output_path": "E27-I01/G3_I-M2_guard_polarity.txt",
+    "source_encoding": "utf-16",
+    "source_sha256": "be441bd2a7a681174748ebd8eaf5099c41fdef9bd4c85ca9a74651361bfe7f0b",
+    "raw_source": "*** This is nuXmv 2.2.0 (compiled on Fri May 29 11:00:56 2026)\r\n*** Copyright (c) 2014-2026, Fondazione Bruno Kessler\r\n*** For more information on nuXmv see https://nuxmv.fbk.eu\r\n*** or email to <nuxmv@fbk.eu>.\r\n*** Please report bugs at Please report bugs to <nusmv-users@fbk.eu>\r\n*** (click on \"Login Anonymously\" to access)\r\n*** Alternatively write to <nuxmv@fbk.eu>.\r\n\r\n*** This version of nuXmv is linked to NuSMV 2.7.0.\r\n*** For more information on NuSMV see <http://nusmv.fbk.eu>\r\n*** or email to <nusmv-users@fbk.eu>.\r\n*** Copyright (C) 2010-2026, Fondazione Bruno Kessler\r\n\r\n*** This version of nuXmv is linked to the CUDD library version 2.4.1\r\n*** Copyright (c) 1995-2004, Regents of the University of Colorado\r\n\r\n*** This version of nuXmv is linked to the MiniSat SAT solver. \r\n*** See http://minisat.se/MiniSat.html\r\n*** Copyright (c) 2003-2006, Niklas Een, Niklas Sorensson\r\n*** Copyright (c) 2007-2010, Niklas Sorensson\r\n\r\n*** This version of nuXmv is linked to MathSAT\r\n*** Copyright (C) 2009-2019 by Fondazione Bruno Kessler\r\n*** Copyright (C) 2009-2019 by University of Trento and others\r\n*** See http://mathsat.fbk.eu\r\n\r\n-- specification  G (!Guard_Closed -> !Machine_Enable_After_Scan)  is false\r\n-- as demonstrated by the following execution sequence\r\nTrace Description: LTL Counterexample \r\nTrace Type: Counterexample \r\n  -> State: 1.1 <-\r\n    Guard_Closed = FALSE\r\n    E_Stop = FALSE\r\n    Reset_PB = FALSE\r\n    Fault_Input = FALSE\r\n    TwoHand_Left = FALSE\r\n    TwoHand_Right = FALSE\r\n    Fault_Latched = TRUE\r\n    Machine_Enable_After_Scan = FALSE\r\n    Safety_Permissive_After_Scan = FALSE\r\n    Fault_After_Scan = TRUE\r\n    Reset_Guard = FALSE\r\n    Trip_Cond = TRUE\r\n    Safety_Healthy = FALSE\r\n  -> State: 1.2 <-\r\n    E_Stop = TRUE\r\n    Reset_PB = TRUE\r\n    Safety_Permissive_After_Scan = TRUE\r\n    Fault_After_Scan = FALSE\r\n    Reset_Guard = TRUE\r\n    Trip_Cond = FALSE\r\n  -> State: 1.3 <-\r\n    Reset_PB = FALSE\r\n    TwoHand_Left = TRUE\r\n    TwoHand_Right = TRUE\r\n    Fault_Latched = FALSE\r\n    Machine_Enable_After_Scan = TRUE\r\n    Reset_Guard = FALSE\r\n  -- Loop starts here\r\n  -> State: 1.4 <-\r\n    Guard_Closed = TRUE\r\n    E_Stop = FALSE\r\n    TwoHand_Left = FALSE\r\n    TwoHand_Right = FALSE\r\n    Machine_Enable_After_Scan = FALSE\r\n    Safety_Permissive_After_Scan = FALSE\r\n    Fault_After_Scan = TRUE\r\n    Trip_Cond = TRUE\r\n  -> State: 1.5 <-\r\n    Guard_Closed = FALSE\r\n    E_Stop = TRUE\r\n    Reset_PB = TRUE\r\n    Fault_Latched = TRUE\r\n    Safety_Permissive_After_Scan = TRUE\r\n    Fault_After_Scan = FALSE\r\n    Reset_Guard = TRUE\r\n    Trip_Cond = FALSE\r\n  -> State: 1.6 <-\r\n    Guard_Closed = TRUE\r\n    E_Stop = FALSE\r\n    Reset_PB = FALSE\r\n    Fault_Latched = FALSE\r\n    Safety_Permissive_After_Scan = FALSE\r\n    Fault_After_Scan = TRUE\r\n    Reset_Guard = FALSE\r\n    Trip_Cond = TRUE\r\n-- specification  G (!E_Stop -> !Machine_Enable_After_Scan)  is true\r\n-- specification  G (Fault_Input -> !Machine_Enable_After_Scan)  is true\r\n-- specification  G (!(TwoHand_Left & TwoHand_Right) -> !Machine_Enable_After_Scan)  is true\r\n-- specification  G (((Fault_Latched & Safety_Healthy) & !Reset_PB) ->  X Fault_Latched)  is true\r\n"
+  },
+  {
+    "case_id": "E27-I01",
+    "mutant_id": "I-M2",
+    "property_id": "P_I3_FAULT_OFF",
+    "specification": "G (Fault_Input -> !Machine_Enable_After_Scan)",
+    "verification_status": "SATISFIED",
+    "steps": [],
+    "transitions": [],
+    "tool": "nuXmv",
+    "tool_version": "2.2.0",
+    "source_output_path": "E27-I01/G3_I-M2_guard_polarity.txt",
+    "source_encoding": "utf-16",
+    "source_sha256": "be441bd2a7a681174748ebd8eaf5099c41fdef9bd4c85ca9a74651361bfe7f0b",
+    "raw_source": "*** This is nuXmv 2.2.0 (compiled on Fri May 29 11:00:56 2026)\r\n*** Copyright (c) 2014-2026, Fondazione Bruno Kessler\r\n*** For more information on nuXmv see https://nuxmv.fbk.eu\r\n*** or email to <nuxmv@fbk.eu>.\r\n*** Please report bugs at Please report bugs to <nusmv-users@fbk.eu>\r\n*** (click on \"Login Anonymously\" to access)\r\n*** Alternatively write to <nuxmv@fbk.eu>.\r\n\r\n*** This version of nuXmv is linked to NuSMV 2.7.0.\r\n*** For more information on NuSMV see <http://nusmv.fbk.eu>\r\n*** or email to <nusmv-users@fbk.eu>.\r\n*** Copyright (C) 2010-2026, Fondazione Bruno Kessler\r\n\r\n*** This version of nuXmv is linked to the CUDD library version 2.4.1\r\n*** Copyright (c) 1995-2004, Regents of the University of Colorado\r\n\r\n*** This version of nuXmv is linked to the MiniSat SAT solver. \r\n*** See http://minisat.se/MiniSat.html\r\n*** Copyright (c) 2003-2006, Niklas Een, Niklas Sorensson\r\n*** Copyright (c) 2007-2010, Niklas Sorensson\r\n\r\n*** This version of nuXmv is linked to MathSAT\r\n*** Copyright (C) 2009-2019 by Fondazione Bruno Kessler\r\n*** Copyright (C) 2009-2019 by University of Trento and others\r\n*** See http://mathsat.fbk.eu\r\n\r\n-- specification  G (!Guard_Closed -> !Machine_Enable_After_Scan)  is false\r\n-- as demonstrated by the following execution sequence\r\nTrace Description: LTL Counterexample \r\nTrace Type: Counterexample \r\n  -> State: 1.1 <-\r\n    Guard_Closed = FALSE\r\n    E_Stop = FALSE\r\n    Reset_PB = FALSE\r\n    Fault_Input = FALSE\r\n    TwoHand_Left = FALSE\r\n    TwoHand_Right = FALSE\r\n    Fault_Latched = TRUE\r\n    Machine_Enable_After_Scan = FALSE\r\n    Safety_Permissive_After_Scan = FALSE\r\n    Fault_After_Scan = TRUE\r\n    Reset_Guard = FALSE\r\n    Trip_Cond = TRUE\r\n    Safety_Healthy = FALSE\r\n  -> State: 1.2 <-\r\n    E_Stop = TRUE\r\n    Reset_PB = TRUE\r\n    Safety_Permissive_After_Scan = TRUE\r\n    Fault_After_Scan = FALSE\r\n    Reset_Guard = TRUE\r\n    Trip_Cond = FALSE\r\n  -> State: 1.3 <-\r\n    Reset_PB = FALSE\r\n    TwoHand_Left = TRUE\r\n    TwoHand_Right = TRUE\r\n    Fault_Latched = FALSE\r\n    Machine_Enable_After_Scan = TRUE\r\n    Reset_Guard = FALSE\r\n  -- Loop starts here\r\n  -> State: 1.4 <-\r\n    Guard_Closed = TRUE\r\n    E_Stop = FALSE\r\n    TwoHand_Left = FALSE\r\n    TwoHand_Right = FALSE\r\n    Machine_Enable_After_Scan = FALSE\r\n    Safety_Permissive_After_Scan = FALSE\r\n    Fault_After_Scan = TRUE\r\n    Trip_Cond = TRUE\r\n  -> State: 1.5 <-\r\n    Guard_Closed = FALSE\r\n    E_Stop = TRUE\r\n    Reset_PB = TRUE\r\n    Fault_Latched = TRUE\r\n    Safety_Permissive_After_Scan = TRUE\r\n    Fault_After_Scan = FALSE\r\n    Reset_Guard = TRUE\r\n    Trip_Cond = FALSE\r\n  -> State: 1.6 <-\r\n    Guard_Closed = TRUE\r\n    E_Stop = FALSE\r\n    Reset_PB = FALSE\r\n    Fault_Latched = FALSE\r\n    Safety_Permissive_After_Scan = FALSE\r\n    Fault_After_Scan = TRUE\r\n    Reset_Guard = FALSE\r\n    Trip_Cond = TRUE\r\n-- specification  G (!E_Stop -> !Machine_Enable_After_Scan)  is true\r\n-- specification  G (Fault_Input -> !Machine_Enable_After_Scan)  is true\r\n-- specification  G (!(TwoHand_Left & TwoHand_Right) -> !Machine_Enable_After_Scan)  is true\r\n-- specification  G (((Fault_Latched & Safety_Healthy) & !Reset_PB) ->  X Fault_Latched)  is true\r\n"
+  },
+  {
+    "case_id": "E27-I01",
+    "mutant_id": "I-M2",
+    "property_id": "P_I4_TWO_HAND_REQUIRED",
+    "specification": "G (!(TwoHand_Left & TwoHand_Right) -> !Machine_Enable_After_Scan)",
+    "verification_status": "SATISFIED",
+    "steps": [],
+    "transitions": [],
+    "tool": "nuXmv",
+    "tool_version": "2.2.0",
+    "source_output_path": "E27-I01/G3_I-M2_guard_polarity.txt",
+    "source_encoding": "utf-16",
+    "source_sha256": "be441bd2a7a681174748ebd8eaf5099c41fdef9bd4c85ca9a74651361bfe7f0b",
+    "raw_source": "*** This is nuXmv 2.2.0 (compiled on Fri May 29 11:00:56 2026)\r\n*** Copyright (c) 2014-2026, Fondazione Bruno Kessler\r\n*** For more information on nuXmv see https://nuxmv.fbk.eu\r\n*** or email to <nuxmv@fbk.eu>.\r\n*** Please report bugs at Please report bugs to <nusmv-users@fbk.eu>\r\n*** (click on \"Login Anonymously\" to access)\r\n*** Alternatively write to <nuxmv@fbk.eu>.\r\n\r\n*** This version of nuXmv is linked to NuSMV 2.7.0.\r\n*** For more information on NuSMV see <http://nusmv.fbk.eu>\r\n*** or email to <nusmv-users@fbk.eu>.\r\n*** Copyright (C) 2010-2026, Fondazione Bruno Kessler\r\n\r\n*** This version of nuXmv is linked to the CUDD library version 2.4.1\r\n*** Copyright (c) 1995-2004, Regents of the University of Colorado\r\n\r\n*** This version of nuXmv is linked to the MiniSat SAT solver. \r\n*** See http://minisat.se/MiniSat.html\r\n*** Copyright (c) 2003-2006, Niklas Een, Niklas Sorensson\r\n*** Copyright (c) 2007-2010, Niklas Sorensson\r\n\r\n*** This version of nuXmv is linked to MathSAT\r\n*** Copyright (C) 2009-2019 by Fondazione Bruno Kessler\r\n*** Copyright (C) 2009-2019 by University of Trento and others\r\n*** See http://mathsat.fbk.eu\r\n\r\n-- specification  G (!Guard_Closed -> !Machine_Enable_After_Scan)  is false\r\n-- as demonstrated by the following execution sequence\r\nTrace Description: LTL Counterexample \r\nTrace Type: Counterexample \r\n  -> State: 1.1 <-\r\n    Guard_Closed = FALSE\r\n    E_Stop = FALSE\r\n    Reset_PB = FALSE\r\n    Fault_Input = FALSE\r\n    TwoHand_Left = FALSE\r\n    TwoHand_Right = FALSE\r\n    Fault_Latched = TRUE\r\n    Machine_Enable_After_Scan = FALSE\r\n    Safety_Permissive_After_Scan = FALSE\r\n    Fault_After_Scan = TRUE\r\n    Reset_Guard = FALSE\r\n    Trip_Cond = TRUE\r\n    Safety_Healthy = FALSE\r\n  -> State: 1.2 <-\r\n    E_Stop = TRUE\r\n    Reset_PB = TRUE\r\n    Safety_Permissive_After_Scan = TRUE\r\n    Fault_After_Scan = FALSE\r\n    Reset_Guard = TRUE\r\n    Trip_Cond = FALSE\r\n  -> State: 1.3 <-\r\n    Reset_PB = FALSE\r\n    TwoHand_Left = TRUE\r\n    TwoHand_Right = TRUE\r\n    Fault_Latched = FALSE\r\n    Machine_Enable_After_Scan = TRUE\r\n    Reset_Guard = FALSE\r\n  -- Loop starts here\r\n  -> State: 1.4 <-\r\n    Guard_Closed = TRUE\r\n    E_Stop = FALSE\r\n    TwoHand_Left = FALSE\r\n    TwoHand_Right = FALSE\r\n    Machine_Enable_After_Scan = FALSE\r\n    Safety_Permissive_After_Scan = FALSE\r\n    Fault_After_Scan = TRUE\r\n    Trip_Cond = TRUE\r\n  -> State: 1.5 <-\r\n    Guard_Closed = FALSE\r\n    E_Stop = TRUE\r\n    Reset_PB = TRUE\r\n    Fault_Latched = TRUE\r\n    Safety_Permissive_After_Scan = TRUE\r\n    Fault_After_Scan = FALSE\r\n    Reset_Guard = TRUE\r\n    Trip_Cond = FALSE\r\n  -> State: 1.6 <-\r\n    Guard_Closed = TRUE\r\n    E_Stop = FALSE\r\n    Reset_PB = FALSE\r\n    Fault_Latched = FALSE\r\n    Safety_Permissive_After_Scan = FALSE\r\n    Fault_After_Scan = TRUE\r\n    Reset_Guard = FALSE\r\n    Trip_Cond = TRUE\r\n-- specification  G (!E_Stop -> !Machine_Enable_After_Scan)  is true\r\n-- specification  G (Fault_Input -> !Machine_Enable_After_Scan)  is true\r\n-- specification  G (!(TwoHand_Left & TwoHand_Right) -> !Machine_Enable_After_Scan)  is true\r\n-- specification  G (((Fault_Latched & Safety_Healthy) & !Reset_PB) ->  X Fault_Latched)  is true\r\n"
+  },
+  {
+    "case_id": "E27-I01",
+    "mutant_id": "I-M2",
+    "property_id": "P_I5_RESET_REQUIRED",
+    "specification": "G (((Fault_Latched & Safety_Healthy) & !Reset_PB) ->  X Fault_Latched)",
+    "verification_status": "SATISFIED",
+    "steps": [],
+    "transitions": [],
+    "tool": "nuXmv",
+    "tool_version": "2.2.0",
+    "source_output_path": "E27-I01/G3_I-M2_guard_polarity.txt",
+    "source_encoding": "utf-16",
+    "source_sha256": "be441bd2a7a681174748ebd8eaf5099c41fdef9bd4c85ca9a74651361bfe7f0b",
+    "raw_source": "*** This is nuXmv 2.2.0 (compiled on Fri May 29 11:00:56 2026)\r\n*** Copyright (c) 2014-2026, Fondazione Bruno Kessler\r\n*** For more information on nuXmv see https://nuxmv.fbk.eu\r\n*** or email to <nuxmv@fbk.eu>.\r\n*** Please report bugs at Please report bugs to <nusmv-users@fbk.eu>\r\n*** (click on \"Login Anonymously\" to access)\r\n*** Alternatively write to <nuxmv@fbk.eu>.\r\n\r\n*** This version of nuXmv is linked to NuSMV 2.7.0.\r\n*** For more information on NuSMV see <http://nusmv.fbk.eu>\r\n*** or email to <nusmv-users@fbk.eu>.\r\n*** Copyright (C) 2010-2026, Fondazione Bruno Kessler\r\n\r\n*** This version of nuXmv is linked to the CUDD library version 2.4.1\r\n*** Copyright (c) 1995-2004, Regents of the University of Colorado\r\n\r\n*** This version of nuXmv is linked to the MiniSat SAT solver. \r\n*** See http://minisat.se/MiniSat.html\r\n*** Copyright (c) 2003-2006, Niklas Een, Niklas Sorensson\r\n*** Copyright (c) 2007-2010, Niklas Sorensson\r\n\r\n*** This version of nuXmv is linked to MathSAT\r\n*** Copyright (C) 2009-2019 by Fondazione Bruno Kessler\r\n*** Copyright (C) 2009-2019 by University of Trento and others\r\n*** See http://mathsat.fbk.eu\r\n\r\n-- specification  G (!Guard_Closed -> !Machine_Enable_After_Scan)  is false\r\n-- as demonstrated by the following execution sequence\r\nTrace Description: LTL Counterexample \r\nTrace Type: Counterexample \r\n  -> State: 1.1 <-\r\n    Guard_Closed = FALSE\r\n    E_Stop = FALSE\r\n    Reset_PB = FALSE\r\n    Fault_Input = FALSE\r\n    TwoHand_Left = FALSE\r\n    TwoHand_Right = FALSE\r\n    Fault_Latched = TRUE\r\n    Machine_Enable_After_Scan = FALSE\r\n    Safety_Permissive_After_Scan = FALSE\r\n    Fault_After_Scan = TRUE\r\n    Reset_Guard = FALSE\r\n    Trip_Cond = TRUE\r\n    Safety_Healthy = FALSE\r\n  -> State: 1.2 <-\r\n    E_Stop = TRUE\r\n    Reset_PB = TRUE\r\n    Safety_Permissive_After_Scan = TRUE\r\n    Fault_After_Scan = FALSE\r\n    Reset_Guard = TRUE\r\n    Trip_Cond = FALSE\r\n  -> State: 1.3 <-\r\n    Reset_PB = FALSE\r\n    TwoHand_Left = TRUE\r\n    TwoHand_Right = TRUE\r\n    Fault_Latched = FALSE\r\n    Machine_Enable_After_Scan = TRUE\r\n    Reset_Guard = FALSE\r\n  -- Loop starts here\r\n  -> State: 1.4 <-\r\n    Guard_Closed = TRUE\r\n    E_Stop = FALSE\r\n    TwoHand_Left = FALSE\r\n    TwoHand_Right = FALSE\r\n    Machine_Enable_After_Scan = FALSE\r\n    Safety_Permissive_After_Scan = FALSE\r\n    Fault_After_Scan = TRUE\r\n    Trip_Cond = TRUE\r\n  -> State: 1.5 <-\r\n    Guard_Closed = FALSE\r\n    E_Stop = TRUE\r\n    Reset_PB = TRUE\r\n    Fault_Latched = TRUE\r\n    Safety_Permissive_After_Scan = TRUE\r\n    Fault_After_Scan = FALSE\r\n    Reset_Guard = TRUE\r\n    Trip_Cond = FALSE\r\n  -> State: 1.6 <-\r\n    Guard_Closed = TRUE\r\n    E_Stop = FALSE\r\n    Reset_PB = FALSE\r\n    Fault_Latched = FALSE\r\n    Safety_Permissive_After_Scan = FALSE\r\n    Fault_After_Scan = TRUE\r\n    Reset_Guard = FALSE\r\n    Trip_Cond = TRUE\r\n-- specification  G (!E_Stop -> !Machine_Enable_After_Scan)  is true\r\n-- specification  G (Fault_Input -> !Machine_Enable_After_Scan)  is true\r\n-- specification  G (!(TwoHand_Left & TwoHand_Right) -> !Machine_Enable_After_Scan)  is true\r\n-- specification  G (((Fault_Latched & Safety_Healthy) & !Reset_PB) ->  X Fault_Latched)  is true\r\n"
+  }
+]
