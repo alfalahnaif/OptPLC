@@ -1,0 +1,32 @@
+case_id: E27-M01
+domain: motor_control
+
+inputs:
+  Start_PB:
+    type: BOOL
+    semantics: "TRUE = start request"
+  Stop_PB:
+    type: BOOL
+    semantics: "TRUE = healthy/not pressed; FALSE = stop pressed/open circuit"
+  Emergency_Stop:
+    type: BOOL
+    semantics: "TRUE = healthy; FALSE = emergency stop active/open circuit"
+  Reset_PB:
+    type: BOOL
+    semantics: "TRUE = reset request"
+  Overload:
+    type: BOOL
+    semantics: "TRUE = overload fault active"
+
+outputs:
+  Motor:
+    type: BOOL
+    semantics: "TRUE = motor contactor command ON"
+
+internal:
+  Run_Latched:
+    type: BOOL
+    initial: false
+  Fault_Latched:
+    type: BOOL
+    initial: false

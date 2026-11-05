@@ -1,0 +1,7 @@
+Case,Mutant,Fault,TargetProperty
+E27-I01,I-M1,Guard bypass,P-I1
+E27-I01,I-M2,Guard polarity inversion,P-I1
+E27-I01,I-M3,Reset bypass,P-I5
+E27-I01,I-M4,E-Stop bypass,P-I2
+E27-I01,I-M5,Two-hand control bypass,P-I4
+E27-I01,I-M6,Fault-memory removal,P-I5

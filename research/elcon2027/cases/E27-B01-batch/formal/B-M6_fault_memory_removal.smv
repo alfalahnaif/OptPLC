@@ -1,0 +1,116 @@
+MODULE main
+
+VAR
+  Start_PB       : boolean;
+  E_Stop         : boolean;
+  Abort          : boolean;
+  Reset_PB       : boolean;
+  High_Level     : boolean;
+  Low_Level      : boolean;
+  Mix_Timer_Done : boolean;
+
+  Step_State     : 0..4;
+  Fault_Latched  : boolean;
+
+DEFINE
+  Safety_Healthy := E_Stop & (!Abort);
+  Safety_OK_Impl := E_Stop & (!Abort);
+  Trip_Cond := (!E_Stop) | Abort;
+  Reset_Guard := Reset_PB & Safety_OK_Impl;
+
+  Fault_After_Scan := Trip_Cond;
+
+  Effective_Step :=
+    case
+      Trip_Cond : 0;
+      TRUE      : Step_State;
+    esac;
+
+  Start_Guard :=
+    Start_PB & Safety_OK_Impl & (!Fault_After_Scan);
+
+  Fill_Command :=
+    case
+      (Effective_Step = 0) & Start_Guard : TRUE;
+      Effective_Step = 1                 : TRUE;
+      (Effective_Step = 4) & Start_Guard : TRUE;
+      TRUE                               : FALSE;
+    esac;
+
+  Mixer_Command := (Effective_Step = 2);
+  Drain_Command := (Effective_Step = 3);
+
+  Complete_Command :=
+    (Effective_Step = 4) & (!Start_Guard);
+
+  Force_Off := Trip_Cond | Fault_After_Scan;
+
+  Fill_Valve_After_Scan :=
+    Fill_Command & (!Force_Off);
+
+  Mixer_Motor_After_Scan :=
+    Mixer_Command & (!Force_Off);
+
+  Drain_Valve_After_Scan :=
+    Drain_Command & (!Force_Off);
+
+  Batch_Complete_After_Scan :=
+    Complete_Command & (!Force_Off);
+
+  Step_After_Scan :=
+    case
+      Trip_Cond : 0;
+      (Effective_Step = 0) & Start_Guard : 1;
+      (Effective_Step = 1) & High_Level : 2;
+      (Effective_Step = 2) & Mix_Timer_Done : 3;
+      (Effective_Step = 3) & Low_Level : 4;
+      (Effective_Step = 4) & Start_Guard : 1;
+      TRUE : Effective_Step;
+    esac;
+
+ASSIGN
+  init(Start_PB)       := {FALSE, TRUE};
+  init(E_Stop)         := {FALSE, TRUE};
+  init(Abort)          := {FALSE, TRUE};
+  init(Reset_PB)       := {FALSE, TRUE};
+  init(High_Level)     := {FALSE, TRUE};
+  init(Low_Level)      := {FALSE, TRUE};
+  init(Mix_Timer_Done) := {FALSE, TRUE};
+
+  init(Step_State)    := 0;
+  init(Fault_Latched) := FALSE;
+
+  next(Start_PB)       := {FALSE, TRUE};
+  next(E_Stop)         := {FALSE, TRUE};
+  next(Abort)          := {FALSE, TRUE};
+  next(Reset_PB)       := {FALSE, TRUE};
+  next(High_Level)     := {FALSE, TRUE};
+  next(Low_Level)      := {FALSE, TRUE};
+  next(Mix_Timer_Done) := {FALSE, TRUE};
+
+  next(Step_State)    := Step_After_Scan;
+  next(Fault_Latched) := Fault_After_Scan;
+
+LTLSPEC NAME P_B1_ESTOP_OFF :=
+  G ((!E_Stop) ->
+     (!(Fill_Valve_After_Scan |
+        Mixer_Motor_After_Scan |
+        Drain_Valve_After_Scan)));
+
+LTLSPEC NAME P_B2_ABORT_OFF :=
+  G (Abort ->
+     (!(Fill_Valve_After_Scan |
+        Mixer_Motor_After_Scan |
+        Drain_Valve_After_Scan)));
+
+LTLSPEC NAME P_B3_FILL_DRAIN_MUTEX :=
+  G (!(Fill_Valve_After_Scan & Drain_Valve_After_Scan));
+
+LTLSPEC NAME P_B4_MIXER_STATE :=
+  G (Mixer_Motor_After_Scan -> (Step_State = 2));
+
+LTLSPEC NAME P_B5_RESET_REQUIRED :=
+  G ((Fault_Latched & Safety_Healthy & (!Reset_PB))
+     -> X Fault_Latched);
+
+

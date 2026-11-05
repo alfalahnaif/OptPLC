@@ -1,0 +1,45 @@
+case_id: E27-B01
+domain: Sequential Batch
+
+states:
+  0: IDLE
+  1: FILL
+  2: MIX
+  3: DRAIN
+  4: COMPLETE
+
+signals:
+  Start_PB:
+    true_means: batch start requested
+
+  E_Stop:
+    true_means: emergency-stop circuit healthy
+    false_means: emergency stop active
+
+  Abort:
+    true_means: abort requested
+
+  Reset_PB:
+    true_means: fault reset requested
+
+  High_Level:
+    true_means: filling target reached
+
+  Low_Level:
+    true_means: vessel drained
+
+  Mix_Timer_Done:
+    true_means: mixing duration completed
+
+  Fill_Valve:
+    role: output
+
+  Mixer_Motor:
+    role: output
+
+  Drain_Valve:
+    role: output
+
+  Batch_Complete:
+    role: output
+

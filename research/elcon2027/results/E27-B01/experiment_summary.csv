@@ -1,0 +1,7 @@
+"Case","Domain","Mutant","Fault","G1","G2","G2Rule","G3","Property"
+"E27-B01","Sequential Batch","B-M1","E-Stop bypass","PASS","DETECTED","BT-6","DETECTED","P-B1"
+"E27-B01","Sequential Batch","B-M2","Abort bypass","PASS","PASS","","DETECTED","P-B2"
+"E27-B01","Sequential Batch","B-M3","Reset bypass","PASS","DETECTED","BT-7","DETECTED","P-B5"
+"E27-B01","Sequential Batch","B-M4","Fill-drain conflict","PASS","DETECTED","BT-5","DETECTED","P-B3"
+"E27-B01","Sequential Batch","B-M5","Mixer-state bypass","PASS","PASS","","DETECTED","P-B4"
+"E27-B01","Sequential Batch","B-M6","Fault-memory removal","PASS","DETECTED","BT-7","DETECTED","P-B5"

@@ -1,0 +1,29 @@
+{
+  "study": "ElCon-EE 2027 mutation-based pilot",
+  "domains": 3,
+  "valid_mutants": 18,
+
+  "g1": {
+    "name": "MATIEC compilation",
+    "detected": 0,
+    "survived": 18,
+    "mdr_percent": 0.0,
+    "msr_percent": 100.0
+  },
+
+  "g2": {
+    "name": "Domain-aware static validation",
+    "detected": 4,
+    "survived": 14,
+    "mdr_percent": 22.22,
+    "msr_percent": 77.78
+  },
+
+  "g3": {
+    "name": "nuXmv symbolic LTL model checking",
+    "detected": 18,
+    "survived": 0,
+    "mdr_percent": 100.0,
+    "msr_percent": 0.0
+  }
+}

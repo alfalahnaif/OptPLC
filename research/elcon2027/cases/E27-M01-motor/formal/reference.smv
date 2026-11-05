@@ -1,0 +1,63 @@
+MODULE main
+
+VAR
+  Start_PB       : boolean;
+  Stop_PB        : boolean;
+  Emergency_Stop : boolean;
+  Reset_PB       : boolean;
+  Overload       : boolean;
+  Run_Latched    : boolean;
+  Fault_Latched  : boolean;
+
+DEFINE
+  Trip_Cond := (!Emergency_Stop) | Overload;
+  Reset_Guard := Reset_PB & Emergency_Stop & (!Overload) & Stop_PB;
+  Start_Guard := Start_PB & Emergency_Stop & (!Overload);
+  Safety_Healthy := Emergency_Stop & (!Overload) & Stop_PB;
+
+  Fault_After_Scan :=
+    case
+      Trip_Cond : TRUE;
+      Reset_Guard : FALSE;
+      TRUE : Fault_Latched;
+    esac;
+
+  Run_After_Scan :=
+    case
+      (!Stop_PB) | Fault_After_Scan : FALSE;
+      Start_Guard : TRUE;
+      TRUE : Run_Latched;
+    esac;
+
+  Motor_After_Scan := Run_After_Scan & (!Fault_After_Scan);
+
+ASSIGN
+  init(Start_PB) := {FALSE, TRUE};
+  init(Stop_PB) := {FALSE, TRUE};
+  init(Emergency_Stop) := {FALSE, TRUE};
+  init(Reset_PB) := {FALSE, TRUE};
+  init(Overload) := {FALSE, TRUE};
+  init(Run_Latched) := FALSE;
+  init(Fault_Latched) := FALSE;
+
+  next(Start_PB) := {FALSE, TRUE};
+  next(Stop_PB) := {FALSE, TRUE};
+  next(Emergency_Stop) := {FALSE, TRUE};
+  next(Reset_PB) := {FALSE, TRUE};
+  next(Overload) := {FALSE, TRUE};
+
+  next(Fault_Latched) := Fault_After_Scan;
+  next(Run_Latched) := Run_After_Scan;
+
+LTLSPEC NAME P_M1_ESTOP_OFF :=
+  G ((!Emergency_Stop) -> (!Motor_After_Scan));
+
+LTLSPEC NAME P_M2_OVERLOAD_OFF :=
+  G (Overload -> (!Motor_After_Scan));
+
+LTLSPEC NAME P_M3_STOP_OFF :=
+  G ((!Stop_PB) -> (!Motor_After_Scan));
+
+LTLSPEC NAME P_M4_RESET_REQUIRED :=
+  G ((Fault_Latched & Safety_Healthy & (!Reset_PB)) -> X Fault_Latched);
+

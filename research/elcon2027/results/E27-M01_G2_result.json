@@ -1,0 +1,212 @@
+{
+  "reference": {
+    "domain_detected": true,
+    "overall": "PASS",
+    "rules": [
+      {
+        "id": "MC-1",
+        "description": "E-Stop or overload must de-energize motor output",
+        "status": "passed",
+        "details": null
+      },
+      {
+        "id": "MC-2",
+        "description": "Motor start should check Stop, E-Stop, and fault conditions",
+        "status": "passed",
+        "details": null
+      },
+      {
+        "id": "MC-3",
+        "description": "Fault latch should prevent automatic motor restart",
+        "status": "passed",
+        "details": null
+      },
+      {
+        "id": "MC-4",
+        "description": "Thermal overload condition should be monitored when provided",
+        "status": "passed",
+        "details": null
+      }
+    ]
+  },
+  "M-M1": {
+    "domain_detected": true,
+    "overall": "PASS",
+    "rules": [
+      {
+        "id": "MC-1",
+        "description": "E-Stop or overload must de-energize motor output",
+        "status": "passed",
+        "details": null
+      },
+      {
+        "id": "MC-2",
+        "description": "Motor start should check Stop, E-Stop, and fault conditions",
+        "status": "passed",
+        "details": null
+      },
+      {
+        "id": "MC-3",
+        "description": "Fault latch should prevent automatic motor restart",
+        "status": "passed",
+        "details": null
+      },
+      {
+        "id": "MC-4",
+        "description": "Thermal overload condition should be monitored when provided",
+        "status": "passed",
+        "details": null
+      }
+    ]
+  },
+  "M-M2": {
+    "domain_detected": true,
+    "overall": "PASS",
+    "rules": [
+      {
+        "id": "MC-1",
+        "description": "E-Stop or overload must de-energize motor output",
+        "status": "passed",
+        "details": null
+      },
+      {
+        "id": "MC-2",
+        "description": "Motor start should check Stop, E-Stop, and fault conditions",
+        "status": "passed",
+        "details": null
+      },
+      {
+        "id": "MC-3",
+        "description": "Fault latch should prevent automatic motor restart",
+        "status": "passed",
+        "details": null
+      },
+      {
+        "id": "MC-4",
+        "description": "Thermal overload condition should be monitored when provided",
+        "status": "passed",
+        "details": null
+      }
+    ]
+  },
+  "M-M3": {
+    "domain_detected": true,
+    "overall": "PASS",
+    "rules": [
+      {
+        "id": "MC-1",
+        "description": "E-Stop or overload must de-energize motor output",
+        "status": "passed",
+        "details": null
+      },
+      {
+        "id": "MC-2",
+        "description": "Motor start should check Stop, E-Stop, and fault conditions",
+        "status": "passed",
+        "details": null
+      },
+      {
+        "id": "MC-3",
+        "description": "Fault latch should prevent automatic motor restart",
+        "status": "passed",
+        "details": null
+      },
+      {
+        "id": "MC-4",
+        "description": "Thermal overload condition should be monitored when provided",
+        "status": "passed",
+        "details": null
+      }
+    ]
+  },
+  "M-M4": {
+    "domain_detected": true,
+    "overall": "PASS",
+    "rules": [
+      {
+        "id": "MC-1",
+        "description": "E-Stop or overload must de-energize motor output",
+        "status": "passed",
+        "details": null
+      },
+      {
+        "id": "MC-2",
+        "description": "Motor start should check Stop, E-Stop, and fault conditions",
+        "status": "passed",
+        "details": null
+      },
+      {
+        "id": "MC-3",
+        "description": "Fault latch should prevent automatic motor restart",
+        "status": "passed",
+        "details": null
+      },
+      {
+        "id": "MC-4",
+        "description": "Thermal overload condition should be monitored when provided",
+        "status": "passed",
+        "details": null
+      }
+    ]
+  },
+  "M-M5": {
+    "domain_detected": true,
+    "overall": "PASS",
+    "rules": [
+      {
+        "id": "MC-1",
+        "description": "E-Stop or overload must de-energize motor output",
+        "status": "passed",
+        "details": null
+      },
+      {
+        "id": "MC-2",
+        "description": "Motor start should check Stop, E-Stop, and fault conditions",
+        "status": "passed",
+        "details": null
+      },
+      {
+        "id": "MC-3",
+        "description": "Fault latch should prevent automatic motor restart",
+        "status": "passed",
+        "details": null
+      },
+      {
+        "id": "MC-4",
+        "description": "Thermal overload condition should be monitored when provided",
+        "status": "passed",
+        "details": null
+      }
+    ]
+  },
+  "M-M6": {
+    "domain_detected": true,
+    "overall": "PASS",
+    "rules": [
+      {
+        "id": "MC-1",
+        "description": "E-Stop or overload must de-energize motor output",
+        "status": "passed",
+        "details": null
+      },
+      {
+        "id": "MC-2",
+        "description": "Motor start should check Stop, E-Stop, and fault conditions",
+        "status": "passed",
+        "details": null
+      },
+      {
+        "id": "MC-3",
+        "description": "Fault latch should prevent automatic motor restart",
+        "status": "passed",
+        "details": null
+      },
+      {
+        "id": "MC-4",
+        "description": "Thermal overload condition should be monitored when provided",
+        "status": "passed",
+        "details": null
+      }
+    ]
+  }
+}

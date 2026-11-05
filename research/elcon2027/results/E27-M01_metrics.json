@@ -1,0 +1,23 @@
+{
+  "case": "E27-M01",
+  "domain": "Motor Control",
+  "valid_mutants": 6,
+  "g1": {
+    "name": "MATIEC compilation",
+    "detected": 0,
+    "survived": 6,
+    "mdr_percent": 0.0
+  },
+  "g2": {
+    "name": "Static domain validation",
+    "detected": 0,
+    "survived": 6,
+    "mdr_percent": 0.0
+  },
+  "g3": {
+    "name": "nuXmv LTL model checking",
+    "detected": 6,
+    "survived": 0,
+    "mdr_percent": 100.0
+  }
+}

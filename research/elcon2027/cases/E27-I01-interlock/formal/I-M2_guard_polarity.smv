@@ -1,0 +1,76 @@
+MODULE main
+
+VAR
+  Guard_Closed   : boolean;
+  E_Stop         : boolean;
+  Reset_PB       : boolean;
+  Fault_Input    : boolean;
+  TwoHand_Left   : boolean;
+  TwoHand_Right  : boolean;
+  Fault_Latched  : boolean;
+
+DEFINE
+  Safety_Healthy := Guard_Closed & E_Stop & (!Fault_Input);
+
+  Trip_Cond := Guard_Closed | (!E_Stop) | Fault_Input;
+
+  Reset_Guard :=
+    Reset_PB &
+    (!Guard_Closed) &
+    E_Stop &
+    (!Fault_Input) &
+    (!TwoHand_Left) &
+    (!TwoHand_Right);
+
+  Fault_After_Scan :=
+    case
+      Trip_Cond  : TRUE;
+      Reset_Guard : FALSE;
+      TRUE : Fault_Latched;
+    esac;
+
+  Safety_Permissive_After_Scan :=
+    (!Guard_Closed) &
+    E_Stop &
+    (!Fault_Input) &
+    (!Fault_After_Scan);
+
+  Machine_Enable_After_Scan :=
+    Safety_Permissive_After_Scan &
+    TwoHand_Left &
+    TwoHand_Right;
+
+ASSIGN
+  init(Guard_Closed)  := {FALSE, TRUE};
+  init(E_Stop)        := {FALSE, TRUE};
+  init(Reset_PB)      := {FALSE, TRUE};
+  init(Fault_Input)   := {FALSE, TRUE};
+  init(TwoHand_Left)  := {FALSE, TRUE};
+  init(TwoHand_Right) := {FALSE, TRUE};
+
+  init(Fault_Latched) := TRUE;
+
+  next(Guard_Closed)  := {FALSE, TRUE};
+  next(E_Stop)        := {FALSE, TRUE};
+  next(Reset_PB)      := {FALSE, TRUE};
+  next(Fault_Input)   := {FALSE, TRUE};
+  next(TwoHand_Left)  := {FALSE, TRUE};
+  next(TwoHand_Right) := {FALSE, TRUE};
+
+  next(Fault_Latched) := Fault_After_Scan;
+
+LTLSPEC NAME P_I1_GUARD_OFF :=
+  G ((!Guard_Closed) -> (!Machine_Enable_After_Scan));
+
+LTLSPEC NAME P_I2_ESTOP_OFF :=
+  G ((!E_Stop) -> (!Machine_Enable_After_Scan));
+
+LTLSPEC NAME P_I3_FAULT_OFF :=
+  G (Fault_Input -> (!Machine_Enable_After_Scan));
+
+LTLSPEC NAME P_I4_TWO_HAND_REQUIRED :=
+  G ((!(TwoHand_Left & TwoHand_Right)) -> (!Machine_Enable_After_Scan));
+
+LTLSPEC NAME P_I5_RESET_REQUIRED :=
+  G ((Fault_Latched & Safety_Healthy & (!Reset_PB)) -> X Fault_Latched);
+

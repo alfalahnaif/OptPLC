@@ -64,3 +64,6 @@ tsconfig.tsbuildinfo
 backend/benchmark/results/*.json
 !backend/benchmark/results/README.md
 !backend/benchmark/results/.gitkeep
+# nuXmv distribution archive: academic licence forbids redistribution, 24 MB.
+# SHA256 recorded in research/elcon2027/REPRODUCE.md §4 so runs stay reproducible.
+research/tools/nuxmv/*.tar.xz

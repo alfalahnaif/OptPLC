@@ -1,0 +1,30 @@
+case_id: E27-M01
+
+properties:
+  - id: P-M1
+    name: emergency_stop_force_off
+    intent: "If Emergency_Stop is active, Motor must be OFF."
+    ltl_candidate: "G(!Emergency_Stop -> !Motor)"
+    priority: safety
+
+  - id: P-M2
+    name: overload_force_off
+    intent: "If Overload is active, Motor must be OFF."
+    ltl_candidate: "G(Overload -> !Motor)"
+    priority: safety
+
+  - id: P-M3
+    name: stop_dominance
+    intent: "If Stop_PB is pressed/open, Motor must be OFF regardless of Start_PB."
+    ltl_candidate: "G(!Stop_PB -> !Motor)"
+    priority: safety
+
+  - id: P-M4
+    name: no_automatic_restart_after_trip
+    intent: "After a safety trip, Motor must remain OFF while Fault_Latched is TRUE and until a valid Reset clears the latch."
+    ltl_candidate: "G(Fault_Latched -> !Motor)"
+    priority: safety
+
+notes:
+  - "The LTL strings are candidate properties for the later ST-to-SMV/nuXmv stage."
+  - "Engineer intent is authoritative for this pilot; the LTL encoding must be reviewed before formal experiments."

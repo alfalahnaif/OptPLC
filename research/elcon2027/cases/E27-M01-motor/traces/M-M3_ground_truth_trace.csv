@@ -1,0 +1,4 @@
+scan,Start_PB,Stop_PB,Emergency_Stop,Reset_PB,Overload,Reference_Motor,Mutant_M-M3_Motor,meaning
+1,1,1,1,0,0,1,1,normal running
+2,1,1,0,0,0,0,0,E-Stop active; both must stop
+3,1,1,1,0,0,0,1,E-Stop released; Reset not pressed; mutant restarts unsafely

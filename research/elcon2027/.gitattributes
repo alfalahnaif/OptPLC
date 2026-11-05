@@ -1,0 +1,13 @@
+# Pilot artifacts are byte-exact evidence: the SHA256 baselines in
+# results/*/baseline_hashes.csv were computed on the files as they were run
+# (CRLF). The repository default (* text=auto eol=lf) would rewrite them on
+# checkout and silently invalidate every recorded hash, so line-ending
+# conversion is disabled for the cases and the stored results.
+#
+# The nuXmv logs under results/ are UTF-16LE and must never be touched either.
+cases/**        -text
+results/**      -text
+
+# Documentation and the re-run script are ordinary text, normalized as usual.
+*.md            text eol=lf
+scripts/*.py    text eol=lf

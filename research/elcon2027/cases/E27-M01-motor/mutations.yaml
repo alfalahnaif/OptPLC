@@ -1,0 +1,33 @@
+case_id: E27-M01
+
+mutations:
+  - id: M-M1
+    type: emergency_stop_bypass
+    description: "Remove Emergency_Stop from the safety-trip logic."
+    expected_label: UNSAFE
+
+  - id: M-M2
+    type: emergency_stop_polarity_inversion
+    description: "Invert the normally-closed Emergency_Stop semantics."
+    expected_label: UNSAFE
+
+  - id: M-M3
+    type: reset_bypass
+    description: "Clear Fault_Latched automatically when the safety circuit becomes healthy, without requiring Reset_PB."
+    expected_label: UNSAFE
+    witness: "Start held TRUE; E-Stop trips; E-Stop is released; Reset remains FALSE; motor restarts."
+
+  - id: M-M4
+    type: start_over_stop_priority
+    description: "Give Start priority over Stop in the run-latch decision."
+    expected_label: UNSAFE
+
+  - id: M-M5
+    type: overload_bypass
+    description: "Remove Overload from the safety-trip logic."
+    expected_label: UNSAFE
+
+  - id: M-M6
+    type: fault_memory_removal
+    description: "Replace the latched safety fault with instantaneous fault state, allowing automatic restart after fault clearance."
+    expected_label: UNSAFE
