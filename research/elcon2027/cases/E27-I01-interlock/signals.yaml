@@ -1,0 +1,49 @@
+case_id: E27-I01
+domain: Safety Gate Interlock
+
+signals:
+  Guard_Closed:
+    type: BOOL
+    role: input
+    true_means: gate closed and safe
+    false_means: gate open and unsafe
+
+  E_Stop:
+    type: BOOL
+    role: input
+    true_means: emergency-stop circuit healthy
+    false_means: emergency stop active
+
+  Reset_PB:
+    type: BOOL
+    role: input
+    true_means: reset pressed
+
+  Fault_Input:
+    type: BOOL
+    role: input
+    true_means: external fault active
+    false_means: no external fault
+
+  TwoHand_Left:
+    type: BOOL
+    role: input
+    true_means: left hand control pressed
+
+  TwoHand_Right:
+    type: BOOL
+    role: input
+    true_means: right hand control pressed
+
+  Machine_Enable:
+    type: BOOL
+    role: output
+
+  Safety_Permissive:
+    type: BOOL
+    role: internal
+
+  Fault_Latched:
+    type: BOOL
+    role: internal
+

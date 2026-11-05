@@ -1,0 +1,7 @@
+"Case","Mutant","Fault","G1","G2","G3","Property"
+"E27-M01","M-M1","E-Stop bypass","PASS","PASS","DETECTED","P-M1"
+"E27-M01","M-M2","E-Stop polarity inversion","PASS","PASS","DETECTED","P-M1"
+"E27-M01","M-M3","Reset bypass","PASS","PASS","DETECTED","P-M4"
+"E27-M01","M-M4","Start-over-stop priority","PASS","PASS","DETECTED","P-M3"
+"E27-M01","M-M5","Overload bypass","PASS","PASS","DETECTED","P-M2"
+"E27-M01","M-M6","Fault-memory removal","PASS","PASS","DETECTED","P-M4"

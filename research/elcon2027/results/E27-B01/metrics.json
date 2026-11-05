@@ -1,0 +1,26 @@
+{
+  "case": "E27-B01",
+  "domain": "Sequential Batch",
+  "valid_mutants": 6,
+  "g1": {
+    "name": "MATIEC compilation",
+    "detected": 0,
+    "survived": 6,
+    "mdr_percent": 0.0,
+    "msr_percent": 100.0
+  },
+  "g2": {
+    "name": "Static domain validation",
+    "detected": 4,
+    "survived": 2,
+    "mdr_percent": 66.67,
+    "msr_percent": 33.33
+  },
+  "g3": {
+    "name": "nuXmv LTL model checking",
+    "detected": 6,
+    "survived": 0,
+    "mdr_percent": 100.0,
+    "msr_percent": 0.0
+  }
+}

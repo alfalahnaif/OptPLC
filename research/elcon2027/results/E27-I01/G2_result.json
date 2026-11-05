@@ -1,0 +1,170 @@
+{
+  "reference": {
+    "domain_detected": true,
+    "overall": "PASS",
+    "rules": [
+      {
+        "id": "SI-1",
+        "status": "passed",
+        "description": "Safety interlock should use multi-condition AND-chain permissive logic",
+        "details": null
+      },
+      {
+        "id": "SI-2",
+        "status": "passed",
+        "description": "Process outputs should be gated through permissive conditions",
+        "details": null
+      },
+      {
+        "id": "SI-3",
+        "status": "passed",
+        "description": "Emergency stop should override all other conditions when available",
+        "details": null
+      }
+    ]
+  },
+  "I-M1": {
+    "domain_detected": true,
+    "overall": "PASS",
+    "rules": [
+      {
+        "id": "SI-1",
+        "status": "passed",
+        "description": "Safety interlock should use multi-condition AND-chain permissive logic",
+        "details": null
+      },
+      {
+        "id": "SI-2",
+        "status": "passed",
+        "description": "Process outputs should be gated through permissive conditions",
+        "details": null
+      },
+      {
+        "id": "SI-3",
+        "status": "passed",
+        "description": "Emergency stop should override all other conditions when available",
+        "details": null
+      }
+    ]
+  },
+  "I-M2": {
+    "domain_detected": true,
+    "overall": "PASS",
+    "rules": [
+      {
+        "id": "SI-1",
+        "status": "passed",
+        "description": "Safety interlock should use multi-condition AND-chain permissive logic",
+        "details": null
+      },
+      {
+        "id": "SI-2",
+        "status": "passed",
+        "description": "Process outputs should be gated through permissive conditions",
+        "details": null
+      },
+      {
+        "id": "SI-3",
+        "status": "passed",
+        "description": "Emergency stop should override all other conditions when available",
+        "details": null
+      }
+    ]
+  },
+  "I-M3": {
+    "domain_detected": true,
+    "overall": "PASS",
+    "rules": [
+      {
+        "id": "SI-1",
+        "status": "passed",
+        "description": "Safety interlock should use multi-condition AND-chain permissive logic",
+        "details": null
+      },
+      {
+        "id": "SI-2",
+        "status": "passed",
+        "description": "Process outputs should be gated through permissive conditions",
+        "details": null
+      },
+      {
+        "id": "SI-3",
+        "status": "passed",
+        "description": "Emergency stop should override all other conditions when available",
+        "details": null
+      }
+    ]
+  },
+  "I-M4": {
+    "domain_detected": true,
+    "overall": "PASS",
+    "rules": [
+      {
+        "id": "SI-1",
+        "status": "passed",
+        "description": "Safety interlock should use multi-condition AND-chain permissive logic",
+        "details": null
+      },
+      {
+        "id": "SI-2",
+        "status": "passed",
+        "description": "Process outputs should be gated through permissive conditions",
+        "details": null
+      },
+      {
+        "id": "SI-3",
+        "status": "passed",
+        "description": "Emergency stop should override all other conditions when available",
+        "details": null
+      }
+    ]
+  },
+  "I-M5": {
+    "domain_detected": true,
+    "overall": "PASS",
+    "rules": [
+      {
+        "id": "SI-1",
+        "status": "passed",
+        "description": "Safety interlock should use multi-condition AND-chain permissive logic",
+        "details": null
+      },
+      {
+        "id": "SI-2",
+        "status": "passed",
+        "description": "Process outputs should be gated through permissive conditions",
+        "details": null
+      },
+      {
+        "id": "SI-3",
+        "status": "passed",
+        "description": "Emergency stop should override all other conditions when available",
+        "details": null
+      }
+    ]
+  },
+  "I-M6": {
+    "domain_detected": true,
+    "overall": "PASS",
+    "rules": [
+      {
+        "id": "SI-1",
+        "status": "passed",
+        "description": "Safety interlock should use multi-condition AND-chain permissive logic",
+        "details": null
+      },
+      {
+        "id": "SI-2",
+        "status": "passed",
+        "description": "Process outputs should be gated through permissive conditions",
+        "details": null
+      },
+      {
+        "id": "SI-3",
+        "status": "passed",
+        "description": "Emergency stop should override all other conditions when available",
+        "details": null
+      }
+    ]
+  }
+}

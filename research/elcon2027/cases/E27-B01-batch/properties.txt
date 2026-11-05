@@ -1,0 +1,19 @@
+E27-B01 Engineer-Approved Properties
+
+P-B1 Emergency-stop safety
+G(!E_Stop -> !(Fill_Valve | Mixer_Motor | Drain_Valve))
+
+P-B2 Abort safety
+G(Abort -> !(Fill_Valve | Mixer_Motor | Drain_Valve))
+
+P-B3 Fill/drain mutual exclusion
+G(!(Fill_Valve & Drain_Valve))
+
+P-B4 Mixer state restriction
+G(Mixer_Motor -> Step_State = 2)
+
+P-B5 Reset-dependent fault retention
+G((Fault_Latched & Safety_Healthy & !Reset_PB) -> X Fault_Latched)
+
+Safety_Healthy = E_Stop AND NOT Abort
+

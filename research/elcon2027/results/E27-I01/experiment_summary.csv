@@ -1,0 +1,7 @@
+"Case","Mutant","Fault","G1","G2","G3","Property"
+"E27-I01","I-M1","Guard bypass","PASS","PASS","DETECTED","P-I1"
+"E27-I01","I-M2","Guard polarity inversion","PASS","PASS","DETECTED","P-I1"
+"E27-I01","I-M3","Reset bypass","PASS","PASS","DETECTED","P-I5"
+"E27-I01","I-M4","E-Stop bypass","PASS","PASS","DETECTED","P-I2"
+"E27-I01","I-M5","Two-hand bypass","PASS","PASS","DETECTED","P-I4"
+"E27-I01","I-M6","Fault-memory removal","PASS","PASS","DETECTED","P-I5"

@@ -1,0 +1,7 @@
+Case,Mutant,Fault,TargetProperty
+E27-B01,B-M1,E-Stop bypass,P-B1
+E27-B01,B-M2,Abort bypass,P-B2
+E27-B01,B-M3,Reset bypass,P-B5
+E27-B01,B-M4,Fill-drain conflict,P-B3
+E27-B01,B-M5,Mixer state bypass,P-B4
+E27-B01,B-M6,Fault-memory removal,P-B5

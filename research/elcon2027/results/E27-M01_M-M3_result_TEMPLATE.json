@@ -1,0 +1,26 @@
+{
+  "case_id": "E27-M01",
+  "mutant_id": "M-M3",
+  "mutation_type": "reset_bypass",
+  "expected_label": "UNSAFE",
+  "ground_truth": {
+    "violation": "automatic_restart_without_reset",
+    "witness_file": "../cases/E27-M01-motor/traces/M-M3_ground_truth_trace.csv"
+  },
+  "gates": {
+    "matiec": {
+      "reference_status": "NOT_RUN",
+      "mutant_status": "NOT_RUN",
+      "exit_code": null,
+      "version": null
+    },
+    "static_validator": {
+      "reference_status": "NOT_RUN",
+      "mutant_status": "NOT_RUN",
+      "rule_ids": []
+    },
+    "nuxmv": {
+      "status": "NOT_IMPLEMENTED"
+    }
+  }
+}

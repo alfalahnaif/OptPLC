@@ -1,0 +1,20 @@
+E27-I01 Engineer-Approved Safety Properties
+
+P-I1 Guard safety
+G(!Guard_Closed -> !Machine_Enable)
+
+P-I2 Emergency-stop safety
+G(!E_Stop -> !Machine_Enable)
+
+P-I3 External fault safety
+G(Fault_Input -> !Machine_Enable)
+
+P-I4 Two-hand requirement
+G(!(TwoHand_Left & TwoHand_Right) -> !Machine_Enable)
+
+P-I5 Reset-dependent fault retention
+G((Fault_Latched & Safety_Healthy & !Reset_PB) -> X Fault_Latched)
+
+Safety_Healthy =
+Guard_Closed AND E_Stop AND NOT Fault_Input
+

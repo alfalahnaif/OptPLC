@@ -1,0 +1,4 @@
+"Case","Domain","Mutants","G1Detected","G2Detected","G3Detected","G1MDR","G2MDR","G3MDR"
+"E27-M01","Motor Control","6","0","0","6","0","0","100"
+"E27-I01","Safety Interlock","6","0","0","6","0","0","100"
+"E27-B01","Sequential Batch","6","0","4","6","0","66.67","100"
