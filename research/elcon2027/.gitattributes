@@ -11,3 +11,7 @@ results/**      -text
 # Documentation and the re-run script are ordinary text, normalized as usual.
 *.md            text eol=lf
 scripts/*.py    text eol=lf
+
+# The canonical witness inventory and derived JSON have fixed UTF-8 bytes.
+witness_manifest.json -text
+witnesses/**    -text

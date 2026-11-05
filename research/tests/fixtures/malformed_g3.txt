@@ -1,0 +1,6 @@
+*** This is nuXmv 2.2.0
+-- specification G (!E_Stop -> !Machine_Enable_After_Scan) is false
+Trace Type: Counterexample
+  -> State: 1.1 <-
+    E_Stop = TRUE
+    broken assignment

@@ -1,0 +1,88 @@
+{
+  "E27-M01": {
+    "property_ids": {
+      "G (!Emergency_Stop -> !Motor_After_Scan)": "P_M1_ESTOP_OFF",
+      "G (Overload -> !Motor_After_Scan)": "P_M2_OVERLOAD_OFF",
+      "G (!Stop_PB -> !Motor_After_Scan)": "P_M3_STOP_OFF",
+      "G (((Fault_Latched & Safety_Healthy) & !Reset_PB) ->  X Fault_Latched)": "P_M4_RESET_REQUIRED"
+    },
+    "variable_roles": {
+      "Start_PB": "input",
+      "Stop_PB": "input",
+      "Emergency_Stop": "input",
+      "Reset_PB": "input",
+      "Overload": "input",
+      "Motor_After_Scan": "output",
+      "Run_Latched": "state",
+      "Fault_Latched": "state",
+      "Run_After_Scan": "state",
+      "Fault_After_Scan": "state",
+      "Safety_Healthy": "state",
+      "Start_Guard": "state",
+      "Reset_Guard": "state",
+      "Trip": "state",
+      "Trip_Cond": "state"
+    }
+  },
+  "E27-I01": {
+    "property_ids": {
+      "G (!Guard_Closed -> !Machine_Enable_After_Scan)": "P_I1_GUARD_OFF",
+      "G (!E_Stop -> !Machine_Enable_After_Scan)": "P_I2_ESTOP_OFF",
+      "G (Fault_Input -> !Machine_Enable_After_Scan)": "P_I3_FAULT_OFF",
+      "G (!(TwoHand_Left & TwoHand_Right) -> !Machine_Enable_After_Scan)": "P_I4_TWO_HAND_REQUIRED",
+      "G (((Fault_Latched & Safety_Healthy) & !Reset_PB) ->  X Fault_Latched)": "P_I5_RESET_REQUIRED"
+    },
+    "variable_roles": {
+      "Guard_Closed": "input",
+      "E_Stop": "input",
+      "Reset_PB": "input",
+      "Fault_Input": "input",
+      "TwoHand_Left": "input",
+      "TwoHand_Right": "input",
+      "Machine_Enable_After_Scan": "output",
+      "Fault_Latched": "state",
+      "Safety_Permissive_After_Scan": "state",
+      "Fault_After_Scan": "state",
+      "Reset_Guard": "state",
+      "Trip_Cond": "state",
+      "Safety_Healthy": "state"
+    }
+  },
+  "E27-B01": {
+    "property_ids": {
+      "G (!E_Stop -> !((Fill_Valve_After_Scan | Mixer_Motor_After_Scan) | Drain_Valve_After_Scan))": "P_B1_ESTOP_OFF",
+      "G (Abort -> !((Fill_Valve_After_Scan | Mixer_Motor_After_Scan) | Drain_Valve_After_Scan))": "P_B2_ABORT_OFF",
+      "G !(Fill_Valve_After_Scan & Drain_Valve_After_Scan)": "P_B3_FILL_DRAIN_MUTEX",
+      "G (Mixer_Motor_After_Scan -> Step_State = 2)": "P_B4_MIXER_STATE",
+      "G (((Fault_Latched & Safety_Healthy) & !Reset_PB) ->  X Fault_Latched)": "P_B5_RESET_REQUIRED"
+    },
+    "variable_roles": {
+      "Start_PB": "input",
+      "E_Stop": "input",
+      "Abort": "input",
+      "Reset_PB": "input",
+      "High_Level": "input",
+      "Low_Level": "input",
+      "Mix_Timer_Done": "input",
+      "Fill_Valve_After_Scan": "output",
+      "Mixer_Motor_After_Scan": "output",
+      "Drain_Valve_After_Scan": "output",
+      "Batch_Complete_After_Scan": "output",
+      "Step_State": "state",
+      "Fault_Latched": "state",
+      "Step_After_Scan": "state",
+      "Force_Off": "state",
+      "Complete_Command": "state",
+      "Drain_Command": "state",
+      "Mixer_Command": "state",
+      "Fill_Command": "state",
+      "Start_Guard": "state",
+      "Effective_Step": "state",
+      "Fault_After_Scan": "state",
+      "Reset_Guard": "state",
+      "Trip_Cond": "state",
+      "Safety_OK_Impl": "state",
+      "Safety_Healthy": "state"
+    }
+  }
+}
